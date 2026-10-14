@@ -1,0 +1,8 @@
+{
+  "command": "npm run test:e2e",
+  "cwd": "C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite\\backend",
+  "startedAt": "2026-10-14T16:35:17.930Z",
+  "finishedAt": "2026-10-14T16:35:27.074Z",
+  "exitCode": 0,
+  "signal": null
+}

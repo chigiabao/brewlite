@@ -1,0 +1,60 @@
+Command: npm ci
+Working directory: C:\Users\Gtvkun\Documents\GitHub\brewlite\backend
+Started (UTC): 2026-10-14T16:23:27.003Z
+
+npm warn cleanup Failed to remove some directories [
+npm warn cleanup   [
+npm warn cleanup     '\\\\?\\C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite\\backend\\node_modules\\fast-check',
+npm warn cleanup     [Error: EPERM: operation not permitted, rmdir 'C:\Users\Gtvkun\Documents\GitHub\brewlite\backend\node_modules\fast-check\lib\types\random\generator'] {
+npm warn cleanup       errno: -4048,
+npm warn cleanup       code: 'EPERM',
+npm warn cleanup       syscall: 'rmdir',
+npm warn cleanup       path: 'C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite\\backend\\node_modules\\fast-check\\lib\\types\\random\\generator'
+npm warn cleanup     }
+npm warn cleanup   ],
+npm warn cleanup   [
+npm warn cleanup     '\\\\?\\C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite\\backend\\node_modules\\@visx\\vendor',
+npm warn cleanup     [Error: EPERM: operation not permitted, rmdir 'C:\Users\Gtvkun\Documents\GitHub\brewlite\backend\node_modules\@visx\vendor\vendor-cjs\d3-shape\src\curve'] {
+npm warn cleanup       errno: -4048,
+npm warn cleanup       code: 'EPERM',
+npm warn cleanup       syscall: 'rmdir',
+npm warn cleanup       path: 'C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite\\backend\\node_modules\\@visx\\vendor\\vendor-cjs\\d3-shape\\src\\curve'
+npm warn cleanup     }
+npm warn cleanup   ],
+npm warn cleanup   [
+npm warn cleanup     '\\\\?\\C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite\\backend\\node_modules',
+npm warn cleanup     [Error: EPERM: operation not permitted, rmdir 'C:\Users\Gtvkun\Documents\GitHub\brewlite\backend\node_modules\c12\node_modules\dotenv'] {
+npm warn cleanup       errno: -4048,
+npm warn cleanup       code: 'EPERM',
+npm warn cleanup       syscall: 'rmdir',
+npm warn cleanup       path: 'C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite\\backend\\node_modules\\c12\\node_modules\\dotenv'
+npm warn cleanup     }
+npm warn cleanup   ],
+npm warn cleanup   [
+npm warn cleanup     '\\\\?\\C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite\\backend\\node_modules\\mysql2',
+npm warn cleanup     [Error: EPERM: operation not permitted, rmdir 'C:\Users\Gtvkun\Documents\GitHub\brewlite\backend\node_modules\mysql2\typings\mysql\lib'] {
+npm warn cleanup       errno: -4048,
+npm warn cleanup       code: 'EPERM',
+npm warn cleanup       syscall: 'rmdir',
+npm warn cleanup       path: 'C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite\\backend\\node_modules\\mysql2\\typings\\mysql\\lib'
+npm warn cleanup     }
+npm warn cleanup   ],
+npm warn cleanup   [
+npm warn cleanup     '\\\\?\\C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite\\backend\\node_modules\\@nestjs\\schematics',
+npm warn cleanup     [Error: EPERM: operation not permitted, rmdir 'C:\Users\Gtvkun\Documents\GitHub\brewlite\backend\node_modules\@nestjs\schematics\dist\lib'] {
+npm warn cleanup       errno: -4048,
+npm warn cleanup       code: 'EPERM',
+npm warn cleanup       syscall: 'rmdir',
+npm warn cleanup       path: 'C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite\\backend\\node_modules\\@nestjs\\schematics\\dist\\lib'
+npm warn cleanup     }
+npm warn cleanup   ]
+npm warn cleanup ]
+npm error code ECONNRESET
+npm error network aborted
+npm error network This is a problem related to network connectivity.
+npm error network In most cases you are behind a proxy or have bad network settings.
+npm error network
+npm error network If you are behind a proxy, please make sure that the 'proxy' config is set properly.  See: 'npm help config'
+npm error A complete log of this run can be found in: C:\Users\Gtvkun\AppData\Local\npm-cache\_logs\2026-10-14T16_23_27_602Z-debug-0.log
+
+Exit code: 1; signal: none

@@ -1,0 +1,43 @@
+Command: npm run build
+Working directory: C:\Users\Gtvkun\Documents\GitHub\brewlite\frontend
+Started (UTC): 2026-10-14T16:32:08.256Z
+
+
+> frontend@0.1.0 build
+> next build
+
+▲ Next.js 16.4.0 (Turbopack)
+✓ Running next.config.ts took 192ms
+- Cache Components enabled
+- Partial Prefetching enabled
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 19.4s
+  Running TypeScript ...
+  Finished TypeScript in 10.1s ...
+  Collecting page data using 7 workers ...
+  Generating static pages using 7 workers (0/10) ...
+  Generating static pages using 7 workers (2/10) 
+  Generating static pages using 7 workers (4/10) 
+  Generating static pages using 7 workers (7/10) 
+✓ Generating static pages using 7 workers (10/10) in 2.5s
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /cart
+├ ○ /checkout
+├ ○ /login
+├ ○ /orders
+├   /orders/[id]/confirmed
+│ └ ◐ /orders/[id]/confirmed
+└   /products/[id]
+  └ ◐ /products/[id]
+
+
+○  (Static)             prerendered as static content
+◐  (Partial Prerender)  prerendered as static HTML with dynamic server-streamed content
+
+
+Exit code: 0; signal: none

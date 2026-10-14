@@ -1,0 +1,10 @@
+Command: docker compose exec -T db psql -U brew -d brewlite -c SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename;
+Working directory: C:\Users\Gtvkun\Documents\GitHub\brewlite
+Started (UTC): 2026-10-14T16:30:40.619Z
+
+ tablename 
+-----------
+(0 rows)
+
+
+Exit code: 0; signal: none

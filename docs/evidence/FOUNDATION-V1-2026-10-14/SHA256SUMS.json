@@ -1,0 +1,186 @@
+﻿[
+    {
+        "file":  "00-environment.json",
+        "sha256":  "76f3d4714c5b6945edce2abe04783d89f481eadc4afc1a070088822cc207bb73"
+    },
+    {
+        "file":  "00-source-hashes.json",
+        "sha256":  "7ff2658b0587f10e56788926332dbcb03adc1aa12e925975340b3fae3a90ef36"
+    },
+    {
+        "file":  "01-docker-compose-up.exit.txt",
+        "sha256":  "07846b783c23904a75834c1932bc2fad41e388e18bc32ffd73ed87bfa3844d87"
+    },
+    {
+        "file":  "01-docker-compose-up.json",
+        "sha256":  "26aa2359e9fec3d5451cd2d6557b3e39e97274521093b6944e57251220581b60"
+    },
+    {
+        "file":  "01-docker-compose-up.log",
+        "sha256":  "4a32c8a7eca4c45c94db5e8989c029cc207566b2eccb2aadee6c52e0e5f1243f"
+    },
+    {
+        "file":  "02-foundation-guard.json",
+        "sha256":  "48754fe301316f43e66d67493fa8af00e9afa082a7be545acda8ba6769068125"
+    },
+    {
+        "file":  "02-foundation-guard.log",
+        "sha256":  "1c729432c77ef9ff936fefca5510ec994bdf3c45618401c12e66628d18641e80"
+    },
+    {
+        "file":  "03-backend-npm-ci.json",
+        "sha256":  "9454c696ce73417131a64f22765e810fb0744fd3d8748bdb6f869b063ebabc6f"
+    },
+    {
+        "file":  "03-backend-npm-ci.log",
+        "sha256":  "f786029ada87b4715b0c7cfb55fec5608c594ab02175b73010995c5178920cdb"
+    },
+    {
+        "file":  "03b-backend-npm-ci-retry.json",
+        "sha256":  "67b306549b8c8b8503f6d3e40fa4f18f197216d040ac04f9eadf2e641e469463"
+    },
+    {
+        "file":  "03b-backend-npm-ci-retry.log",
+        "sha256":  "50758b4d7992cd4e2e6bcd8a193e306cc443ab7e553e8a9a0afe34b12161ca9b"
+    },
+    {
+        "file":  "04-backend-prisma-validate.json",
+        "sha256":  "45cc3675ec249a1f04678948d7071c5b321df01124d5a5cd9ef8ac640d93f07b"
+    },
+    {
+        "file":  "04-backend-prisma-validate.log",
+        "sha256":  "5005853c7536bc0ee108b4b4f458e9fb771518ce2b34d715148ef2389a25f39d"
+    },
+    {
+        "file":  "05-backend-migrate-deploy.json",
+        "sha256":  "b194b9629d7b60a28e2cdb79fc87ef6e3e298c51f07456b9ee57d862ebff7836"
+    },
+    {
+        "file":  "05-backend-migrate-deploy.log",
+        "sha256":  "e4509033dccffe846817e41926071b62f307813a8c4ca32527a280d509caafb6"
+    },
+    {
+        "file":  "06-backend-prisma-generate.json",
+        "sha256":  "6d49c000b043af550ec8710c6c62ff28b56b91750bb78734603227cfb37e9af5"
+    },
+    {
+        "file":  "06-backend-prisma-generate.log",
+        "sha256":  "c2fcd10f47bb74cdfc3709bae6592d5aba8240ba7459c5f3f0eb3d92a7218709"
+    },
+    {
+        "file":  "07-backend-build.json",
+        "sha256":  "ee47b6ecce476d5a7ada38af30e00838167456c01c9c9ed70df0576b30863702"
+    },
+    {
+        "file":  "07-backend-build.log",
+        "sha256":  "fe8ab3f3d094c65f9061fb88991452ca7086798d31b04245a4e26d3ce041007d"
+    },
+    {
+        "file":  "08-backend-unit-tests.json",
+        "sha256":  "ef8e00902933d069adbf95a4d79224e3a927241cf00a3341bb18c2dc4463eb01"
+    },
+    {
+        "file":  "08-backend-unit-tests.log",
+        "sha256":  "79e792a515e056b6777b9c630aeb50ac65da130b6b27477de04e22f135d62612"
+    },
+    {
+        "file":  "09-backend-e2e-tests.json",
+        "sha256":  "ed4e8cd6b592056bf53c3d8f22ec149b276abe5ee693449c1a7a3f6ed515c2d6"
+    },
+    {
+        "file":  "09-backend-e2e-tests.log",
+        "sha256":  "268273e4fce03e3db0a37a34a492c67bd03a5e825a2accb89b661947fee305b7"
+    },
+    {
+        "file":  "10-backend-migration-status.json",
+        "sha256":  "d785f43f28034e89a72355a936f916d504760df7982fe8379d10cd7b952415e7"
+    },
+    {
+        "file":  "10-backend-migration-status.log",
+        "sha256":  "deb83745932778bd1137a8abc0fbac10419e43987e5699cf5c5da5df5bd17bdf"
+    },
+    {
+        "file":  "20-frontend-npm-ci.json",
+        "sha256":  "6ffcee6146003c22ed4765dc2c757be5d0bcbf5c31ad00f7f4e444c0e9354ef2"
+    },
+    {
+        "file":  "20-frontend-npm-ci.log",
+        "sha256":  "a9c7c6e586e8d94f38719e2c6d988efc05dbc45bfa90f0c14227feb548b96a44"
+    },
+    {
+        "file":  "21-frontend-lint.json",
+        "sha256":  "c3bc93bb93fcbba98a88e20407293c0ec88ae562f2b64538d5a5f5ace08860f1"
+    },
+    {
+        "file":  "21-frontend-lint.log",
+        "sha256":  "7934e953a99c4a42aa45e5a79c53e4a3920b5db68e66b7a3ade3600fa055f27b"
+    },
+    {
+        "file":  "22-frontend-build.json",
+        "sha256":  "921b90dd586ba041c1ce48b0c4d03aefc8cc4df0a852a150e010816507588b68"
+    },
+    {
+        "file":  "22-frontend-build.log",
+        "sha256":  "edbee53be1ab2378b6fa58b664f5166e18220b10aa39770ffa02f7b9e508462f"
+    },
+    {
+        "file":  "30-database-up.json",
+        "sha256":  "750f0d0268a6f6b490a22f6318b8648bc69c35b8eb6f0957d6261c852714ee10"
+    },
+    {
+        "file":  "30-database-up.log",
+        "sha256":  "923bdcbd7682eef2af19034fe7c4cbd02c6248bd8776d6ca9d1f65ac27abcafc"
+    },
+    {
+        "file":  "31-db-before-migration.json",
+        "sha256":  "23f9149250d881f8245ac0a57f75bdf2f220117fa8be9b557c22a71dda273f0a"
+    },
+    {
+        "file":  "31-db-before-migration.log",
+        "sha256":  "1f3b4a6d845f4341cc09cd6401d970f0f622643672a4ba91586d062c6dfca06c"
+    },
+    {
+        "file":  "32-compose-status.json",
+        "sha256":  "35d089facf55004171956dfeef80cbb65287aa1eefe2e8279f2dea7d48d30080"
+    },
+    {
+        "file":  "32-compose-status.log",
+        "sha256":  "2d31849a7e79c30ae7e9a09ffeac479fe31a4c5d0ae967f9b3273ac14669f347"
+    },
+    {
+        "file":  "33-db-volume.json",
+        "sha256":  "a6ea081051c5e3ffea8e8cf552eefd530041ec8b03ce0cb448e0718f0338cc8b"
+    },
+    {
+        "file":  "33-db-volume.log",
+        "sha256":  "bb6b7d91accee8c7da4d3b948ca27f9fa904b342ec5b60193a809fabeed74049"
+    },
+    {
+        "file":  "34-db-after-migration.json",
+        "sha256":  "9f0c93bce07397a7b3c1da397981ffa5ffa16d69585b6034a97367c6d2d514b3"
+    },
+    {
+        "file":  "34-db-after-migration.log",
+        "sha256":  "0d30dccf0d25ccadb618cf6bb0700d92adf9061115ea504c6cc9673d48d41cc6"
+    },
+    {
+        "file":  "35-compose-final-status.json",
+        "sha256":  "fa2bc1c241950816d7e764431feea58129fe019e37290771888c0ed33a4fcb79"
+    },
+    {
+        "file":  "35-compose-final-status.log",
+        "sha256":  "8967e0fdcdac9eb1a16e459bb6034355e1c24daba667758d2fddb2d1b55f8b52"
+    },
+    {
+        "file":  "README.md",
+        "sha256":  "19bc0e13cbde759a279efe6bb9ec135626cb168a89b679e4ab48fe04163ed466"
+    },
+    {
+        "file":  "run-command.mjs",
+        "sha256":  "2cbe09031002becf549c44ef92edfa8fcfee846b378f55adabc048d3ffab6d35"
+    },
+    {
+        "file":  "summary.json",
+        "sha256":  "368712b2cd407559f5da7e8fa859ec159f4deafc211436f50348682d148cb5d5"
+    }
+]

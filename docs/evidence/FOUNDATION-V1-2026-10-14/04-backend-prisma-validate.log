@@ -1,0 +1,10 @@
+Command: npx prisma validate
+Working directory: C:\Users\Gtvkun\Documents\GitHub\brewlite\backend
+Started (UTC): 2026-10-14T16:34:46.912Z
+
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma\schema.prisma.
+The schema at prisma\schema.prisma is valid 🚀
+
+Exit code: 0; signal: none

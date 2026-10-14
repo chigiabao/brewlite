@@ -1,0 +1,7 @@
+Command: docker compose ps --format json
+Working directory: C:\Users\Gtvkun\Documents\GitHub\brewlite
+Started (UTC): 2026-10-14T16:36:32.752Z
+
+{"Command":"\"docker-entrypoint.s…\"","CreatedAt":"2026-10-14 23:29:33 +0700 +07","Engine":"","ExitCode":0,"Health":"healthy","ID":"5eb99487572a","Image":"postgres:16","Labels":"com.docker.compose.config-hash=51bd66434390cf416b5ddf152ddb72cb686d9506ecff0822e23fc8660b78be17,com.docker.compose.depends_on=,com.docker.compose.oneoff=False,com.docker.compose.project=brewlite,com.docker.compose.project.working_dir=C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite,desktop.docker.io/ports/5432/tcp=:5432,com.docker.compose.container-number=1,com.docker.compose.image=sha256:75adc2a65806c96bc0e59030230bfe3f1c1b0d6d8f8181a8913e2b8b53bdc166,com.docker.compose.project.config_files=C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite\\docker-compose.yml,com.docker.compose.service=db,com.docker.compose.version=5.5.1,desktop.docker.io/ports.scheme=v2","LocalVolumes":"1","Mounts":"brewlite_dbdata","Name":"brewlite-db-1","Names":"brewlite-db-1","Networks":"brewlite_default","Ports":"0.0.0.0:5432-\u003e5432/tcp, [::]:5432-\u003e5432/tcp","Project":"brewlite","Publishers":[{"URL":"0.0.0.0","TargetPort":5432,"PublishedPort":5432,"Protocol":"tcp"},{"URL":"::","TargetPort":5432,"PublishedPort":5432,"Protocol":"tcp"}],"RunningFor":"7 minutes ago","Service":"db","Size":"0B","State":"running","Status":"Up 7 minutes (healthy)"}
+
+Exit code: 0; signal: none

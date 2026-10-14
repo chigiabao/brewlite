@@ -1,0 +1,8 @@
+{
+  "command": "npx prisma migrate deploy",
+  "cwd": "C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite\\backend",
+  "startedAt": "2026-10-14T16:34:51.765Z",
+  "finishedAt": "2026-10-14T16:34:57.714Z",
+  "exitCode": 0,
+  "signal": null
+}

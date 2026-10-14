@@ -1,0 +1,32 @@
+Command: npx prisma migrate deploy
+Working directory: C:\Users\Gtvkun\Documents\GitHub\brewlite\backend
+Started (UTC): 2026-10-14T16:34:51.765Z
+
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma\schema.prisma.
+Datasource "db": PostgreSQL database "brewlite", schema "public" at "127.0.0.1:5432"
+
+1 migration found in prisma/migrations
+
+Applying migration `20261014000100_foundation_v1`
+
+┌─────────────────────────────────────────────────────────┐
+│  Update available 7.10.0 -> 8.0.0-rc.22                 │
+│                                                         │
+│  This is a major update - please follow the guide at    │
+│  https://pris.ly/d/major-version-upgrade                │
+│                                                         │
+│  Run the following to update                            │
+│    npm i --save-dev prisma@latest                       │
+│    npm i @prisma/client@latest                          │
+└─────────────────────────────────────────────────────────┘
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20261014000100_foundation_v1/
+    └─ migration.sql
+
+All migrations have been successfully applied.
+
+Exit code: 0; signal: none

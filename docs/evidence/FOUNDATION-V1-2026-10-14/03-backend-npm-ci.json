@@ -1,0 +1,8 @@
+{
+  "command": "npm ci",
+  "cwd": "C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite\\backend",
+  "startedAt": "2026-10-14T16:23:27.003Z",
+  "finishedAt": "2026-10-14T16:30:27.151Z",
+  "exitCode": 1,
+  "signal": null
+}

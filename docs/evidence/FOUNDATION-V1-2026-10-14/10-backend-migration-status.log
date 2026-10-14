@@ -1,0 +1,14 @@
+Command: npx prisma migrate status
+Working directory: C:\Users\Gtvkun\Documents\GitHub\brewlite\backend
+Started (UTC): 2026-10-14T16:35:27.324Z
+
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma\schema.prisma.
+Datasource "db": PostgreSQL database "brewlite", schema "public" at "127.0.0.1:5432"
+
+1 migration found in prisma/migrations
+
+Database schema is up to date!
+
+Exit code: 0; signal: none

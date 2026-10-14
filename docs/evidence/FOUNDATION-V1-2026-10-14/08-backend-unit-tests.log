@@ -1,0 +1,19 @@
+Command: npm test
+Working directory: C:\Users\Gtvkun\Documents\GitHub\brewlite\backend
+Started (UTC): 2026-10-14T16:35:12.118Z
+
+
+> backend@0.0.1 test
+> vitest run
+
+
+ RUN  v4.1.11 C:/Users/Gtvkun/Documents/GitHub/brewlite/backend
+
+
+ Test Files  1 passed | 2 skipped (3)
+      Tests  1 passed | 5 todo (6)
+   Start at  23:35:13
+   Duration  3.98s (transform 141ms, setup 0ms, import 2.29s, tests 1.09s, environment 1ms)
+
+
+Exit code: 0; signal: none

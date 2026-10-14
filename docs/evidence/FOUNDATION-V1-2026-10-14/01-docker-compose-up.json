@@ -1,0 +1,9 @@
+﻿{
+    "command":  "docker compose up --build",
+    "cwd":  "C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite",
+    "startedAt":  "2026-10-14T16:21:30.6760056Z",
+    "finishedAt":  "2026-10-14T16:28:15.6111792Z",
+    "timestampSource":  "Captured log file creation and last-write timestamps",
+    "exitCode":  1,
+    "signal":  null
+}

@@ -1,0 +1,7 @@
+Command: node scripts/verify-foundation.mjs
+Working directory: C:\Users\Gtvkun\Documents\GitHub\brewlite
+Started (UTC): 2026-10-14T16:22:50.434Z
+
+PASS FOUNDATION V1: contract, giá, module và ranh giới import nhất quán.
+
+Exit code: 0; signal: none

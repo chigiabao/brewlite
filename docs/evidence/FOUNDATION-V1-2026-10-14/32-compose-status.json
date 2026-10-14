@@ -1,0 +1,8 @@
+{
+  "command": "docker compose ps --format json",
+  "cwd": "C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite",
+  "startedAt": "2026-10-14T16:32:45.632Z",
+  "finishedAt": "2026-10-14T16:32:47.789Z",
+  "exitCode": 0,
+  "signal": null
+}

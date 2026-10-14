@@ -1,0 +1,19 @@
+Command: npm ci
+Working directory: C:\Users\Gtvkun\Documents\GitHub\brewlite\frontend
+Started (UTC): 2026-10-14T16:23:38.805Z
+
+npm warn deprecated eslint@9.39.5: This version is no longer supported. Please see https://eslint.org/version-support for other options.
+
+added 366 packages, and audited 367 packages in 8m
+
+147 packages are looking for funding
+  run `npm fund` for details
+
+5 high severity vulnerabilities
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+
+Exit code: 0; signal: none

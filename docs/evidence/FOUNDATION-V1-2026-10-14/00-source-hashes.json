@@ -1,0 +1,50 @@
+﻿[
+    {
+        "path":  "docs/FOUNDATION-V1.md",
+        "sha256":  "1ca5bd317c97b982dda8392e7a4170512c20dbd4787b3c9c99b2cc48fcad22ef"
+    },
+    {
+        "path":  "scripts/verify-foundation.mjs",
+        "sha256":  "b0a4b8cdae9f078375d78ce6390e6dd3f9673423774aa5428c2268f8feb585ba"
+    },
+    {
+        "path":  "contracts/brewlite-v1.json",
+        "sha256":  "e8fce6aeb33b41b3bd8f834debe58d58e65bddaef2a0c28d9a264d2bed84cd31"
+    },
+    {
+        "path":  "docker-compose.yml",
+        "sha256":  "165f9abff4a79e6bcd10804fbeee261346f454863c988483161e395f8b38e1a6"
+    },
+    {
+        "path":  "backend/Dockerfile",
+        "sha256":  "3060adf8d9ce324be7a5ddd4cfb1458f0515e7d36423fb7e32c1668f8675cc65"
+    },
+    {
+        "path":  "backend/package-lock.json",
+        "sha256":  "fd4cb62d5ab3c615f778d39d2fb56f039575547fc56d6ec8927b5bc4d7a7721f"
+    },
+    {
+        "path":  "backend/prisma.config.ts",
+        "sha256":  "2cb3c3c0e884fbaea15f4be689ae50cb65fde9d3690bf7db639b138d3c05cfec"
+    },
+    {
+        "path":  "backend/prisma/schema.prisma",
+        "sha256":  "380205097b250f7d56aa64bdaf0d269014d339995722eb9c20292a06897e3ebe"
+    },
+    {
+        "path":  "backend/prisma/migrations/20261014000100_foundation_v1/migration.sql",
+        "sha256":  "f0fa847a4dfc003755d55534fd15e29e4885b2e33ddcd24b8783f894cb5d50a2"
+    },
+    {
+        "path":  "backend/test/app.e2e-spec.ts",
+        "sha256":  "2ad3ddfdb4c558ad85a8816a7fe618138a9c05aa8743c6e7a83c277a83bab82f"
+    },
+    {
+        "path":  "frontend/Dockerfile",
+        "sha256":  "8d312a03e53afe065b266757fd83b4b92f9920b9e03bbf77f0bbf1c94d60b50b"
+    },
+    {
+        "path":  "frontend/package-lock.json",
+        "sha256":  "9f09192856b49aced648025169f52d180e6cea061763a5cfb3c115978b0ec341"
+    }
+]

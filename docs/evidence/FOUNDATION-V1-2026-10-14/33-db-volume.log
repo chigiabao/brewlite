@@ -1,0 +1,22 @@
+Command: docker volume inspect brewlite_dbdata
+Working directory: C:\Users\Gtvkun\Documents\GitHub\brewlite
+Started (UTC): 2026-10-14T16:32:47.981Z
+
+[
+    {
+        "CreatedAt": "2026-10-14T16:29:30Z",
+        "Driver": "local",
+        "Labels": {
+            "com.docker.compose.config-hash": "407da8b7b03e6ea41658273efa8f9329ff8366083072264da69bcbebff7942e7",
+            "com.docker.compose.project": "brewlite",
+            "com.docker.compose.version": "5.5.1",
+            "com.docker.compose.volume": "dbdata"
+        },
+        "Mountpoint": "/var/lib/docker/volumes/brewlite_dbdata/_data",
+        "Name": "brewlite_dbdata",
+        "Options": null,
+        "Scope": "local"
+    }
+]
+
+Exit code: 0; signal: none

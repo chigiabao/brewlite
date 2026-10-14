@@ -1,0 +1,213 @@
+﻿{
+    "evidenceDate":  "2026-10-14",
+    "timezone":  "Asia/Saigon",
+    "completedAtUtc":  "2026-10-14T16:38:58.8549556Z",
+    "documentedCommandsAttempted":  true,
+    "localChecksPassedAfterDependencyRetry":  true,
+    "fullDockerComposePassed":  false,
+    "dockerBlocker":  "Backend Dockerfile:8 runs Prisma generate without build-time DATABASE_URL.",
+    "unitTests":  {
+                      "todo":  5,
+                      "passed":  1
+                  },
+    "e2eTests":  {
+                     "passed":  1,
+                     "scope":  "GET / returns Hello World!; no database query"
+                 },
+    "frontendLint":  {
+                         "errors":  0,
+                         "warnings":  2
+                     },
+    "freshDatabaseMigrationApplied":  "20261014000100_foundation_v1",
+    "seedExecuted":  false,
+    "finalServices":  [
+                          {
+                              "port":  5432,
+                              "name":  "db",
+                              "health":  "healthy",
+                              "state":  "running"
+                          }
+                      ],
+    "commands":  [
+                     {
+                         "evidenceFile":  "01-docker-compose-up.json",
+                         "command":  "docker compose up --build",
+                         "cwd":  "C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite",
+                         "startedAt":  "2026-10-14T16:21:30.6760056Z",
+                         "finishedAt":  "2026-10-14T16:28:15.6111792Z",
+                         "exitCode":  1,
+                         "signal":  null
+                     },
+                     {
+                         "evidenceFile":  "02-foundation-guard.json",
+                         "command":  "node scripts/verify-foundation.mjs",
+                         "cwd":  "C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite",
+                         "startedAt":  "2026-10-14T16:22:50.434Z",
+                         "finishedAt":  "2026-10-14T16:22:51.058Z",
+                         "exitCode":  0,
+                         "signal":  null
+                     },
+                     {
+                         "evidenceFile":  "03-backend-npm-ci.json",
+                         "command":  "npm ci",
+                         "cwd":  "C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite\\backend",
+                         "startedAt":  "2026-10-14T16:23:27.003Z",
+                         "finishedAt":  "2026-10-14T16:30:27.151Z",
+                         "exitCode":  1,
+                         "signal":  null
+                     },
+                     {
+                         "evidenceFile":  "03b-backend-npm-ci-retry.json",
+                         "command":  "npm ci",
+                         "cwd":  "C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite\\backend",
+                         "startedAt":  "2026-10-14T16:31:56.100Z",
+                         "finishedAt":  "2026-10-14T16:33:28.860Z",
+                         "exitCode":  0,
+                         "signal":  null
+                     },
+                     {
+                         "evidenceFile":  "04-backend-prisma-validate.json",
+                         "command":  "npx prisma validate",
+                         "cwd":  "C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite\\backend",
+                         "startedAt":  "2026-10-14T16:34:46.912Z",
+                         "finishedAt":  "2026-10-14T16:34:51.666Z",
+                         "exitCode":  0,
+                         "signal":  null
+                     },
+                     {
+                         "evidenceFile":  "05-backend-migrate-deploy.json",
+                         "command":  "npx prisma migrate deploy",
+                         "cwd":  "C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite\\backend",
+                         "startedAt":  "2026-10-14T16:34:51.765Z",
+                         "finishedAt":  "2026-10-14T16:34:57.714Z",
+                         "exitCode":  0,
+                         "signal":  null
+                     },
+                     {
+                         "evidenceFile":  "06-backend-prisma-generate.json",
+                         "command":  "npx prisma generate",
+                         "cwd":  "C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite\\backend",
+                         "startedAt":  "2026-10-14T16:34:57.862Z",
+                         "finishedAt":  "2026-10-14T16:35:03.679Z",
+                         "exitCode":  0,
+                         "signal":  null
+                     },
+                     {
+                         "evidenceFile":  "07-backend-build.json",
+                         "command":  "npm run build",
+                         "cwd":  "C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite\\backend",
+                         "startedAt":  "2026-10-14T16:35:03.807Z",
+                         "finishedAt":  "2026-10-14T16:35:11.925Z",
+                         "exitCode":  0,
+                         "signal":  null
+                     },
+                     {
+                         "evidenceFile":  "08-backend-unit-tests.json",
+                         "command":  "npm test",
+                         "cwd":  "C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite\\backend",
+                         "startedAt":  "2026-10-14T16:35:12.118Z",
+                         "finishedAt":  "2026-10-14T16:35:17.719Z",
+                         "exitCode":  0,
+                         "signal":  null
+                     },
+                     {
+                         "evidenceFile":  "09-backend-e2e-tests.json",
+                         "command":  "npm run test:e2e",
+                         "cwd":  "C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite\\backend",
+                         "startedAt":  "2026-10-14T16:35:17.930Z",
+                         "finishedAt":  "2026-10-14T16:35:27.074Z",
+                         "exitCode":  0,
+                         "signal":  null
+                     },
+                     {
+                         "evidenceFile":  "10-backend-migration-status.json",
+                         "command":  "npx prisma migrate status",
+                         "cwd":  "C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite\\backend",
+                         "startedAt":  "2026-10-14T16:35:27.324Z",
+                         "finishedAt":  "2026-10-14T16:35:31.407Z",
+                         "exitCode":  0,
+                         "signal":  null
+                     },
+                     {
+                         "evidenceFile":  "20-frontend-npm-ci.json",
+                         "command":  "npm ci",
+                         "cwd":  "C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite\\frontend",
+                         "startedAt":  "2026-10-14T16:23:38.805Z",
+                         "finishedAt":  "2026-10-14T16:31:29.583Z",
+                         "exitCode":  0,
+                         "signal":  null
+                     },
+                     {
+                         "evidenceFile":  "21-frontend-lint.json",
+                         "command":  "npm run lint",
+                         "cwd":  "C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite\\frontend",
+                         "startedAt":  "2026-10-14T16:31:39.077Z",
+                         "finishedAt":  "2026-10-14T16:31:54.080Z",
+                         "exitCode":  0,
+                         "signal":  null
+                     },
+                     {
+                         "evidenceFile":  "22-frontend-build.json",
+                         "command":  "npm run build",
+                         "cwd":  "C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite\\frontend",
+                         "startedAt":  "2026-10-14T16:32:08.256Z",
+                         "finishedAt":  "2026-10-14T16:32:48.009Z",
+                         "exitCode":  0,
+                         "signal":  null
+                     },
+                     {
+                         "evidenceFile":  "30-database-up.json",
+                         "command":  "docker compose up -d --wait db",
+                         "cwd":  "C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite",
+                         "startedAt":  "2026-10-14T16:29:06.530Z",
+                         "finishedAt":  "2026-10-14T16:29:50.879Z",
+                         "exitCode":  0,
+                         "signal":  null
+                     },
+                     {
+                         "evidenceFile":  "31-db-before-migration.json",
+                         "command":  "docker compose exec -T db psql -U brew -d brewlite -c SELECT tablename FROM pg_tables WHERE schemaname = \u0027public\u0027 ORDER BY tablename;",
+                         "cwd":  "C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite",
+                         "startedAt":  "2026-10-14T16:30:40.619Z",
+                         "finishedAt":  "2026-10-14T16:30:41.692Z",
+                         "exitCode":  0,
+                         "signal":  null
+                     },
+                     {
+                         "evidenceFile":  "32-compose-status.json",
+                         "command":  "docker compose ps --format json",
+                         "cwd":  "C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite",
+                         "startedAt":  "2026-10-14T16:32:45.632Z",
+                         "finishedAt":  "2026-10-14T16:32:47.789Z",
+                         "exitCode":  0,
+                         "signal":  null
+                     },
+                     {
+                         "evidenceFile":  "33-db-volume.json",
+                         "command":  "docker volume inspect brewlite_dbdata",
+                         "cwd":  "C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite",
+                         "startedAt":  "2026-10-14T16:32:47.981Z",
+                         "finishedAt":  "2026-10-14T16:32:48.316Z",
+                         "exitCode":  0,
+                         "signal":  null
+                     },
+                     {
+                         "evidenceFile":  "34-db-after-migration.json",
+                         "command":  "docker compose exec -T db psql -U brew -d brewlite -c SELECT tablename FROM pg_tables WHERE schemaname = \u0027public\u0027 ORDER BY tablename; SELECT migration_name, finished_at, rolled_back_at, applied_steps_count FROM _prisma_migrations ORDER BY migration_name;",
+                         "cwd":  "C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite",
+                         "startedAt":  "2026-10-14T16:36:28.014Z",
+                         "finishedAt":  "2026-10-14T16:36:32.286Z",
+                         "exitCode":  0,
+                         "signal":  null
+                     },
+                     {
+                         "evidenceFile":  "35-compose-final-status.json",
+                         "command":  "docker compose ps --format json",
+                         "cwd":  "C:\\Users\\Gtvkun\\Documents\\GitHub\\brewlite",
+                         "startedAt":  "2026-10-14T16:36:32.752Z",
+                         "finishedAt":  "2026-10-14T16:36:35.968Z",
+                         "exitCode":  0,
+                         "signal":  null
+                     }
+                 ]
+}

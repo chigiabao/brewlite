@@ -1,0 +1,16 @@
+﻿{
+    "evidenceDate":  "2026-10-14",
+    "userTimezone":  "Asia/Saigon",
+    "capturedAtUtc":  "2026-10-14T16:24:21.0666875Z",
+    "gitCommit":  "c149450400a65b4ad37b0cb082eca06ff2f56fc2",
+    "gitBranch":  "main",
+    "initialGitStatus":  "?? docs/evidence/",
+    "node":  "v24.15.0",
+    "npm":  "11.12.1",
+    "docker":  "Docker version 29.8.0, build 88096ef",
+    "compose":  "Docker Compose version v5.5.1",
+    "preexistingBrewliteVolumes":  [
+
+                                   ],
+    "note":  "No BrewLite volumes or containers existed before this run. npm/npx are invoked through their Node CLI on Windows to avoid the blocked PowerShell wrapper."
+}

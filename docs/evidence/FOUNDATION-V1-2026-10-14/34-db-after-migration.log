@@ -1,0 +1,23 @@
+Command: docker compose exec -T db psql -U brew -d brewlite -c SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename; SELECT migration_name, finished_at, rolled_back_at, applied_steps_count FROM _prisma_migrations ORDER BY migration_name;
+Working directory: C:\Users\Gtvkun\Documents\GitHub\brewlite
+Started (UTC): 2026-10-14T16:36:28.014Z
+
+     tablename      
+--------------------
+ Coupon
+ LoyaltyEntry
+ Order
+ OrderItem
+ Payment
+ Product
+ User
+ _prisma_migrations
+(8 rows)
+
+        migration_name        |          finished_at          | rolled_back_at | applied_steps_count 
+------------------------------+-------------------------------+----------------+---------------------
+ 20261014000100_foundation_v1 | 2026-10-14 16:34:57.574362+00 |                |                   1
+(1 row)
+
+
+Exit code: 0; signal: none
