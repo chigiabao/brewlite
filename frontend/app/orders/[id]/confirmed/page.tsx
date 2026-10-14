@@ -1,4 +1,4 @@
-// Trang xác nhận đơn. Người phụ trách: F (Task 9).
+// Trang xác nhận đơn. Người phụ trách: F (Task 9 UI), E sở hữu API dữ liệu.
 'use client';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';

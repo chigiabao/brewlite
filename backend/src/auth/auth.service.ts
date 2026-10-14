@@ -10,13 +10,13 @@ export class AuthService {
     private readonly jwt: JwtService,
   ) {}
 
-  // TODO(E – Task 7): băm mật khẩu bằng bcryptjs, lưu User, trả { id, email }.
+  // TODO(D – Task 7): băm mật khẩu bằng bcryptjs, lưu User, trả { id, email }.
   register(dto: AuthDto) {
-    throw new NotImplementedException('POST /auth/register chưa làm (E – Task 7)');
+    throw new NotImplementedException('POST /auth/register chưa làm (D – Task 7)');
   }
 
-  // TODO(E – Task 7): so khớp mật khẩu, trả { accessToken } (payload: { sub: user.id, email }).
+  // TODO(D – Task 7): so khớp mật khẩu, trả { accessToken } (payload: { sub: user.id, email }).
   login(dto: AuthDto) {
-    throw new NotImplementedException('POST /auth/login chưa làm (E – Task 7)');
+    throw new NotImplementedException('POST /auth/login chưa làm (D – Task 7)');
   }
 }

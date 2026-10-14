@@ -1,4 +1,4 @@
-// Trang đăng nhập / đăng ký. Người phụ trách: E (Task 7), C hỗ trợ giao diện.
+// Trang đăng nhập / đăng ký. Người phụ trách: D (Task 7), C hỗ trợ giao diện.
 'use client';
 import { useState } from 'react';
 
@@ -7,7 +7,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  // TODO(E – Task 7): gọi POST /auth/login hoặc /auth/register qua api(),
+  // TODO(D – Task 7): gọi POST /auth/login hoặc /auth/register qua api(),
   // lưu accessToken vào localStorage('token'), rồi quay lại trang trước (giỏ hàng/thanh toán).
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

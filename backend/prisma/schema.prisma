@@ -1,6 +1,6 @@
-// Schema dùng chung cả nhóm. Người phụ trách chính: B.
-// Ai cần thêm bảng/cột thì báo nhóm và tạo migration riêng:
-//   npx prisma migrate dev --name <ten-thay-doi>
+// FOUNDATION V1 (A điều phối migration; từng feature vẫn sở hữu nghiệp vụ).
+// Contract: ../../contracts/brewlite-v1.json. Không sửa schema chung trực tiếp trên nhánh khác.
+// Đồng tiền: số nguyên VND. Product.stock = tồn kho đơn vị sản phẩm của MVP (không phải BOM nguyên liệu).
 
 generator client {
   provider = "prisma-client"
@@ -21,60 +21,111 @@ enum OrderStatus {
   CANCELLED
 }
 
+enum PaymentMethod {
+  WALLET
+  CARD
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+enum LoyaltyKind {
+  EARN
+  REDEEM
+}
+
 model Product {
   id       Int         @id @default(autoincrement())
   name     String
-  price    Int // đơn vị: đồng
+  price    Int         // VND; giá gốc, không tin giá do frontend gửi
   imageUrl String
   stock    Int         @default(100)
-  version  Int         @default(0) // optimistic locking (Task 10 – G)
+  version  Int         @default(0) // E: optimistic locking
   items    OrderItem[]
 }
 
 model User {
-  id            Int     @id @default(autoincrement())
-  email         String  @unique
-  passwordHash  String
-  loyaltyPoints Int     @default(0)
-  orders        Order[]
+  id             Int            @id @default(autoincrement())
+  email          String         @unique
+  passwordHash   String
+  loyaltyPoints  Int            @default(0)
+  orders         Order[]
+  loyaltyEntries LoyaltyEntry[]
 }
 
 model Order {
-  id        Int         @id @default(autoincrement())
-  userId    Int
-  user      User        @relation(fields: [userId], references: [id])
-  status    OrderStatus @default(PENDING)
-  total     Int
-  createdAt DateTime    @default(now())
-  items     OrderItem[]
-  payment   Payment?
+  id              Int            @id @default(autoincrement())
+  userId          Int
+  user            User           @relation(fields: [userId], references: [id])
+  status          OrderStatus    @default(PENDING)
+  subtotal        Int            @default(0)
+  discountTotal   Int            @default(0)
+  pointsRedeemed  Int            @default(0)
+  total           Int            // Số tiền thực phải thanh toán, VND
+  couponCode      String?
+  coupon          Coupon?        @relation(fields: [couponCode], references: [code])
+  createdAt       DateTime       @default(now())
+  items           OrderItem[]
+  payments        Payment[]      // Cho phép thử lại sau PAYMENT_FAILED (mỗi attempt có key riêng)
+  loyaltyEntries  LoyaltyEntry[]
+
+  @@index([userId, createdAt])
 }
 
 model OrderItem {
-  id        Int     @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   orderId   Int
-  order     Order   @relation(fields: [orderId], references: [id])
+  order     Order    @relation(fields: [orderId], references: [id])
   productId Int
-  product   Product @relation(fields: [productId], references: [id])
+  product   Product  @relation(fields: [productId], references: [id])
   size      String
+  toppings  String[] @default([])
   qty       Int
+  unitPrice Int      // Snapshot sau phụ thu size và topping
   lineTotal Int
 }
 
 model Payment {
-  id             Int    @id @default(autoincrement())
-  orderId        Int    @unique
-  order          Order  @relation(fields: [orderId], references: [id])
-  idempotencyKey String @unique
+  id             Int           @id @default(autoincrement())
+  orderId        Int
+  order          Order         @relation(fields: [orderId], references: [id])
+  idempotencyKey String        @unique
+  requestHash    String        // Cùng key, khác payload => 409
   amount         Int
-  method         String
+  method         PaymentMethod
+  status         PaymentStatus @default(PENDING)
+  transactionId  String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([orderId])
 }
 
-// Mã giảm giá (Task 10 – G)
 model Coupon {
-  code      String   @id
-  percent   Int
-  minTotal  Int      @default(0)
-  expiresAt DateTime
-  active    Boolean  @default(true)
+  code            String   @id
+  discountPercent Int?
+  discountAmount  Int?
+  minOrderValue   Int      @default(0)
+  maxUses         Int?
+  usedCount       Int      @default(0)
+  expiresAt       DateTime
+  active          Boolean  @default(true)
+  orders          Order[]
+}
+
+model LoyaltyEntry {
+  id        Int         @id @default(autoincrement())
+  userId    Int
+  user      User        @relation(fields: [userId], references: [id])
+  orderId   Int
+  order     Order       @relation(fields: [orderId], references: [id])
+  kind      LoyaltyKind
+  points    Int         // số nguyên dương, EARN cộng / REDEEM trừ
+  createdAt DateTime    @default(now())
+
+  @@unique([orderId, kind]) // Không cộng/trừ điểm hai lần cho cùng đơn
+  @@index([userId])
 }

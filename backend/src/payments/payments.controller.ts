@@ -2,14 +2,14 @@ import { BadRequestException, Body, Controller, Headers, Post } from '@nestjs/co
 import { PayDto } from './payments.dto.js';
 import { PaymentsService } from './payments.service.js';
 
-// TODO(E – Task 7): khi JwtStrategy xong, thêm @UseGuards(JwtAuthGuard) và @CurrentUser().
+// TODO(D – Task 7): khi JwtStrategy xong, thêm @UseGuards(JwtAuthGuard) và @CurrentUser().
 const TEMP_USER_ID = 1;
 
 @Controller('payments')
 export class PaymentsController {
   constructor(private readonly payments: PaymentsService) {}
 
-  // Người phụ trách: F (Task 8), G (Task 10.2 idempotency)
+  // Người phụ trách: F (Task 8 và Task 10.2 idempotency)
   @Post()
   pay(
     @Headers('idempotency-key') key: string,

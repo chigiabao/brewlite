@@ -11,10 +11,10 @@ export class PaymentsService {
   ) {}
 
   // TODO(F – Task 8): gọi gateway.charge(), đổi order.status thành PAID hoặc PAYMENT_FAILED.
-  // TODO(G – Task 10.2): kiểm tra idempotencyKey đã dùng chưa; nếu rồi thì trả kết quả cũ.
-  // TODO(G – Task 10.1): gọi assertTransition() trước khi đổi status.
-  // TODO(G – Task 10.4): cộng loyaltyPoints cho user sau khi đơn PAID.
+  // TODO(F – Task 10.2): kiểm tra idempotencyKey đã dùng chưa; nếu rồi thì trả kết quả cũ.
+  // TODO(F – Task 10.1): gọi assertTransition() trước khi đổi status.
+  // TODO(F – Task 10.4, phối hợp G): cộng loyaltyPoints cho user sau khi đơn PAID.
   pay(userId: number, dto: PayDto, idempotencyKey: string) {
-    throw new NotImplementedException('POST /payments chưa làm (F – Task 8, G – Task 10)');
+    throw new NotImplementedException('POST /payments chưa làm (F – Task 8/10, tích hợp G – Rewards)');
   }
 }

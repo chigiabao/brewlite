@@ -1,4 +1,4 @@
-// Trang chi tiết sản phẩm. Người phụ trách: D (Task 4).
+// Trang chi tiết sản phẩm. Người phụ trách: B (Task 4).
 'use client';
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';

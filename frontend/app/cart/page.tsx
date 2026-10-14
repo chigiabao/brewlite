@@ -1,4 +1,4 @@
-// Trang giỏ hàng. Người phụ trách: D (Task 5).
+// Trang giỏ hàng. Người phụ trách: C (Task 5).
 'use client';
 import Link from 'next/link';
 import { useCart } from '@/store/cart';

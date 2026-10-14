@@ -1,5 +1,9 @@
 # BrewLite
 
+> **Foundation V1:** Đọc [Master Contract + Release Gates](docs/FOUNDATION-V1.md), [Bổ sung guide A–G](docs/GUIDE-DELTA-A-G.md), [Contract JSON](contracts/brewlite-v1.json). Kiểm tra nhanh: `node scripts/verify-foundation.mjs`.
+>
+> Đây là **khung**, không phải bản release hoàn chỉnh: API nghiệp vụ vẫn còn TODO/501. Các guide PDF chỉ bắt đầu triển khai sau khi nhóm phê duyệt Gate 0.
+
 Ứng dụng đặt cà phê không dùng tiền mặt – Bài tập lớn môn Công nghệ Phần mềm.
 
 ## Cấu trúc dự án

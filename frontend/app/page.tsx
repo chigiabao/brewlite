@@ -1,4 +1,4 @@
-// Trang Menu. Người phụ trách: C (Task 3).
+// Trang Menu. Người phụ trách: B (Task 3).
 'use client';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';

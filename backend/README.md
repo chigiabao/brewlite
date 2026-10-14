@@ -9,6 +9,7 @@ backend/
 ├── prisma.config.ts            # Cấu hình Prisma (đường dẫn schema, DATABASE_URL, lệnh seed)
 ├── prisma/
 │   ├── schema.prisma           # Bảng: Product, User, Order, OrderItem, Payment, Coupon
+│   ├── migrations/            # Baseline migration DB mới (A review)
 │   └── seed.ts                 # Dữ liệu menu mẫu
 ├── src/
 │   ├── main.ts                 # Khởi động server: CORS, ValidationPipe, cổng 3001
@@ -42,5 +43,7 @@ backend/
 │       └── payments.spec.ts        # Test (b), (c)
 └── test/                       # Test e2e
 ```
+
+Module Rewards mới: `src/rewards/` (G, coupon/loyalty), contract chung: `src/contracts/public.ts` (A). Chốt spec trong `../docs/FOUNDATION-V1.md` trước khi code.
 
 Mỗi chỗ cần làm được đánh dấu `TODO(<người> – Task N)`. Endpoint chưa làm trả lỗi 501.

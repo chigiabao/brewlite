@@ -5,3 +5,4 @@ dist/
 .next/
 backend/src/generated/
 *.tsbuildinfo
+*.zip

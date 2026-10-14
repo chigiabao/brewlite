@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   description: 'Đặt cà phê không dùng tiền mặt',
 };
 
-// TODO(C – Task 3): thêm badge số lượng giỏ hàng lên header (lấy từ useCart).
+// TODO(C – Task 5): thêm badge số lượng giỏ hàng lên header (lấy từ useCart).
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi">
@@ -29,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/login" className="hover:underline">
                 Đăng nhập
               </Link>
-              {/* TODO(E – Task 7): đổi thành Đăng xuất khi đã có token */}
+              {/* TODO(D – Task 7): đổi thành Đăng xuất khi đã có token */}
             </nav>
           </header>
           <main className="flex-1 p-4">

@@ -1,4 +1,4 @@
-// Trang lịch sử đơn. Người phụ trách: F (Task 9).
+// Trang lịch sử đơn. Người phụ trách: F (Task 9 UI), E sở hữu API dữ liệu.
 'use client';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';

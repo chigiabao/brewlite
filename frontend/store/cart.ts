@@ -1,4 +1,4 @@
-// Giỏ hàng bằng Zustand. Người phụ trách: D (Task 5).
+// Giỏ hàng bằng Zustand. Người phụ trách: C (Task 5).
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 

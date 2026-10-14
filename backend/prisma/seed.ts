@@ -17,7 +17,7 @@ async function main() {
       { name: 'Trà đào', price: 39000, imageUrl: '/img/tradao.jpg' },
     ],
   });
-  // TODO(B): thêm sản phẩm nếu cần. TODO(G): thêm Coupon mẫu cho Task 10.
+  // TODO(B): thêm sản phẩm nếu cần. TODO(G): seed Coupon riêng khi triển khai Rewards.
 }
 
 main().finally(() => prisma.$disconnect());

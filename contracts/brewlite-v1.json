@@ -1,0 +1,131 @@
+{
+  "contractVersion": "1.0.0",
+  "reference": "BrewLite-CongNghePhanMem.pdf, mục 4, 8, 9, 12 và guide A-G",
+  "stack": {
+    "backend": "NestJS",
+    "frontend": "Next.js",
+    "database": "PostgreSQL",
+    "orm": "Prisma",
+    "deployment": "Docker Compose"
+  },
+  "owners": {
+    "A": "platform-integration",
+    "B": "catalog",
+    "C": "cart",
+    "D": "identity",
+    "E": "ordering",
+    "F": "payments",
+    "G": "rewards"
+  },
+  "pricing": {
+    "currency": "VND",
+    "sizeExtra": {
+      "S": 0,
+      "M": 5000,
+      "L": 10000
+    },
+    "toppingPrice": 5000,
+    "allowedToppings": [
+      "Trân châu",
+      "Kem"
+    ]
+  },
+  "orderStatus": [
+    "PENDING",
+    "PAID",
+    "PAYMENT_FAILED",
+    "PREPARING",
+    "READY",
+    "COMPLETED",
+    "CANCELLED"
+  ],
+  "allowedTransitions": {
+    "PENDING": [
+      "PAID",
+      "PAYMENT_FAILED",
+      "CANCELLED"
+    ],
+    "PAID": [
+      "PREPARING",
+      "CANCELLED"
+    ],
+    "PAYMENT_FAILED": [
+      "PAID",
+      "CANCELLED"
+    ],
+    "PREPARING": [
+      "READY"
+    ],
+    "READY": [
+      "COMPLETED"
+    ],
+    "COMPLETED": [],
+    "CANCELLED": []
+  },
+  "paymentMethods": [
+    "WALLET",
+    "CARD"
+  ],
+  "api": [
+    {
+      "method": "GET",
+      "path": "/products",
+      "owner": "B"
+    },
+    {
+      "method": "GET",
+      "path": "/products/:id",
+      "owner": "B"
+    },
+    {
+      "method": "POST",
+      "path": "/auth/register",
+      "owner": "D"
+    },
+    {
+      "method": "POST",
+      "path": "/auth/login",
+      "owner": "D"
+    },
+    {
+      "method": "POST",
+      "path": "/orders",
+      "owner": "E"
+    },
+    {
+      "method": "GET",
+      "path": "/orders/me",
+      "owner": "E"
+    },
+    {
+      "method": "GET",
+      "path": "/orders/:id",
+      "owner": "E",
+      "extension": true
+    },
+    {
+      "method": "POST",
+      "path": "/payments",
+      "owner": "F"
+    },
+    {
+      "method": "POST",
+      "path": "/coupons/validate",
+      "owner": "G",
+      "extension": true
+    }
+  ],
+  "decisions": {
+    "apiVersioning": "v1 is unprefixed as in assignment",
+    "completedStatus": "COMPLETED, not PICKED_UP",
+    "coupon": "percentage OR fixed amount; final discount capped at subtotal",
+    "money": "all money represented by nonnegative integer VND",
+    "mockPayment": "no real money is debited",
+    "loyalty": "earn/redeem finalized atomically once per PAID order (never on failed payment)",
+    "stock": "optimistic locking using version inside transaction",
+    "orderSnapshot": "server calculates amounts and captures price/toppings at order time",
+    "orderRetry": "same checkout attempt reuses orderId; known failed payment may get a new payment key",
+    "auth": "JWT required for order/payment operations",
+    "crossFeatureImports": "feature modules may reference only public contract entrypoints of other features"
+  }
+}

@@ -1,4 +1,4 @@
-// API client dùng chung. Người phụ trách: C (Task 3).
+// API client dùng chung. Người phụ trách: A (API client dùng chung); B/C/D/E/F/G chỉ gọi qua hàm public.
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {

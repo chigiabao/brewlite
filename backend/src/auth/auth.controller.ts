@@ -2,7 +2,7 @@ import { Body, Controller, Post } from '@nestjs/common';
 import { AuthDto } from './auth.dto.js';
 import { AuthService } from './auth.service.js';
 
-// Người phụ trách: E (Task 7)
+// Người phụ trách: D (Task 7)
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}

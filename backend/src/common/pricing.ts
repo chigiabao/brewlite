@@ -1,5 +1,5 @@
 // Bảng phụ thu dùng chung. Phải giống hệt frontend/lib/pricing.ts.
-// Giá trị là đề xuất, PO (F) chốt lại với nhóm rồi sửa ở cả 2 nơi.
+// Giá trị là đề xuất, được khóa trong contracts/brewlite-v1.json (A review thay đổi).
 export const SIZE_EXTRA = { S: 0, M: 5000, L: 10000 } as const;
 export const TOPPING_PRICE = 5000;
 

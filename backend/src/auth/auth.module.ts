@@ -13,7 +13,7 @@ import { AuthService } from './auth.service.js';
     }),
   ],
   controllers: [AuthController],
-  // TODO(E – Task 7): thêm JwtStrategy vào providers khi viết xong jwt.strategy.ts
+  // TODO(D – Task 7): thêm JwtStrategy vào providers khi viết xong jwt.strategy.ts
   providers: [AuthService],
   exports: [AuthService],
 })
