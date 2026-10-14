@@ -1,0 +1,31 @@
+# Chạy cả 3 dịch vụ: docker compose up --build
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: brew
+      POSTGRES_PASSWORD: brew
+      POSTGRES_DB: brewlite
+    ports: ["5432:5432"]
+    volumes: [dbdata:/var/lib/postgresql/data]
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql://brew:brew@db:5432/brewlite
+      JWT_SECRET: doi-thanh-chuoi-bi-mat
+      FRONTEND_URL: http://localhost:3000
+      PORT: 3001
+    depends_on: [db]
+    ports: ["3001:3001"]
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:3001
+    depends_on: [backend]
+    ports: ["3000:3000"]
+
+volumes:
+  dbdata:
