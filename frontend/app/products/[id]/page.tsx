@@ -60,7 +60,7 @@ export default function ProductDetailPage({
   const { id } = use(params);
   const product = PRODUCTS_MAP[id] || {
     id,
-    name: 'Cà phê BrewLite',
+    name: 'Cà phê CoffeeShop',
     price: 35000,
     description: 'Sản phẩm cà phê đặc trưng của quán.',
     image: '☕',
@@ -85,7 +85,7 @@ export default function ProductDetailPage({
   };
 
   const handleAddToCart = () => {
-    // Contract according to BrewLite GUIDE-V2 C
+    // Contract according to GUIDE-V2 C
     add({
       productId: product.id,
       name: product.name,

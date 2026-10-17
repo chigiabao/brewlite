@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-console.log('🔍 [BrewLite] Running Foundation Guard verification...\n');
+console.log('🔍 [CoffeeShop] Running Foundation Guard verification...\n');
 
 let failed = false;
 
@@ -32,7 +32,7 @@ const requiredFiles = [
   'frontend/lib/pricing.ts',
   'frontend/app/cart/page.tsx',
   'frontend/components/cart-link.tsx',
-  'BrewLite_GUIDE-V2_C-Cart_2026-10-15.manifest.json',
+  'CoffeeShop_GUIDE-V2_C-Cart_2026-10-15.manifest.json',
 ];
 
 for (const relPath of requiredFiles) {
@@ -55,10 +55,10 @@ check('Ownership guard: Cart must NOT create cart table in Prisma schema', () =>
 });
 
 // 4. Cart store contract check
-check('Contract guard: Cart store uses brewlite-cart-v1', () => {
+check('Contract guard: Cart store uses coffeeshop-cart-v1', () => {
   const cartStorePath = path.resolve(process.cwd(), 'frontend/store/cart.ts');
   const content = fs.readFileSync(cartStorePath, 'utf8');
-  return content.includes('brewlite-cart-v1') && content.includes('useCartStore');
+  return content.includes('coffeeshop-cart-v1') && content.includes('useCartStore');
 });
 
 console.log('\n----------------------------------------');

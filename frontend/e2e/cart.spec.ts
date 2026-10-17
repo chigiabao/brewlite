@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('BrewLite Cart E2E Test Suite (CART-E01 -> CART-E10)', () => {
+test.describe('CoffeeShop Cart E2E Test Suite (CART-E01 -> CART-E10)', () => {
   test.beforeEach(async ({ page }) => {
     // Clear localStorage before each test
     await page.goto('/');

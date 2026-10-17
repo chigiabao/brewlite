@@ -56,7 +56,7 @@ export default function HomePage() {
     <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
       <section style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
         <h1 style={{ fontSize: '2.4rem', fontWeight: 800, color: '#451a03', marginBottom: '0.5rem' }}>
-          Menu Đồ Uống BrewLite
+          Menu Đồ Uống CoffeeShop
         </h1>
         <p style={{ color: '#78716c', fontSize: '1.1rem' }}>
           Chọn món yêu thích, tùy biến size và topping theo ý muốn của bạn

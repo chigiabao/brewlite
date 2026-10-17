@@ -54,11 +54,11 @@ async function run() {
   console.log('  ✅ Captured 13-cart-qty-total.png');
 
   // 14. Tạo view hiển thị localStorage key
-  const storageData = await page.evaluate(() => localStorage.getItem('brewlite-cart-v1'));
+  const storageData = await page.evaluate(() => localStorage.getItem('coffeeshop-cart-v1'));
   await page.setContent(`
     <html>
       <body style="font-family: monospace; background: #1e1e1e; color: #d4d4d4; padding: 30px;">
-        <h2 style="color: #4ec9b0;">DevTools ➔ Application ➔ Local Storage: brewlite-cart-v1</h2>
+        <h2 style="color: #4ec9b0;">DevTools ➔ Application ➔ Local Storage: coffeeshop-cart-v1</h2>
         <div style="background: #252526; padding: 20px; border-radius: 8px; border: 1px solid #3c3c3c; white-space: pre-wrap; word-break: break-all; font-size: 14px; line-height: 1.6; color: #9cdcfe;">
 ${JSON.stringify(JSON.parse(storageData || '{}'), null, 2)}
         </div>

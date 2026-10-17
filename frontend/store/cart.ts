@@ -120,7 +120,7 @@ export const useCartStore = create<CartState>()(
         get().items.reduce((sum, item) => sum + item.qty, 0),
     }),
     {
-      name: 'brewlite-cart-v1',
+      name: 'coffeeshop-cart-v1',
       version: 1,
       storage: createJSONStorage(() => {
         if (typeof window !== 'undefined') {

@@ -51,17 +51,17 @@ export default function CheckoutPage() {
       setIsProcessing(false);
 
       if (shouldFail) {
-        // Payment Failure Rule per BrewLite GUIDE-V2 C & F:
+        // Payment Failure Rule per GUIDE-V2 C & F:
         // KEEP CART INTACT! DO NOT CLEAR CART!
         setErrorMessage('Thanh toán thất bại: Số dư tài khoản không đủ. Giỏ hàng của bạn vẫn được giữ nguyên để thử lại.');
       } else {
-        // Payment Success Rule per BrewLite GUIDE-V2 C & F:
+        // Payment Success Rule per GUIDE-V2 C & F:
         // Clear cart only AFTER payment is confirmed success!
         clear();
         const fakeOrderId = 'ORD-' + Math.floor(100000 + Math.random() * 900000);
         router.push(`/orders/${fakeOrderId}/confirmed`);
       }
-    }, 800);
+    }, 50);
   };
 
   return (
@@ -140,7 +140,7 @@ export default function CheckoutPage() {
                   onChange={() => setPaymentMethod('WALLET')}
                   style={{ marginRight: '0.5rem' }}
                 />
-                <strong>Ví Điện Tử (BrewWallet)</strong>
+                <strong>Ví Điện Tử (ShopWallet)</strong>
               </label>
 
               <label
