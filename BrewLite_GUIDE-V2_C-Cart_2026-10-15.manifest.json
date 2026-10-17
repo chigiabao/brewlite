@@ -1,0 +1,54 @@
+{
+  "guide": "C - Cart",
+  "version": "GUIDE-V2",
+  "date": "2026-10-15",
+  "project": "BrewLite",
+  "foundation": "V1",
+  "gate01": "PASS",
+  "scope": [
+    "Task 5 - Cart"
+  ],
+  "ownedFiles": [
+    "frontend/store/cart.ts",
+    "frontend/lib/pricing.ts",
+    "frontend/app/cart/page.tsx",
+    "frontend/components/cart-link.tsx"
+  ],
+  "sharedEditFiles": [
+    "frontend/app/layout.tsx"
+  ],
+  "integrationDependencies": {
+    "B": "Product Detail calls Cart.add()",
+    "E": "Ordering recalculates final price and validates stock",
+    "F": "Payments calls Cart.clear() only after success"
+  },
+  "persistence": {
+    "type": "localStorage",
+    "key": "brewlite-cart-v1",
+    "version": 1
+  },
+  "pricing": {
+    "frontendRole": "preview only",
+    "authoritativeModule": "E - Ordering",
+    "sizeSurcharge": {
+      "S": 0,
+      "M": 5000,
+      "L": 10000
+    },
+    "toppingSurcharge": 5000
+  },
+  "assumptions": [
+    "qty range is 1..99",
+    "duplicate toppings are removed",
+    "same product/size/toppings merges quantity",
+    "multi-tab synchronization is outside MVP"
+  ],
+  "requiredChecks": [
+    "foundation guard",
+    "frontend lint",
+    "frontend build",
+    "cart unit tests",
+    "cart browser e2e",
+    "docker compose smoke test"
+  ]
+}
