@@ -140,7 +140,7 @@ export default function CheckoutPage() {
                   onChange={() => setPaymentMethod('WALLET')}
                   style={{ marginRight: '0.5rem' }}
                 />
-                <strong>Ví Điện Tử (ShopWallet)</strong>
+                <strong>Ví Điện Tử (BrewWallet)</strong>
               </label>
 
               <label

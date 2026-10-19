@@ -1,4 +1,4 @@
-# CoffeeShop - Module C: Cart Evidence & Delivery Report
+# BrewLite - Module C: Cart Evidence & Delivery Report
 
 - **Module**: C - Cart (Task 5: Giỏ hàng)
 - **Version**: GUIDE-V2
@@ -9,9 +9,9 @@
 ---
 
 ## 1. Tóm Tắt Thực Hiện (Executive Summary)
-Module C phụ trách trọn vẹn nghiệp vụ Giỏ hàng của ứng dụng CoffeeShop:
+Module C phụ trách trọn vẹn nghiệp vụ Giỏ hàng của ứng dụng BrewLite:
 1. Nhận cấu hình sản phẩm từ màn hình Catalog / Product Detail (`useCartStore.getState().add()`).
-2. Lưu giỏ hàng trên trình duyệt bằng **Zustand + `localStorage`** (key: `coffeeshop-cart-v1`, version: 1).
+2. Lưu giỏ hàng trên trình duyệt bằng **Zustand + `localStorage`** (key: `brewlite-cart-v1`, version: 1).
 3. Hỗ trợ tăng/giảm số lượng (từ 1 đến 99, chặn min/max ở cả logic và UI), xóa món.
 4. Tự động nhóm cùng variant (`productId + size + sorted_unique_toppings`), khác variant thì tạo dòng mới.
 5. Giữ nguyên giỏ hàng sau khi refresh trang (Persistence).
@@ -29,11 +29,11 @@ Module C phụ trách trọn vẹn nghiệp vụ Giỏ hàng của ứng dụng 
 | `frontend/lib/pricing.ts` | OWN / EDIT | Logic tính giá preview phía client (size + topping surcharges) |
 | `frontend/app/cart/page.tsx` | OWN / EDIT | Giao diện trang Cart, hiển thị danh sách, +/- qty, xóa, tổng tiền, empty state, nút thanh toán |
 | `frontend/components/cart-link.tsx` | NEW / OWN | Component badge số lượng giỏ hàng trên header với hydration guard |
-| `frontend/app/layout.tsx` | EDIT NHẸ | Tích hợp `<CartLink />` vào Header CoffeeShop |
+| `frontend/app/layout.tsx` | EDIT NHẸ | Tích hợp `<CartLink />` vào Header BrewLite |
 | `frontend/tests/unit/pricing.test.ts` | OWN | Unit test bộ tính giá frontend |
 | `frontend/tests/unit/cart.test.ts` | OWN | Unit test 12 ca kiểm thử CART-U01 -> CART-U12 |
 | `frontend/e2e/cart.spec.ts` | OWN | Playwright E2E test 10 ca kiểm thử CART-E01 -> CART-E10 |
-| `CoffeeShop_GUIDE-V2_C-Cart_2026-10-15.manifest.json` | OWN | Manifest nghiệm thu module C |
+| `BrewLite_GUIDE-V2_C-Cart_2026-10-15.manifest.json` | OWN | Manifest nghiệm thu module C |
 
 ---
 
@@ -48,4 +48,4 @@ Module C phụ trách trọn vẹn nghiệp vụ Giỏ hàng của ứng dụng 
 - `11-cart-page.png`: Minh chứng giao diện trang Giỏ hàng với đầy đủ thông tin món, giá và tổng tiền.
 - `12-cart-after-refresh.png`: Minh chứng giỏ hàng tồn tại nguyên vẹn sau khi reload trình duyệt.
 - `13-cart-qty-total.png`: Minh chứng tính năng tăng giảm số lượng (+/-) và tính lại tổng tiền tức thì.
-- `14-cart-localstorage.png`: Minh chứng dữ liệu trong LocalStorage trình duyệt dưới key `coffeeshop-cart-v1`.
+- `14-cart-localstorage.png`: Minh chứng dữ liệu trong LocalStorage trình duyệt dưới key `brewlite-cart-v1`.

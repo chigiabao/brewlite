@@ -5,7 +5,7 @@ import './globals.css';
 import { CartLink } from '@/components/cart-link';
 
 export const metadata: Metadata = {
-  title: 'CoffeeShop',
+  title: 'BrewLite Coffee',
   description: 'Thưởng thức cà phê hảo hạng, đặt hàng nhanh chóng không dùng tiền mặt',
 };
 
@@ -21,7 +21,7 @@ export default function RootLayout({
           <div className="header-inner">
             <Link href="/" className="brand-logo">
               <span>☕</span>
-              <span>CoffeeShop</span>
+              <span>BrewLite</span>
             </Link>
             <nav className="main-nav">
               <Link href="/" className="nav-link">
@@ -45,7 +45,7 @@ export default function RootLayout({
         </main>
 
         <footer className="site-footer">
-          <p>© 2026 CoffeeShop. All rights reserved.</p>
+          <p>© 2026 BrewLite Coffee. All rights reserved.</p>
         </footer>
       </body>
     </html>

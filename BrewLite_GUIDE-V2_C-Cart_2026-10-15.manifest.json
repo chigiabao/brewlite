@@ -2,7 +2,7 @@
   "guide": "C - Cart",
   "version": "GUIDE-V2",
   "date": "2026-10-15",
-  "project": "CoffeeShop",
+  "project": "BrewLite",
   "foundation": "V1",
   "gate01": "PASS",
   "scope": [
@@ -24,7 +24,7 @@
   },
   "persistence": {
     "type": "localStorage",
-    "key": "coffeeshop-cart-v1",
+    "key": "brewlite-cart-v1",
     "version": 1
   },
   "pricing": {
