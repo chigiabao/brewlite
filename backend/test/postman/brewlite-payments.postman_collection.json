@@ -1,0 +1,522 @@
+{
+  "info": {
+    "name": "BrewLite - Payments (F)",
+    "description": "POST /payments - verify full cases. Chay fixture SQL truoc: backend/test/fixtures/payments-fixtures.sql",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3001" },
+    { "key": "declineUrl", "value": "http://localhost:3002" },
+    { "key": "timeoutUrl", "value": "http://localhost:3003" },
+    { "key": "paymentId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "0. Health",
+      "item": [
+        {
+          "name": "GET /",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/", "host": ["{{baseUrl}}"], "path": [""] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. Validation (400)",
+      "item": [
+        {
+          "name": "V1 missing Idempotency-Key",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400', () => pm.response.to.have.status(400));",
+                  "pm.test('code', () => pm.expect(pm.response.json().code).to.eql('IDEMPOTENCY_KEY_REQUIRED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": 1005,\n  \"method\": \"WALLET\"\n}" },
+            "url": { "raw": "{{baseUrl}}/payments", "host": ["{{baseUrl}}"], "path": ["payments"] }
+          }
+        },
+        {
+          "name": "V2 invalid key (space)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400', () => pm.response.to.have.status(400));",
+                  "pm.test('code', () => pm.expect(pm.response.json().code).to.eql('INVALID_IDEMPOTENCY_KEY'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "bad key" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": 1005,\n  \"method\": \"WALLET\"\n}" },
+            "url": { "raw": "{{baseUrl}}/payments", "host": ["{{baseUrl}}"], "path": ["payments"] }
+          }
+        },
+        {
+          "name": "V3 extra field amount rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('400', () => pm.response.to.have.status(400));"] }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "v3-amount" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": 1005,\n  \"method\": \"WALLET\",\n  \"amount\": 1\n}" },
+            "url": { "raw": "{{baseUrl}}/payments", "host": ["{{baseUrl}}"], "path": ["payments"] }
+          }
+        },
+        {
+          "name": "V4 invalid method",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('400', () => pm.response.to.have.status(400));"] }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "v4-method" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": 1005,\n  \"method\": \"BITCOIN\"\n}" },
+            "url": { "raw": "{{baseUrl}}/payments", "host": ["{{baseUrl}}"], "path": ["payments"] }
+          }
+        },
+        {
+          "name": "V5 missing method",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('400', () => pm.response.to.have.status(400));"] }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "v5-nomethod" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": 1005\n}" },
+            "url": { "raw": "{{baseUrl}}/payments", "host": ["{{baseUrl}}"], "path": ["payments"] }
+          }
+        },
+        {
+          "name": "V6 missing orderId",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('400', () => pm.response.to.have.status(400));"] }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "v6-noorder" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"method\": \"WALLET\"\n}" },
+            "url": { "raw": "{{baseUrl}}/payments", "host": ["{{baseUrl}}"], "path": ["payments"] }
+          }
+        },
+        {
+          "name": "V7 orderId not integer",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('400', () => pm.response.to.have.status(400));"] }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "v7-string" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": \"abc\",\n  \"method\": \"WALLET\"\n}" },
+            "url": { "raw": "{{baseUrl}}/payments", "host": ["{{baseUrl}}"], "path": ["payments"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Order checks",
+      "item": [
+        {
+          "name": "NF1 order not found (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404', () => pm.response.to.have.status(404));",
+                  "pm.test('code', () => pm.expect(pm.response.json().code).to.eql('ORDER_NOT_FOUND'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "nf1-notfound" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": 999999,\n  \"method\": \"WALLET\"\n}" },
+            "url": { "raw": "{{baseUrl}}/payments", "host": ["{{baseUrl}}"], "path": ["payments"] }
+          }
+        },
+        {
+          "name": "NF2 order not payable CANCELLED (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409', () => pm.response.to.have.status(409));",
+                  "pm.test('code', () => pm.expect(pm.response.json().code).to.eql('ORDER_NOT_PAYABLE'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "nf2-cancelled" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": 1011,\n  \"method\": \"WALLET\"\n}" },
+            "url": { "raw": "{{baseUrl}}/payments", "host": ["{{baseUrl}}"], "path": ["payments"] }
+          }
+        },
+        {
+          "name": "NF3 order owned by another user (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404', () => pm.response.to.have.status(404));",
+                  "pm.test('code', () => pm.expect(pm.response.json().code).to.eql('ORDER_NOT_FOUND'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "nf3-owner" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": 1012,\n  \"method\": \"WALLET\"\n}" },
+            "url": { "raw": "{{baseUrl}}/payments", "host": ["{{baseUrl}}"], "path": ["payments"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Success + Idempotency",
+      "item": [
+        {
+          "name": "S1 pay order 1001 WALLET",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('SUCCEEDED + PAID', () => { pm.expect(b.status).to.eql('SUCCEEDED'); pm.expect(b.orderStatus).to.eql('PAID'); });",
+                  "pm.test('amount from order', () => pm.expect(b.amount).to.eql(85000));",
+                  "pm.collectionVariables.set('paymentId', b.paymentId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "s1-order-1001" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": 1001,\n  \"method\": \"WALLET\"\n}" },
+            "url": { "raw": "{{baseUrl}}/payments", "host": ["{{baseUrl}}"], "path": ["payments"] }
+          }
+        },
+        {
+          "name": "S2 replay same key",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('idempotentReplay true', () => pm.expect(b.idempotentReplay).to.eql(true));",
+                  "pm.test('same paymentId', () => pm.expect(b.paymentId).to.eql(pm.collectionVariables.get('paymentId')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "s1-order-1001" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": 1001,\n  \"method\": \"WALLET\"\n}" },
+            "url": { "raw": "{{baseUrl}}/payments", "host": ["{{baseUrl}}"], "path": ["payments"] }
+          }
+        },
+        {
+          "name": "S3 same key different payload (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409', () => pm.response.to.have.status(409));",
+                  "pm.test('code', () => pm.expect(pm.response.json().code).to.eql('IDEMPOTENCY_KEY_REUSED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "s1-order-1001" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": 1001,\n  \"method\": \"CARD\"\n}" },
+            "url": { "raw": "{{baseUrl}}/payments", "host": ["{{baseUrl}}"], "path": ["payments"] }
+          }
+        },
+        {
+          "name": "S4 order already paid, new key (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409', () => pm.response.to.have.status(409));",
+                  "pm.test('code', () => pm.expect(pm.response.json().code).to.eql('ORDER_ALREADY_PAID'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "s4-order-1001-new" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": 1001,\n  \"method\": \"WALLET\"\n}" },
+            "url": { "raw": "{{baseUrl}}/payments", "host": ["{{baseUrl}}"], "path": ["payments"] }
+          }
+        },
+        {
+          "name": "S5 pay order 1002 CARD",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('CARD + PAID', () => { pm.expect(b.method).to.eql('CARD'); pm.expect(b.orderStatus).to.eql('PAID'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "s5-order-1002" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": 1002,\n  \"method\": \"CARD\"\n}" },
+            "url": { "raw": "{{baseUrl}}/payments", "host": ["{{baseUrl}}"], "path": ["payments"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Decline (base 3002)",
+      "item": [
+        {
+          "name": "D1 decline order 1003 (402)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('402', () => pm.response.to.have.status(402));",
+                  "pm.test('code', () => pm.expect(pm.response.json().code).to.eql('PAYMENT_DECLINED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "d1-order-1003" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": 1003,\n  \"method\": \"CARD\"\n}" },
+            "url": { "raw": "{{declineUrl}}/payments", "host": ["{{declineUrl}}"], "path": ["payments"] }
+          }
+        },
+        {
+          "name": "D2 replay declined key (402 no extra charge)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('402', () => pm.response.to.have.status(402));",
+                  "pm.test('idempotentReplay true', () => pm.expect(pm.response.json().idempotentReplay).to.eql(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "d1-order-1003" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": 1003,\n  \"method\": \"CARD\"\n}" },
+            "url": { "raw": "{{declineUrl}}/payments", "host": ["{{declineUrl}}"], "path": ["payments"] }
+          }
+        },
+        {
+          "name": "D3 retry new key (402, new attempt)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('402', () => pm.response.to.have.status(402));",
+                  "pm.test('code', () => pm.expect(pm.response.json().code).to.eql('PAYMENT_DECLINED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "d3-order-1003-retry" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": 1003,\n  \"method\": \"WALLET\"\n}" },
+            "url": { "raw": "{{declineUrl}}/payments", "host": ["{{declineUrl}}"], "path": ["payments"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Timeout (base 3003)",
+      "item": [
+        {
+          "name": "T1 gateway timeout order 1004 (504)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('504', () => pm.response.to.have.status(504));",
+                  "pm.test('code', () => pm.expect(pm.response.json().code).to.eql('GATEWAY_TIMEOUT'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "t1-order-1004" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": 1004,\n  \"method\": \"CARD\"\n}" },
+            "url": { "raw": "{{timeoutUrl}}/payments", "host": ["{{timeoutUrl}}"], "path": ["payments"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Concurrency (dung curl, xem mo ta)",
+      "item": [
+        {
+          "name": "C1 two parallel requests same key",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('manual: run curl snippet in description', () => pm.expect(true).to.be.true);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "c1-order-1005-race" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": 1005,\n  \"method\": \"WALLET\"\n}" },
+            "url": { "raw": "{{baseUrl}}/payments", "host": ["{{baseUrl}}"], "path": ["payments"] },
+            "description": "Postman khong chay song song; dung lenh:\ncurl -s -w '\\n%{http_code}\\n' -X POST http://localhost:3001/payments -H 'Content-Type: application/json' -H 'Idempotency-Key: c1-race' -d '{\"orderId\":1005,\"method\":\"WALLET\"}' &\ncurl -s -w '\\n%{http_code}\\n' -X POST http://localhost:3001/payments -H 'Content-Type: application/json' -H 'Idempotency-Key: c1-race' -d '{\"orderId\":1005,\"method\":\"WALLET\"}' &\nwait\nKy vong: 1x200 + 1x409 PAYMENT_IN_PROGRESS, DB chi 1 payment cho order 1005."
+          }
+        }
+      ]
+    }
+  ]
+}
