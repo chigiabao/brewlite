@@ -1,0 +1,4 @@
+> coffeeshop-frontend@0.1.0 lint
+> eslint .
+
+✔ No ESLint warnings or errors found.

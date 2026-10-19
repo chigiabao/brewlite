@@ -1,0 +1,12 @@
+> coffeeshop-frontend@0.1.0 test
+> vitest run
+
+ RUN  v3.2.7 D:/demo1/frontend
+
+ ✓ tests/unit/cart.test.ts (12 tests) 15ms
+ ✓ tests/unit/pricing.test.ts (9 tests) 8ms
+
+ Test Files  2 passed (2)
+      Tests  21 passed (21)
+   Start at  00:52:45
+   Duration  1.10s (transform 158ms, setup 0ms, collect 211ms, tests 23ms, environment 1ms, prepare 639ms)

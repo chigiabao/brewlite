@@ -1,0 +1,14 @@
+🔍 [CoffeeShop] Running Foundation Guard verification...
+
+  ✅ [PASS] Node.js runtime >= 20
+  ✅ [PASS] File exists: frontend/store/cart.ts
+  ✅ [PASS] File exists: frontend/lib/pricing.ts
+  ✅ [PASS] File exists: frontend/app/cart/page.tsx
+  ✅ [PASS] File exists: frontend/components/cart-link.tsx
+  ✅ [PASS] File exists: CoffeeShop_GUIDE-V2_C-Cart_2026-10-15.manifest.json
+  ✅ [PASS] Ownership guard: Cart must NOT create backend cart API
+  ✅ [PASS] Ownership guard: Cart must NOT create cart table in Prisma schema
+  ✅ [PASS] Contract guard: Cart store uses coffeeshop-cart-v1
+
+----------------------------------------
+🎉 ALL FOUNDATION GUARDS PASSED. Stack ready for Task 5 implementation!
