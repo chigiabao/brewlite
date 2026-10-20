@@ -1,11 +1,13 @@
 import { IsIn, IsInt, Min } from 'class-validator';
 
-/** F sở hữu phương thức thanh toán; không nhận số tiền từ frontend. */
+export const PAYMENT_METHODS = ['WALLET', 'CARD'] as const;
+export type PaymentMethodInput = (typeof PAYMENT_METHODS)[number];
+
 export class PayDto {
   @IsInt()
   @Min(1)
-  orderId: number;
+  orderId!: number;
 
-  @IsIn(['WALLET', 'CARD'])
-  method: 'WALLET' | 'CARD';
+  @IsIn(PAYMENT_METHODS)
+  method!: PaymentMethodInput;
 }
