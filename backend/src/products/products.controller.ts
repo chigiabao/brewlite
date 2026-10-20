@@ -1,7 +1,6 @@
 import { Controller, Get, Param, ParseIntPipe } from '@nestjs/common';
 import { ProductsService } from './products.service.js';
 
-// Người phụ trách: B (Task 2)
 @Controller('products')
 export class ProductsController {
   constructor(private readonly products: ProductsService) {}
