@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
+import { PrismaModule } from '../prisma/prisma.module.js';
 import { RewardsController } from './rewards.controller.js';
 import { RewardsService } from './rewards.service.js';
 
-/** G triển khai độc lập; tích hợp với E/F qua contract đã khóa, không sửa service của họ tùy ý. */
+/** Foundation AppModule đã import RewardsModule; không cần sửa AppModule. */
 @Module({
+  imports: [PrismaModule],
   controllers: [RewardsController],
   providers: [RewardsService],
   exports: [RewardsService],

@@ -1,0 +1,21 @@
+$ tsc --strict --target ES2022 --module commonjs --outDir evidence/compiled backend/src/rewards/reward-rules.ts
+TypeScript pure rules: PASS
+$ node evidence/run-pure-rules-smoke.cjs
+PASS normalize trim uppercase
+PASS valid 10% discount
+PASS fixed discount
+PASS fixed capped subtotal
+PASS inactive
+PASS expired exact time
+PASS min spend
+PASS quota exhausted
+PASS valid rule
+PASS bad percent
+PASS both types
+PASS no types
+PASS negative subtotal
+PASS invalid money decimals
+PASS correct points quote
+PASS points cap remaining
+PASS earn floor at 1%
+SMOKE: 17/17 passed
