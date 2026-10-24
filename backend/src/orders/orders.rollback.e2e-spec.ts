@@ -182,22 +182,6 @@ it('creates only one order when concurrent requests use the same idempotency key
     (result) => result.status === 'rejected',
   );
 
-  // expect(successes).toHaveLength(2);
-  // expect(failures).toHaveLength(0);
-//   console.log(
-//   'Same-key concurrent results:',
-//   results.map((result) =>
-//     result.status === 'fulfilled'
-//       ? { status: result.status, value: result.value }
-//       : {
-//           status: result.status,
-//           error: result.reason,
-//           code: result.reason?.code,
-//           message: result.reason?.message,
-//         },
-//   ),
-// );
-
 expect(successes).toHaveLength(2);
 expect(failures).toHaveLength(0);
 

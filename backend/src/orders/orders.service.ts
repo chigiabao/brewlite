@@ -186,40 +186,7 @@ export class OrdersService {
           },
         });
       });
-      // } catch (error: unknown) {
-      //   // Request đồng thời có thể thua unique constraint.
-      //   // Transaction thất bại sẽ rollback cả phần trừ kho.
-      //   if (
-      //     error instanceof Prisma.PrismaClientKnownRequestError &&
-      //     error.code === 'P2002'
-      //   ) {
-      //     const winner = await this.prisma.order.findFirst({
-      //       where: { userId, idempotencyKey: key },
-      //       select: {
-      //         id: true,
-      //         status: true,
-      //         subtotal: true,
-      //         discountTotal: true,
-      //         pointsRedeemed: true,
-      //         total: true,
-      //         requestHash: true,
-      //       },
-      //     });
-
-      //     if (winner) {
-      //       if (winner.requestHash !== requestHash) {
-      //         throw new ConflictException(
-      //           'IDEMPOTENCY_KEY_PAYLOAD_MISMATCH',
-      //         );
-      //       }
-
-      //       const { requestHash: _hash, ...result } = winner;
-      //       return result;
-      //     }
-      //   }
-
-      //   throw error;
-      // }
+     
     } catch (error: unknown) {
       // Request đồng thời có thể thua unique constraint
       // hoặc gặp xung đột khi giữ tồn kho.

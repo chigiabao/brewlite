@@ -185,53 +185,8 @@ describe('OrdersService', () => {
       [product],
     );
   });
-//   it('trả về đơn hàng cũ khi cùng idempotency key và payload', async () => {
-//   const existingOrder = {
-//     id: 10,
-//     status: 'PENDING',
-//     subtotal: 40000,
-//     discountTotal: 0,
-//     pointsRedeemed: 0,
-//     total: 40000,
-//   };
-
-//   prisma.order.findFirst.mockResolvedValue({
-//     ...existingOrder,
-//      requestHash: 'existing-hash',
-//   });
-
-//   const result = await service.create(
-//     7,
-//     {
-//       items: [
-//         {
-//           productId: 1,
-//           size: 'M',
-//           toppings: ['Trân châu'],
-//           qty: 1,
-//         },
-//       ],
-//     },
-//     'duplicate-order-test',
-//   );
-
-//   expect(result).toEqual(existingOrder);
-//   expect(prisma.order.findFirst).toHaveBeenCalled();
-//   expect(prisma.$transaction).not.toHaveBeenCalled();
-//   expect(stock.reserve).not.toHaveBeenCalled();
-// });
 
 it('trả về đơn hàng cũ khi cùng idempotency key và payload', async () => {
-  // const payload = {
-  //   items: [
-  //     {
-  //       productId: 1,
-  //       size: 'M',
-  //       toppings: ['Trân châu'],
-  //       qty: 1,
-  //     },
-  //   ],
-  // };
   const payload: CreateOrderDto = {
   items: [
     {
