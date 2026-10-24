@@ -1,0 +1,11 @@
+﻿Command: npx.cmd prisma db seed
+WorkingDirectory: C:\Users\Gtvkun\Documents\GitHub\brewlite\backend
+Started(UTC): 2026-10-24T02:45:13.7545926Z
+
+Loaded Prisma config from prisma.config.ts.
+System.Management.Automation.RemoteException
+Running seed command `tsx prisma/seed.ts` ...
+
+The seed command has been executed.
+
+ExitCode: 0

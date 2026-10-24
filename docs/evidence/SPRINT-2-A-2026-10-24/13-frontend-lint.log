@@ -1,0 +1,19 @@
+﻿Command: npm.cmd run lint
+WorkingDirectory: C:\Users\Gtvkun\Documents\GitHub\brewlite\frontend
+Started(UTC): 2026-10-24T02:45:47.3880713Z
+
+
+> frontend@0.1.0 lint
+> eslint
+
+
+C:\Users\Gtvkun\Documents\GitHub\brewlite\frontend\app\page.tsx
+  27:11  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\Gtvkun\Documents\GitHub\brewlite\frontend\app\products\[id]\page.tsx
+  38:7  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+✖ 2 problems (0 errors, 2 warnings)
+
+
+ExitCode: 0

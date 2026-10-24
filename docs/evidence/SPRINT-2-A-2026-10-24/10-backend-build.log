@@ -1,0 +1,10 @@
+﻿Command: npm.cmd run build
+WorkingDirectory: C:\Users\Gtvkun\Documents\GitHub\brewlite\backend
+Started(UTC): 2026-10-24T02:45:24.6343075Z
+
+
+> backend@0.0.1 build
+> nest build
+
+
+ExitCode: 0

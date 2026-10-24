@@ -1,0 +1,174 @@
+﻿Command: docker compose down -v --remove-orphans; docker compose up -d --build --wait; docker compose ps
+WorkingDirectory: C:\Users\Gtvkun\Documents\GitHub\brewlite
+Started(UTC): 2026-10-24T02:46:13.0531822Z
+
+ Container brewlite-db-1 Stopping 
+ Container brewlite-db-1 Stopped 
+ Container brewlite-db-1 Removing 
+ Container brewlite-db-1 Removed 
+ Volume brewlite_dbdata Removing 
+ Network brewlite_default Removing 
+ Volume brewlite_dbdata Removed 
+ Network brewlite_default Removed 
+ Image brewlite-backend Building 
+ Image brewlite-frontend Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.14kB done
+#1 DONE 0.0s
+
+#2 [backend internal] load build definition from Dockerfile
+#2 transferring dockerfile: 678B 0.0s done
+#2 DONE 0.0s
+
+#3 [frontend internal] load build definition from Dockerfile
+#3 transferring dockerfile: 244B done
+#3 DONE 0.0s
+
+#4 [frontend internal] load metadata for docker.io/library/node:24-alpine
+#4 ...
+
+#5 [backend internal] load metadata for docker.io/library/node:24-bookworm-slim
+#5 DONE 1.9s
+
+#4 [frontend internal] load metadata for docker.io/library/node:24-alpine
+#4 DONE 2.0s
+
+#6 [backend internal] load .dockerignore
+#6 transferring context: 63B done
+#6 DONE 0.0s
+
+#7 [frontend internal] load .dockerignore
+#7 transferring context: 73B done
+#7 DONE 0.0s
+
+#8 [frontend internal] load build context
+#8 DONE 0.0s
+
+#9 [backend 1/7] FROM docker.io/library/node:24-bookworm-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205
+#9 resolve docker.io/library/node:24-bookworm-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 0.0s done
+#9 DONE 0.1s
+
+#10 [backend internal] load build context
+#10 transferring context: 730.21kB 0.1s done
+#10 DONE 0.1s
+
+#11 [frontend 1/6] FROM docker.io/library/node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53
+#11 resolve docker.io/library/node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 0.0s done
+#11 DONE 0.1s
+
+#8 [frontend internal] load build context
+#8 transferring context: 1.46kB 0.0s done
+#8 DONE 0.0s
+
+#12 [frontend 2/6] WORKDIR /app
+#12 CACHED
+
+#13 [frontend 3/6] COPY package*.json ./
+#13 CACHED
+
+#14 [frontend 4/6] RUN npm ci
+#14 CACHED
+
+#15 [frontend 5/6] COPY . .
+#15 CACHED
+
+#16 [frontend 6/6] RUN npm run build
+#16 CACHED
+
+#17 [frontend] exporting to image
+#17 exporting layers done
+#17 exporting manifest sha256:43e5a15b55efecdcff0980a05ca1a92c6a0a4b29cbffb13853d9ddebaa7ad0c7 done
+#17 exporting config sha256:7588498b5f48762fc4b5f903da12d27c560578ed5c9d4e8808b1012f3a45f645 done
+#17 exporting attestation manifest sha256:572e75b905aa31ce364d27bafffc2f338123e766ef3ab93b307c979ef7959f0c 0.0s done
+#17 exporting manifest list sha256:238424157eedb119f3dab5c3f1e973b44019f04afdc86079404118fee83e7c0d 0.0s done
+#17 naming to docker.io/library/brewlite-frontend:latest done
+#17 unpacking to docker.io/library/brewlite-frontend:latest 0.0s done
+#17 DONE 0.2s
+
+#18 [backend 3/7] WORKDIR /app
+#18 CACHED
+
+#19 [backend 4/7] COPY package*.json ./
+#19 CACHED
+
+#20 [backend 2/7] RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+#20 CACHED
+
+#21 [backend 5/7] RUN npm ci
+#21 CACHED
+
+#22 [backend 6/7] COPY . .
+#22 DONE 0.1s
+
+#23 [backend 7/7] RUN DATABASE_URL="postgresql://build:build@localhost:5432/brewlite?schema=public"     sh -c 'npx prisma generate && npm run build'
+#23 ...
+
+#24 [frontend] resolving provenance for metadata file
+#24 DONE 0.0s
+
+#23 [backend 7/7] RUN DATABASE_URL="postgresql://build:build@localhost:5432/brewlite?schema=public"     sh -c 'npx prisma generate && npm run build'
+#23 1.923 Loaded Prisma config from prisma.config.ts.
+#23 1.923 
+#23 2.186 Prisma schema loaded from prisma/schema.prisma.
+#23 2.381 
+#23 2.381 ✔ Generated Prisma Client (7.10.0) to ./src/generated/prisma in 127ms
+#23 2.381 
+#23 2.538 
+#23 2.538 > backend@0.0.1 build
+#23 2.538 > nest build
+#23 2.538 
+#23 DONE 6.7s
+
+#25 [backend] exporting to image
+#25 exporting layers
+#25 exporting layers 0.2s done
+#25 exporting manifest sha256:96e6ef8e08f9013e3b7e4c49378a16ab7fa83a822f9c65a9e35253304a19f6d9 0.0s done
+#25 exporting config sha256:0296e66689b7458375cf1327f520fad126041dfc224ec7df4b9446444ce336d5 0.0s done
+#25 exporting attestation manifest sha256:bf86698c1ef7f5a34f1fa0fbd4ec5ac33946488500fa4d8d6950ab2f88abe207 0.0s done
+#25 exporting manifest list sha256:380632a8254914c6ca826ad5fac1fdce74229731d125f0513b22a8746a7a7bb5 0.0s done
+#25 naming to docker.io/library/brewlite-backend:latest
+#25 naming to docker.io/library/brewlite-backend:latest done
+#25 unpacking to docker.io/library/brewlite-backend:latest
+#25 unpacking to docker.io/library/brewlite-backend:latest 11.4s done
+#25 DONE 11.7s
+
+#26 [backend] resolving provenance for metadata file
+#26 DONE 0.0s
+ Image brewlite-backend Built 
+ Image brewlite-frontend Built 
+ Network brewlite_default Creating 
+ Volume brewlite_dbdata Creating 
+ Network brewlite_default Creating 
+ Volume brewlite_dbdata Creating 
+ Volume brewlite_dbdata Created 
+ Volume brewlite_dbdata Created 
+ Network brewlite_default Created 
+ Network brewlite_default Created 
+ Container brewlite-db-1 Creating 
+ Container brewlite-db-1 Created 
+ Container brewlite-backend-1 Creating 
+ Container brewlite-backend-1 Created 
+ Container brewlite-frontend-1 Creating 
+ Container brewlite-frontend-1 Created 
+ Container brewlite-db-1 Starting 
+ Container brewlite-db-1 Started 
+ Container brewlite-db-1 Waiting 
+ Container brewlite-db-1 Healthy 
+ Container brewlite-backend-1 Starting 
+ Container brewlite-backend-1 Started 
+ Container brewlite-backend-1 Waiting 
+ Container brewlite-backend-1 Healthy 
+ Container brewlite-frontend-1 Starting 
+ Container brewlite-frontend-1 Started 
+ Container brewlite-backend-1 Waiting 
+ Container brewlite-frontend-1 Waiting 
+ Container brewlite-db-1 Waiting 
+ Container brewlite-db-1 Healthy 
+ Container brewlite-backend-1 Healthy 
+ Container brewlite-frontend-1 Healthy 
+NAME                  IMAGE               COMMAND                  SERVICE    CREATED          STATUS                    PORTS
+brewlite-backend-1    brewlite-backend    "docker-entrypoint.s…"   backend    21 seconds ago   Up 16 seconds (healthy)   0.0.0.0:3001->3001/tcp, [::]:3001->3001/tcp
+brewlite-db-1         postgres:16         "docker-entrypoint.s…"   db         22 seconds ago   Up 20 seconds (healthy)   0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp
+brewlite-frontend-1   brewlite-frontend   "docker-entrypoint.s…"   frontend   21 seconds ago   Up 5 seconds (healthy)    0.0.0.0:3000->3000/tcp, [::]:3000->3000/tcp
+
+ExitCode: 0

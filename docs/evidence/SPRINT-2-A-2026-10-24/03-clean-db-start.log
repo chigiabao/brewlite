@@ -1,0 +1,28 @@
+﻿Command: docker compose down -v --remove-orphans; docker compose up -d --wait db
+WorkingDirectory: C:\Users\Gtvkun\Documents\GitHub\brewlite
+Started(UTC): 2026-10-24T02:44:57.6452316Z
+
+ Container brewlite-db-1 Stopping 
+ Container brewlite-db-1 Stopped 
+ Container brewlite-db-1 Removing 
+ Container brewlite-db-1 Removed 
+ Volume brewlite_dbdata Removing 
+ Network brewlite_default Removing 
+ Volume brewlite_dbdata Removed 
+ Network brewlite_default Removed 
+ Network brewlite_default Creating 
+ Volume brewlite_dbdata Creating 
+ Network brewlite_default Creating 
+ Volume brewlite_dbdata Creating 
+ Volume brewlite_dbdata Created 
+ Volume brewlite_dbdata Created 
+ Network brewlite_default Created 
+ Network brewlite_default Created 
+ Container brewlite-db-1 Creating 
+ Container brewlite-db-1 Created 
+ Container brewlite-db-1 Starting 
+ Container brewlite-db-1 Started 
+ Container brewlite-db-1 Waiting 
+ Container brewlite-db-1 Healthy 
+
+ExitCode: 0

@@ -1,0 +1,72 @@
+﻿Command: npm.cmd run lint
+WorkingDirectory: C:\Users\Gtvkun\Documents\GitHub\brewlite\backend
+Started(UTC): 2026-10-24T02:45:22.8954580Z
+
+
+> backend@0.0.1 lint
+> oxlint --type-aware src/ test/
+
+
+  ! eslint(no-unused-vars): Parameter 'userId' is declared but never used. Unused parameters should start with a '_'.
+    ,-[src/orders/orders.service.ts:12:10]
+ 11 |   // TODO(E – Task 10): trừ tồn kho trong transaction (stock.service.ts) và áp couponCode qua hợp đồng Rewards (G), E chịu trách nhiệm transaction.
+ 12 |   create(userId: number, dto: CreateOrderDto) {
+    :          ^^^|^^
+    :             `-- 'userId' is declared here
+ 13 |     throw new NotImplementedException('POST /orders chưa làm (E – Task 6)');
+    `----
+  help: Consider removing this parameter.
+
+  ! eslint(no-unused-vars): Parameter 'dto' is declared but never used. Unused parameters should start with a '_'.
+    ,-[src/orders/orders.service.ts:12:26]
+ 11 |   // TODO(E – Task 10): trừ tồn kho trong transaction (stock.service.ts) và áp couponCode qua hợp đồng Rewards (G), E chịu trách nhiệm transaction.
+ 12 |   create(userId: number, dto: CreateOrderDto) {
+    :                          ^|^
+    :                           `-- 'dto' is declared here
+ 13 |     throw new NotImplementedException('POST /orders chưa làm (E – Task 6)');
+    `----
+  help: Consider removing this parameter.
+
+  ! eslint(no-unused-vars): Parameter 'userId' is declared but never used. Unused parameters should start with a '_'.
+    ,-[src/orders/orders.service.ts:17:12]
+ 16 |   // TODO(E – Task 9): trả [{ id, status, total, createdAt }] của user, mới nhất trước.
+ 17 |   findMine(userId: number) {
+    :            ^^^|^^
+    :               `-- 'userId' is declared here
+ 18 |     throw new NotImplementedException('GET /orders/me chưa làm (E – Task 9)');
+    `----
+  help: Consider removing this parameter.
+
+  ! eslint(no-unused-vars): Parameter 'dto' is declared but never used. Unused parameters should start with a '_'.
+    ,-[src/auth/auth.service.ts:14:12]
+ 13 |   // TODO(D – Task 7): băm mật khẩu bằng bcryptjs, lưu User, trả { id, email }.
+ 14 |   register(dto: AuthDto) {
+    :            ^|^
+    :             `-- 'dto' is declared here
+ 15 |     throw new NotImplementedException('POST /auth/register chưa làm (D – Task 7)');
+    `----
+  help: Consider removing this parameter.
+
+  ! eslint(no-unused-vars): Parameter 'dto' is declared but never used. Unused parameters should start with a '_'.
+    ,-[src/auth/auth.service.ts:19:9]
+ 18 |   // TODO(D – Task 7): so khớp mật khẩu, trả { accessToken } (payload: { sub: user.id, email }).
+ 19 |   login(dto: AuthDto) {
+    :         ^|^
+    :          `-- 'dto' is declared here
+ 20 |     throw new NotImplementedException('POST /auth/login chưa làm (D – Task 7)');
+    `----
+  help: Consider removing this parameter.
+
+  ! eslint(no-unused-vars): Identifier 'IsOptional' is imported but never used.
+   ,-[src/rewards/rewards.dto.ts:1:17]
+ 1 | import { IsInt, IsOptional, IsString, Min } from 'class-validator';
+   :                 ^^^^^|^^^^
+   :                      `-- 'IsOptional' is imported here
+ 2 | 
+   `----
+  help: Consider removing this import.
+
+Found 6 warnings and 0 errors.
+Finished in 693ms on 49 files with 111 rules using 8 threads.
+
+ExitCode: 0

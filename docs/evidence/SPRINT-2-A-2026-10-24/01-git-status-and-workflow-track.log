@@ -1,0 +1,15 @@
+﻿Command: git status --short; git ls-files .github/workflows/foundation.yml
+WorkingDirectory: C:\Users\Gtvkun\Documents\GitHub\brewlite
+Started(UTC): 2026-10-24T02:44:57.3280739Z
+
+ M .github/workflows/foundation.yml
+ M .gitignore
+ M backend/prisma/seed.ts
+ M backend/vitest.config.e2e.ts
+ M docker-compose.yml
+ M scripts/verify-foundation.mjs
+?? docs/evidence/SPRINT-2-A-2026-10-24/
+?? scripts/collect-sprint2-a-evidence.ps1
+.github/workflows/foundation.yml
+
+ExitCode: 0

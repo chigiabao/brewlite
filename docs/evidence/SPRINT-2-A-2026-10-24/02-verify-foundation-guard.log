@@ -1,0 +1,7 @@
+﻿Command: node scripts/verify-foundation.mjs
+WorkingDirectory: C:\Users\Gtvkun\Documents\GitHub\brewlite
+Started(UTC): 2026-10-24T02:44:57.4900580Z
+
+PASS FOUNDATION V1 & SPRINT 2 LOCK: contract, giá, healthcheck, seed idempotent, CI và ranh giới import nhất quán.
+
+ExitCode: 0

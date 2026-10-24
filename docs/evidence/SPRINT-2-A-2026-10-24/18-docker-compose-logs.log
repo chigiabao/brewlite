@@ -1,0 +1,128 @@
+﻿Command: docker compose logs --no-color --tail=200 backend frontend db
+WorkingDirectory: C:\Users\Gtvkun\Documents\GitHub\brewlite
+Started(UTC): 2026-10-24T02:47:06.2165343Z
+
+db-1       | The files belonging to this database system will be owned by user "postgres".
+db-1       | This user must also own the server process.
+db-1       | 
+db-1       | The database cluster will be initialized with locale "en_US.utf8".
+db-1       | The default database encoding has accordingly been set to "UTF8".
+db-1       | The default text search configuration will be set to "english".
+db-1       | 
+db-1       | Data page checksums are disabled.
+db-1       | 
+db-1       | fixing permissions on existing directory /var/lib/postgresql/data ... ok
+db-1       | creating subdirectories ... ok
+db-1       | selecting dynamic shared memory implementation ... posix
+db-1       | selecting default max_connections ... 100
+db-1       | selecting default shared_buffers ... 128MB
+db-1       | selecting default time zone ... Etc/UTC
+db-1       | creating configuration files ... ok
+db-1       | running bootstrap script ... ok
+db-1       | performing post-bootstrap initialization ... ok
+db-1       | initdb: warning: enabling "trust" authentication for local connections
+db-1       | initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+db-1       | syncing data to disk ... ok
+db-1       | 
+db-1       | 
+db-1       | Success. You can now start the database server using:
+db-1       | 
+db-1       |     pg_ctl -D /var/lib/postgresql/data -l logfile start
+db-1       | 
+db-1       | waiting for server to start....2026-10-24 02:46:39.452 UTC [48] LOG:  starting PostgreSQL 16.15 (Debian 16.15-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+db-1       | 2026-10-24 02:46:39.456 UTC [48] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+db-1       | 2026-10-24 02:46:39.467 UTC [51] LOG:  database system was shut down at 2026-10-24 02:46:39 UTC
+db-1       | 2026-10-24 02:46:39.473 UTC [48] LOG:  database system is ready to accept connections
+db-1       |  done
+db-1       | server started
+db-1       | CREATE DATABASE
+db-1       | 
+db-1       | 
+db-1       | /usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+db-1       | 
+db-1       | waiting for server to shut down...2026-10-24 02:46:39.674 UTC [48] LOG:  received fast shutdown request
+db-1       | .2026-10-24 02:46:39.678 UTC [48] LOG:  aborting any active transactions
+db-1       | 2026-10-24 02:46:39.681 UTC [48] LOG:  background worker "logical replication launcher" (PID 54) exited with exit code 1
+db-1       | 2026-10-24 02:46:39.681 UTC [49] LOG:  shutting down
+db-1       | 2026-10-24 02:46:39.685 UTC [49] LOG:  checkpoint starting: shutdown immediate
+db-1       | 2026-10-24 02:46:39.788 UTC [49] LOG:  checkpoint complete: wrote 926 buffers (5.7%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.030 s, sync=0.054 s, total=0.107 s; sync files=301, longest=0.006 s, average=0.001 s; distance=4273 kB, estimate=4273 kB; lsn=0/191F0E8, redo lsn=0/191F0E8
+backend-1  | Loaded Prisma config from prisma.config.ts.
+backend-1  | 
+backend-1  | Prisma schema loaded from prisma/schema.prisma.
+backend-1  | Datasource "db": PostgreSQL database "brewlite", schema "public" at "db:5432"
+backend-1  | 
+backend-1  | 1 migration found in prisma/migrations
+backend-1  | 
+backend-1  | Applying migration `20261014000100_foundation_v1`
+backend-1  | 
+backend-1  | ┌─────────────────────────────────────────────────────────┐
+backend-1  | │  Update available 7.10.0 -> 8.0.0-rc.27                 │
+backend-1  | │                                                         │
+backend-1  | │  This is a major update - please follow the guide at    │
+backend-1  | │  https://pris.ly/d/major-version-upgrade                │
+backend-1  | │                                                         │
+backend-1  | │  Run the following to update                            │
+backend-1  | │    npm i --save-dev prisma@latest                       │
+backend-1  | │    npm i @prisma/client@latest                          │
+backend-1  | └─────────────────────────────────────────────────────────┘
+backend-1  | The following migration(s) have been applied:
+backend-1  | 
+backend-1  | migrations/
+backend-1  |   └─ 20261014000100_foundation_v1/
+backend-1  |     └─ migration.sql
+backend-1  | 
+backend-1  | All migrations have been successfully applied.
+backend-1  | Loaded Prisma config from prisma.config.ts.
+backend-1  | 
+backend-1  | Running seed command `tsx prisma/seed.ts` ...
+backend-1  | 
+backend-1  | 🌱  The seed command has been executed.
+backend-1  | [32m[Nest] 135  - [39m10/24/2026, 2:46:47 AM [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+backend-1  | [32m[Nest] 135  - [39m10/24/2026, 2:46:47 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mPrismaModule dependencies initialized[39m[38;5;3m +38ms[39m
+backend-1  | [32m[Nest] 135  - [39m10/24/2026, 2:46:47 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mPassportModule dependencies initialized[39m[38;5;3m +0ms[39m
+backend-1  | [32m[Nest] 135  - [39m10/24/2026, 2:46:47 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mJwtModule dependencies initialized[39m[38;5;3m +4ms[39m
+backend-1  | [32m[Nest] 135  - [39m10/24/2026, 2:46:47 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAppModule dependencies initialized[39m[38;5;3m +1ms[39m
+backend-1  | [32m[Nest] 135  - [39m10/24/2026, 2:46:47 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mRewardsModule dependencies initialized[39m[38;5;3m +0ms[39m
+backend-1  | [32m[Nest] 135  - [39m10/24/2026, 2:46:47 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mOrdersModule dependencies initialized[39m[38;5;3m +1ms[39m
+backend-1  | [32m[Nest] 135  - [39m10/24/2026, 2:46:47 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAuthModule dependencies initialized[39m[38;5;3m +0ms[39m
+backend-1  | [32m[Nest] 135  - [39m10/24/2026, 2:46:47 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mProductsModule dependencies initialized[39m[38;5;3m +0ms[39m
+backend-1  | [32m[Nest] 135  - [39m10/24/2026, 2:46:47 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mPaymentsModule dependencies initialized[39m[38;5;3m +1ms[39m
+backend-1  | [32m[Nest] 135  - [39m10/24/2026, 2:46:47 AM [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mAppController {/}:[39m[38;5;3m +9ms[39m
+backend-1  | [32m[Nest] 135  - [39m10/24/2026, 2:46:47 AM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/, GET} route[39m[38;5;3m +7ms[39m
+backend-1  | [32m[Nest] 135  - [39m10/24/2026, 2:46:47 AM [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mProductsController {/products}:[39m[38;5;3m +0ms[39m
+backend-1  | [32m[Nest] 135  - [39m10/24/2026, 2:46:47 AM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/products, GET} route[39m[38;5;3m +1ms[39m
+backend-1  | [32m[Nest] 135  - [39m10/24/2026, 2:46:47 AM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/products/:id, GET} route[39m[38;5;3m +1ms[39m
+backend-1  | [32m[Nest] 135  - [39m10/24/2026, 2:46:47 AM [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mAuthController {/auth}:[39m[38;5;3m +0ms[39m
+backend-1  | [32m[Nest] 135  - [39m10/24/2026, 2:46:47 AM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/register, POST} route[39m[38;5;3m +1ms[39m
+backend-1  | [32m[Nest] 135  - [39m10/24/2026, 2:46:47 AM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/login, POST} route[39m[38;5;3m +1ms[39m
+backend-1  | [32m[Nest] 135  - [39m10/24/2026, 2:46:47 AM [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mOrdersController {/orders}:[39m[38;5;3m +0ms[39m
+backend-1  | [32m[Nest] 135  - [39m10/24/2026, 2:46:47 AM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/orders, POST} route[39m[38;5;3m +0ms[39m
+backend-1  | [32m[Nest] 135  - [39m10/24/2026, 2:46:47 AM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/orders/me, GET} route[39m[38;5;3m +0ms[39m
+backend-1  | [32m[Nest] 135  - [39m10/24/2026, 2:46:47 AM [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mPaymentsController {/payments}:[39m[38;5;3m +1ms[39m
+backend-1  | [32m[Nest] 135  - [39m10/24/2026, 2:46:47 AM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/payments, POST} route[39m[38;5;3m +0ms[39m
+backend-1  | [32m[Nest] 135  - [39m10/24/2026, 2:46:47 AM [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mRewardsController {/coupons}:[39m[38;5;3m +0ms[39m
+backend-1  | [32m[Nest] 135  - [39m10/24/2026, 2:46:47 AM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/coupons/validate, POST} route[39m[38;5;3m +1ms[39m
+backend-1  | [32m[Nest] 135  - [39m10/24/2026, 2:46:47 AM [32m    LOG[39m [38;5;3m[NestApplication] [39m[32mNest application successfully started[39m[38;5;3m +2ms[39m
+db-1       | 2026-10-24 02:46:39.793 UTC [48] LOG:  database system is shut down
+db-1       |  done
+db-1       | server stopped
+db-1       | 
+db-1       | PostgreSQL init process complete; ready for start up.
+db-1       | 
+db-1       | 2026-10-24 02:46:39.931 UTC [1] LOG:  starting PostgreSQL 16.15 (Debian 16.15-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+db-1       | 2026-10-24 02:46:39.932 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+db-1       | 2026-10-24 02:46:39.932 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+db-1       | 2026-10-24 02:46:39.938 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+db-1       | 2026-10-24 02:46:39.946 UTC [64] LOG:  database system was shut down at 2026-10-24 02:46:39 UTC
+db-1       | 2026-10-24 02:46:39.951 UTC [1] LOG:  database system is ready to accept connections
+frontend-1  | 
+frontend-1  | > frontend@0.1.0 start
+frontend-1  | > next start
+frontend-1  | 
+frontend-1  | ▲ Next.js 16.4.0
+frontend-1  | - Local:         http://localhost:3000
+frontend-1  | - Network:       http://172.20.0.4:3000
+frontend-1  | ✓ Ready in 252ms
+frontend-1  | ✓ Running next.config.ts took 67ms
+
+ExitCode: 0

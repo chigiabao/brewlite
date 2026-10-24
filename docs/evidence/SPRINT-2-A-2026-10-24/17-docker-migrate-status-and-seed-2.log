@@ -1,0 +1,19 @@
+﻿Command: docker compose exec -T backend npx prisma migrate status; docker compose exec -T backend npx prisma db seed
+WorkingDirectory: C:\Users\Gtvkun\Documents\GitHub\brewlite
+Started(UTC): 2026-10-24T02:46:59.4218681Z
+
+Loaded Prisma config from prisma.config.ts.
+System.Management.Automation.RemoteException
+Prisma schema loaded from prisma/schema.prisma.
+Datasource "db": PostgreSQL database "brewlite", schema "public" at "db:5432"
+
+1 migration found in prisma/migrations
+
+Database schema is up to date!
+Loaded Prisma config from prisma.config.ts.
+System.Management.Automation.RemoteException
+Running seed command `tsx prisma/seed.ts` ...
+
+🌱  The seed command has been executed.
+
+ExitCode: 0

@@ -7,6 +7,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(root,p), 'utf8');
 const spec = JSON.parse(read('contracts/brewlite-v1.json'));
 const schema = read('backend/prisma/schema.prisma');
+const compose = read('docker-compose.yml');
+const seed = read('backend/prisma/seed.ts');
 const a = read('backend/src/common/pricing.ts');
 const b = read('frontend/lib/pricing.ts');
 const modules = ['auth','orders','payments','products','rewards'];
@@ -22,6 +24,11 @@ for (const fragment of ['idempotencyKey String', 'requestHash', 'payments       
   assert.ok(schema.includes(fragment), `Thiếu nền schema: ${fragment}`);
 assert.match(read('backend/Dockerfile'), /FROM node:24/);
 assert.match(read('frontend/Dockerfile'), /FROM node:24/);
+assert.ok(fs.existsSync(path.join(root, '.github/workflows/foundation.yml')), 'Thiếu .github/workflows/foundation.yml');
+assert.match(compose, /127\.0\.0\.1:3001/, 'docker-compose.yml thiếu HTTP healthcheck cho backend');
+assert.match(compose, /127\.0\.0\.1:3000/, 'docker-compose.yml thiếu HTTP healthcheck cho frontend');
+assert.doesNotMatch(seed, /product\.count\(\)\)\s*>\s*0\)\s*return/, 'seed.ts không được return sớm khi đã có Product');
+assert.match(seed, /prisma\.coupon\.upsert/, 'seed.ts phải seed Coupon độc lập bằng upsert');
 for (const status of spec.orderStatus) {
   assert.match(schema, new RegExp(`\\b${status}\\b`), `Schema thiếu trạng thái ${status}`);
   assert.match(read('backend/src/contracts/public.ts'), new RegExp(`'${status}'`));
@@ -56,4 +63,4 @@ for (const module of modules) {
   }
 }
 assert.ok(fs.existsSync(path.join(root,'backend/prisma/migrations/20261014000100_foundation_v1/migration.sql')));
-console.log('PASS FOUNDATION V1: contract, giá, module và ranh giới import nhất quán.');
+console.log('PASS FOUNDATION V1 & SPRINT 2 LOCK: contract, giá, healthcheck, seed idempotent, CI và ranh giới import nhất quán.');

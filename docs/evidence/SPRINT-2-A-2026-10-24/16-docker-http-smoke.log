@@ -1,0 +1,8 @@
+﻿Command: Invoke-WebRequest http://localhost:3001/ -UseBasicParsing | Select-Object StatusCode, Content; Invoke-WebRequest http://localhost:3000/ -UseBasicParsing | Select-Object StatusCode
+WorkingDirectory: C:\Users\Gtvkun\Documents\GitHub\brewlite
+Started(UTC): 2026-10-24T02:46:59.2114500Z
+
+@{StatusCode=200; Content=Hello World!}
+@{StatusCode=200}
+
+ExitCode: 0

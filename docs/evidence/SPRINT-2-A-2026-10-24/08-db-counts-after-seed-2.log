@@ -1,0 +1,22 @@
+﻿Command: @'
+SELECT (SELECT COUNT(*) FROM "Product") AS product_count, (SELECT COUNT(*) FROM "Coupon") AS coupon_count;
+SELECT id, name, price, stock FROM "Product" ORDER BY id;
+'@ | docker compose exec -T db psql -U brew -d brewlite
+WorkingDirectory: C:\Users\Gtvkun\Documents\GitHub\brewlite
+Started(UTC): 2026-10-24T02:45:22.3347794Z
+
+ product_count | coupon_count 
+---------------+--------------
+             4 |            3
+(1 row)
+
+ id |    name    | price | stock 
+----+------------+-------+-------
+  1 | Cà phê sữa | 35000 |   100
+  2 | Americano  | 40000 |   100
+  3 | Cappuccino | 45000 |   100
+  4 | Trà đào    | 39000 |   100
+(4 rows)
+
+
+ExitCode: 0

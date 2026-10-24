@@ -1,0 +1,32 @@
+﻿Command: npx.cmd prisma validate; npx.cmd prisma migrate deploy; npx.cmd prisma generate
+WorkingDirectory: C:\Users\Gtvkun\Documents\GitHub\brewlite\backend
+Started(UTC): 2026-10-24T02:45:03.8825427Z
+
+Loaded Prisma config from prisma.config.ts.
+System.Management.Automation.RemoteException
+Prisma schema loaded from prisma\schema.prisma.
+The schema at prisma\schema.prisma is valid 🚀
+Loaded Prisma config from prisma.config.ts.
+System.Management.Automation.RemoteException
+Prisma schema loaded from prisma\schema.prisma.
+Datasource "db": PostgreSQL database "brewlite", schema "public" at "127.0.0.1:5432"
+
+1 migration found in prisma/migrations
+
+Applying migration `20261014000100_foundation_v1`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20261014000100_foundation_v1/
+    └─ migration.sql
+
+All migrations have been successfully applied.
+Loaded Prisma config from prisma.config.ts.
+System.Management.Automation.RemoteException
+Prisma schema loaded from prisma\schema.prisma.
+
+✔ Generated Prisma Client (7.10.0) to .\src\generated\prisma in 389ms
+
+
+ExitCode: 0

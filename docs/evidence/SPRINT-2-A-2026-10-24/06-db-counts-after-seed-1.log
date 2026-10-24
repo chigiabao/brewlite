@@ -1,0 +1,21 @@
+﻿Command: @'
+SELECT (SELECT COUNT(*) FROM "Product") AS product_count, (SELECT COUNT(*) FROM "Coupon") AS coupon_count;
+SELECT code, "discountPercent", "discountAmount", "minOrderValue", active FROM "Coupon" ORDER BY code;
+'@ | docker compose exec -T db psql -U brew -d brewlite
+WorkingDirectory: C:\Users\Gtvkun\Documents\GitHub\brewlite
+Started(UTC): 2026-10-24T02:45:18.1274475Z
+
+ product_count | coupon_count 
+---------------+--------------
+             4 |            3
+(1 row)
+
+  code   | discountPercent | discountAmount | minOrderValue | active 
+---------+-----------------+----------------+---------------+--------
+ GIAM10  |              10 |                |         30000 | t
+ GIAM15K |                 |          15000 |         50000 | t
+ HET_HAN |              20 |                |             0 | t
+(3 rows)
+
+
+ExitCode: 0

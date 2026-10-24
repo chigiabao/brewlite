@@ -1,17 +1,26 @@
-name: BrewLite Foundation
+name: Foundation & Sprint 2 CI
+
 on:
   push:
+    branches: [main, develop, 'feature/**']
   pull_request:
+    branches: [main, develop]
+
 jobs:
   contract:
+    name: Contract & Ownership Guard
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
-      - run: node scripts/verify-foundation.mjs
+          node-version: 24
+      - name: Verify Foundation & Shared Contract Lock
+        run: node scripts/verify-foundation.mjs
+
   backend:
+    name: Backend (Prisma + Seed x2 + Lint + Build + Unit + E2E)
+    needs: [contract]
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -20,32 +29,55 @@ jobs:
           POSTGRES_USER: brew
           POSTGRES_PASSWORD: brew
           POSTGRES_DB: brewlite
-        ports: ['5432:5432']
+        ports:
+          - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U brew -d brewlite"
-          --health-interval 5s --health-timeout 5s --health-retries 10
+          --health-cmd="pg_isready -U brew -d brewlite"
+          --health-interval=3s
+          --health-timeout=3s
+          --health-retries=20
+    env:
+      DATABASE_URL: postgresql://brew:brew@127.0.0.1:5432/brewlite?schema=public
+      JWT_SECRET: ci-only-test-jwt-secret
+      FRONTEND_URL: http://localhost:3000
+      PORT: 3001
     defaults:
       run:
         working-directory: backend
-    env:
-      DATABASE_URL: postgresql://brew:brew@localhost:5432/brewlite
-      JWT_SECRET: ci-only-not-for-production
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: 24
           cache: npm
           cache-dependency-path: backend/package-lock.json
-      - run: npm ci
-      - run: npx prisma validate
-      - run: npx prisma migrate deploy
-      - run: npx prisma generate
-      - run: npm run build
-      - run: npm test
-      - run: npm run test:e2e
+      - name: Install dependencies
+        run: npm ci
+      - name: Prisma validate
+        run: npx prisma validate
+      - name: Prisma migrate deploy (Clean DB)
+        run: npx prisma migrate deploy
+      - name: Prisma generate
+        run: npx prisma generate
+      - name: Prisma db seed (Run #1)
+        run: npx prisma db seed
+      - name: Prisma db seed (Run #2 - Verify Idempotency)
+        run: npx prisma db seed
+      - name: Backend lint
+        run: npm run lint
+      - name: Backend build
+        run: npm run build
+      - name: Backend unit tests
+        run: npm test
+      - name: Backend E2E & integration tests
+        run: npm run test:e2e
+
   frontend:
+    name: Frontend (Lint + Build)
+    needs: [contract]
     runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
     defaults:
       run:
         working-directory: frontend
@@ -53,9 +85,37 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: 24
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run build
+      - name: Install dependencies
+        run: npm ci
+      - name: Frontend lint
+        run: npm run lint
+      - name: Frontend build
+        run: npm run build
+
+  docker-smoke:
+    name: Docker Compose Smoke (HTTP 200 + Healthcheck + Seed x2)
+    needs: [contract, backend, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start stack with healthcheck wait
+        run: docker compose up -d --build --wait
+      - name: Check service status
+        run: docker compose ps
+      - name: Check backend HTTP 200
+        run: curl --fail --silent --show-error -i http://localhost:3001/
+      - name: Check frontend HTTP 200
+        run: curl --fail --silent --show-error -I http://localhost:3000/
+      - name: Check Prisma migration status in container
+        run: docker compose exec -T backend npx prisma migrate status
+      - name: Re-run seed inside container (Run #2 Idempotency check)
+        run: docker compose exec -T backend npx prisma db seed
+      - name: Save container logs
+        if: always()
+        run: docker compose logs --no-color backend frontend db
+      - name: Cleanup stack and volumes
+        if: always()
+        run: docker compose down -v --remove-orphans
