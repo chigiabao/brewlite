@@ -66,6 +66,7 @@ function createGateway(charge?: () => Promise<{ reference: string; status: 'SUCC
 function createOrders(order: PayableOrder | null) {
   return {
     findOrderForUser: vi.fn(async () => order),
+    markPending: vi.fn(async () => undefined),
     markPaid: vi.fn(async () => undefined),
     markPaymentFailed: vi.fn(async () => undefined),
   };
@@ -119,6 +120,21 @@ describe('PaymentsService', () => {
     expect(orders.markPaid).toHaveBeenCalledTimes(1);
     expect(prisma.__payments).toHaveLength(1);
     expect(prisma.__payments[0].status).toBe(PaymentStatus.SUCCEEDED);
+  });
+
+  it('order PAYMENT_FAILED -> reset PENDING trước khi gọi gateway', async () => {
+    const { service, gateway, orders } = setup({
+      order: { id: 10, userId: 1, status: OrderStatus.PAYMENT_FAILED, total: 85_000 },
+    });
+
+    const result = await service.pay(baseInput);
+
+    expect(orders.markPending).toHaveBeenCalledWith(10);
+    expect(orders.markPending.mock.invocationCallOrder[0]).toBeLessThan(
+      gateway.charge.mock.invocationCallOrder[0],
+    );
+    expect(gateway.charge).toHaveBeenCalledTimes(1);
+    expect(result.orderStatus).toBe(OrderStatus.PAID);
   });
 
   it('amount luôn lấy từ Order.total, không nhận từ client', async () => {

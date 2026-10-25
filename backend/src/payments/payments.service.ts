@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import type { Payment } from '../generated/prisma/client.js';
 import { OrderStatus, PaymentStatus } from '../generated/prisma/enums.js';
@@ -83,6 +83,9 @@ export class PaymentsService {
       throw new PaymentError(PaymentErrorCode.ORDER_NOT_FOUND, 'Không tìm thấy đơn hàng của bạn', 404);
     }
     this.assertPayable(order);
+    if (order.status === OrderStatus.PAYMENT_FAILED) {
+      await this.prepareRetry(order);
+    }
 
     const amount = order.total;
 
@@ -232,6 +235,44 @@ export class PaymentsService {
       throw new PaymentError(
         PaymentErrorCode.ORDER_NOT_PAYABLE,
         `Đơn hàng ở trạng thái ${order.status} không thể thanh toán`,
+        409,
+      );
+    }
+  }
+
+  private async prepareRetry(order: PayableOrder): Promise<void> {
+    try {
+      await this.orders.markPending(order.id);
+      this.logger.log(`payment.order.retry orderId=${order.id}`);
+    } catch (error) {
+      if (!(error instanceof BadRequestException)) throw error;
+
+      const current = await this.orders.findOrderForUser(order.id, order.userId);
+      if (!current) {
+        throw new PaymentError(
+          PaymentErrorCode.ORDER_NOT_FOUND,
+          'Không tìm thấy đơn hàng của bạn',
+          404,
+        );
+      }
+      if (current.status === OrderStatus.PAID) {
+        throw new PaymentError(
+          PaymentErrorCode.ORDER_ALREADY_PAID,
+          'Đơn hàng đã được thanh toán',
+          409,
+        );
+      }
+      if (current.status === OrderStatus.PENDING) {
+        throw new PaymentError(
+          PaymentErrorCode.PAYMENT_IN_PROGRESS,
+          'Đơn hàng đang được xử lý bởi một lượt thanh toán khác, thử lại sau',
+          409,
+          { orderId: order.id },
+        );
+      }
+      throw new PaymentError(
+        PaymentErrorCode.ORDER_NOT_PAYABLE,
+        `Đơn hàng ở trạng thái ${current.status} không thể thanh toán`,
         409,
       );
     }

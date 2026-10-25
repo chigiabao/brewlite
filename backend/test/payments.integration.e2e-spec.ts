@@ -34,8 +34,14 @@ describe('Payments idempotency (integration, real PostgreSQL)', () => {
   });
 
   beforeEach(async () => {
-    await prisma.payment.deleteMany({ where: { order: { userId: USER_ID } } });
-    await prisma.order.deleteMany({ where: { userId: USER_ID } });
+    const orders = await prisma.order.findMany({ where: { userId: USER_ID }, select: { id: true } });
+    const orderIds = orders.map((o) => o.id);
+    if (orderIds.length > 0) {
+      await prisma.payment.deleteMany({ where: { orderId: { in: orderIds } } });
+      await prisma.order.deleteMany({ where: { id: { in: orderIds } } });
+    } else {
+      await prisma.order.deleteMany({ where: { userId: USER_ID } });
+    }
     await prisma.user.upsert({
       where: { id: USER_ID },
       update: {},
@@ -145,5 +151,33 @@ describe('Payments idempotency (integration, real PostgreSQL)', () => {
 
     expect(recovered.orderStatus).toBe('PAID');
     expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(2);
+  });
+
+  it('decline lần 2 trên cùng order vẫn giữ PAYMENT_FAILED và retry tiếp được', async () => {
+    const order = await seedOrder();
+    const decline = vi
+      .spyOn(gateway, 'charge')
+      .mockRejectedValueOnce(new PaymentDeclinedError('MOCK-DECL0000'))
+      .mockRejectedValueOnce(new PaymentDeclinedError('MOCK-DECL0000'));
+
+    for (const idempotencyKey of ['itest-decline-2a', 'itest-decline-2b']) {
+      await expect(
+        service.pay({ userId: USER_ID, orderId: order.id, method: 'WALLET', idempotencyKey }),
+      ).rejects.toMatchObject({ code: 'PAYMENT_DECLINED' });
+    }
+    decline.mockRestore();
+
+    const afterTwoDeclines = await prisma.order.findUnique({ where: { id: order.id } });
+    expect(afterTwoDeclines?.status).toBe('PAYMENT_FAILED');
+
+    const recovered = await service.pay({
+      userId: USER_ID,
+      orderId: order.id,
+      method: 'WALLET',
+      idempotencyKey: 'itest-decline-2c',
+    });
+
+    expect(recovered.orderStatus).toBe('PAID');
+    expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(3);
   });
 });
