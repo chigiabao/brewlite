@@ -43,19 +43,29 @@ export default function CartPage() {
               </div>
               <div className="flex items-center gap-2">
                 <button
+                  type="button"
                   onClick={() => setQty(k, item.qty - 1)}
-                  className="w-8 h-8 border rounded"
+                  disabled={item.qty <= 1}
+                  className="w-8 h-8 border rounded disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-100 font-medium"
+                  aria-label="Giảm số lượng"
                 >
                   −
                 </button>
-                <span>{item.qty}</span>
+                <span className="w-6 text-center font-medium">{item.qty}</span>
                 <button
+                  type="button"
                   onClick={() => setQty(k, item.qty + 1)}
-                  className="w-8 h-8 border rounded"
+                  disabled={item.qty >= 99}
+                  className="w-8 h-8 border rounded disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-100 font-medium"
+                  aria-label="Tăng số lượng"
                 >
                   +
                 </button>
-                <button onClick={() => remove(k)} className="text-red-500 ml-2">
+                <button
+                  type="button"
+                  onClick={() => remove(k)}
+                  className="text-red-500 ml-2 hover:underline text-sm font-medium"
+                >
                   Xóa
                 </button>
               </div>
