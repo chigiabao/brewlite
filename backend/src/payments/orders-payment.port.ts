@@ -18,6 +18,7 @@ export type PayableOrder = {
 
 export interface OrdersPaymentPort {
   findOrderForUser(orderId: number, userId: number): Promise<PayableOrder | null>;
+  markPending(orderId: number, tx?: PaymentTx): Promise<void>;
   markPaid(orderId: number, paymentId: number, tx?: PaymentTx): Promise<void>;
   markPaymentFailed(orderId: number, paymentId: number, tx?: PaymentTx): Promise<void>;
 }
@@ -35,6 +36,10 @@ export class MockOrdersPaymentAdapter implements OrdersPaymentPort {
     });
   }
 
+  markPending(orderId: number, tx?: PaymentTx): Promise<void> {
+    return this.transition(orderId, OrderStatus.PENDING, undefined, tx);
+  }
+
   markPaid(orderId: number, paymentId: number, tx?: PaymentTx): Promise<void> {
     return this.transition(orderId, OrderStatus.PAID, paymentId, tx);
   }
@@ -46,7 +51,7 @@ export class MockOrdersPaymentAdapter implements OrdersPaymentPort {
   private async transition(
     orderId: number,
     to: OrderStatus,
-    paymentId: number,
+    paymentId?: number,
     tx?: PaymentTx,
   ): Promise<void> {
     const order = tx
@@ -61,6 +66,7 @@ export class MockOrdersPaymentAdapter implements OrdersPaymentPort {
     } else {
       await this.prisma.order.update({ where: { id: orderId }, data: { status: to } });
     }
-    this.logger.log(`payment.order.${to} orderId=${orderId} paymentId=${paymentId}`);
+    const paymentLog = paymentId === undefined ? '' : ` paymentId=${paymentId}`;
+    this.logger.log(`payment.order.${to} orderId=${orderId}${paymentLog}`);
   }
 }
