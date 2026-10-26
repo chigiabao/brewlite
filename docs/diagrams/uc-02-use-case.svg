@@ -1,0 +1,180 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 620" width="100%" height="100%" style="background-color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#8b5cf6" />
+    </linearGradient>
+    <linearGradient id="ucGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="errGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#3f1a24" />
+      <stop offset="100%" stop-color="#1f1118" />
+    </linearGradient>
+    <linearGradient id="actorGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#0284c7" />
+    </linearGradient>
+
+    <!-- Markers -->
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#94a3b8" />
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#38bdf8" />
+    </marker>
+    <marker id="arrowRed" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#f43f5e" />
+    </marker>
+    <marker id="arrowAmber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#fbbf24" />
+    </marker>
+
+    <!-- Filters -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.5" />
+    </filter>
+  </defs>
+
+  <!-- Title Banner -->
+  <rect x="25" y="20" width="930" height="55" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1" />
+  <rect x="25" y="20" width="8" height="55" rx="4" fill="url(#headerGrad)" />
+  <text x="45" y="44" fill="#f8fafc" font-size="17" font-weight="700">SƠ ĐỒ USE CASE — UC-02: IDENTITY &amp; ACCESS MANAGEMENT (OWNER: D)</text>
+  <text x="45" y="63" fill="#94a3b8" font-size="12">Master Contract: POST /auth/register (201, 409), POST /auth/login (201/200, 401), JwtAuthGuard (401, 200)</text>
+
+  <!-- System Boundary -->
+  <rect x="230" y="95" width="530" height="505" rx="14" fill="#0b1120" stroke="#334155" stroke-width="1.5" stroke-dasharray="6,4" />
+  <text x="250" y="122" fill="#38bdf8" font-size="13" font-weight="700" letter-spacing="1">HỆ THỐNG XÁC THỰC BREWLITE (AUTH MODULE)</text>
+
+  <!-- ================= ACTOR: GUEST ================= -->
+  <g transform="translate(70, 180)">
+    <!-- Stick Figure -->
+    <circle cx="45" cy="22" r="16" fill="url(#actorGrad)" filter="url(#glow)" />
+    <path d="M 45 38 L 45 78 M 15 52 L 75 52 M 45 78 L 22 115 M 45 78 L 68 115" stroke="#38bdf8" stroke-width="3" stroke-linecap="round" />
+    <text x="45" y="135" fill="#e2e8f0" font-size="13" font-weight="600" text-anchor="middle">Khách (Guest)</text>
+    <text x="45" y="150" fill="#64748b" font-size="11" text-anchor="middle">(Chưa đăng nhập)</text>
+  </g>
+
+  <!-- ================= ACTOR: CUSTOMER ================= -->
+  <g transform="translate(70, 400)">
+    <!-- Stick Figure -->
+    <circle cx="45" cy="22" r="16" fill="#10b981" filter="url(#glow)" />
+    <path d="M 45 38 L 45 78 M 15 52 L 75 52 M 45 78 L 22 115 M 45 78 L 68 115" stroke="#10b981" stroke-width="3" stroke-linecap="round" />
+    <text x="45" y="135" fill="#e2e8f0" font-size="13" font-weight="600" text-anchor="middle">Khách hàng</text>
+    <text x="45" y="150" fill="#64748b" font-size="11" text-anchor="middle">(Đã có tài khoản / JWT)</text>
+  </g>
+
+  <!-- ================= ACTOR: PROTECTED MODULES (E, F) ================= -->
+  <g transform="translate(840, 360)">
+    <rect x="-15" y="0" width="115" height="110" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5" filter="url(#glow)" />
+    <circle cx="42" cy="30" r="14" fill="#f59e0b" />
+    <text x="42" y="35" fill="#0f172a" font-size="13" font-weight="800" text-anchor="middle">&lt;/&gt;</text>
+    <text x="42" y="62" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">Module E / F</text>
+    <text x="42" y="78" fill="#cbd5e1" font-size="10" text-anchor="middle">Ordering / Payments</text>
+    <text x="42" y="94" fill="#94a3b8" font-size="10" text-anchor="middle">(Consumer Guard)</text>
+  </g>
+
+  <!-- ================= USE CASES INSIDE BOUNDARY ================= -->
+
+  <!-- UC-02.1: Register -->
+  <g transform="translate(260, 145)" filter="url(#glow)">
+    <ellipse cx="120" cy="32" rx="110" ry="28" fill="url(#ucGrad)" stroke="#38bdf8" stroke-width="1.5" />
+    <text x="120" y="28" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">UC-02.1: Đăng ký tài khoản</text>
+    <text x="120" y="44" fill="#38bdf8" font-size="10" text-anchor="middle">POST /auth/register</text>
+  </g>
+
+  <!-- Extend: Duplicate email 409 -->
+  <g transform="translate(530, 145)" filter="url(#glow)">
+    <ellipse cx="105" cy="32" rx="98" ry="26" fill="url(#errGrad)" stroke="#f43f5e" stroke-width="1" stroke-dasharray="4,3" />
+    <text x="105" y="27" fill="#fca5a5" font-size="11" font-weight="600" text-anchor="middle">Xử lý trùng email</text>
+    <text x="105" y="42" fill="#ef4444" font-size="10" font-weight="700" text-anchor="middle">409 ConflictException</text>
+  </g>
+
+  <!-- UC-02.2: Login -->
+  <g transform="translate(260, 275)" filter="url(#glow)">
+    <ellipse cx="120" cy="32" rx="110" ry="28" fill="url(#ucGrad)" stroke="#38bdf8" stroke-width="1.5" />
+    <text x="120" y="28" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">UC-02.2: Đăng nhập hệ thống</text>
+    <text x="120" y="44" fill="#38bdf8" font-size="10" text-anchor="middle">POST /auth/login (JWT token)</text>
+  </g>
+
+  <!-- Extend: Invalid credentials 401 -->
+  <g transform="translate(530, 275)" filter="url(#glow)">
+    <ellipse cx="105" cy="32" rx="98" ry="26" fill="url(#errGrad)" stroke="#f43f5e" stroke-width="1" stroke-dasharray="4,3" />
+    <text x="105" y="27" fill="#fca5a5" font-size="11" font-weight="600" text-anchor="middle">Xử lý sai mật khẩu/email</text>
+    <text x="105" y="42" fill="#ef4444" font-size="10" font-weight="700" text-anchor="middle">401 Unauthorized</text>
+  </g>
+
+  <!-- UC-02.3: Protected API Access -->
+  <g transform="translate(260, 420)" filter="url(#glow)">
+    <ellipse cx="120" cy="36" rx="115" ry="32" fill="url(#ucGrad)" stroke="#10b981" stroke-width="1.5" />
+    <text x="120" y="28" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">UC-02.3: Truy cập API cần đăng nhập</text>
+    <text x="120" y="44" fill="#34d399" font-size="10" text-anchor="middle">JwtAuthGuard &amp; @CurrentUser()</text>
+    <text x="120" y="58" fill="#94a3b8" font-size="9" text-anchor="middle">Route: /orders, /orders/me, /payments</text>
+  </g>
+
+  <!-- Extend: Missing/Invalid token 401 -->
+  <g transform="translate(530, 425)" filter="url(#glow)">
+    <ellipse cx="105" cy="32" rx="98" ry="26" fill="url(#errGrad)" stroke="#f43f5e" stroke-width="1" stroke-dasharray="4,3" />
+    <text x="105" y="27" fill="#fca5a5" font-size="11" font-weight="600" text-anchor="middle">Chặn thiếu / sai token</text>
+    <text x="105" y="42" fill="#ef4444" font-size="10" font-weight="700" text-anchor="middle">401 Unauthorized</text>
+  </g>
+
+  <!-- Include: DTO Validation -->
+  <g transform="translate(390, 220)">
+    <ellipse cx="70" cy="20" rx="65" ry="18" fill="#1e293b" stroke="#64748b" stroke-width="1" />
+    <text x="70" y="24" fill="#cbd5e1" font-size="10" text-anchor="middle">Validate AuthDto</text>
+  </g>
+
+  <!-- ================= CONNECTORS / ARROWS ================= -->
+
+  <!-- Guest -> Register -->
+  <path d="M 140 235 L 260 177" stroke="#38bdf8" stroke-width="1.5" fill="none" marker-end="url(#arrowBlue)" />
+
+  <!-- Guest -> Login -->
+  <path d="M 140 250 L 260 295" stroke="#38bdf8" stroke-width="1.5" fill="none" marker-end="url(#arrowBlue)" />
+
+  <!-- Customer -> Login -->
+  <path d="M 140 450 L 260 320" stroke="#10b981" stroke-width="1.5" fill="none" marker-end="url(#arrow)" />
+
+  <!-- Customer -> Protected Route -->
+  <path d="M 140 465 L 260 455" stroke="#10b981" stroke-width="1.5" fill="none" marker-end="url(#arrow)" />
+
+  <!-- Register -> Duplicate extend -->
+  <path d="M 380 177 L 530 177" stroke="#f43f5e" stroke-width="1.2" stroke-dasharray="4,3" fill="none" marker-end="url(#arrowRed)" />
+  <text x="450" y="169" fill="#fca5a5" font-size="9" text-anchor="middle">&lt;&lt;extend&gt;&gt;</text>
+
+  <!-- Login -> Invalid creds extend -->
+  <path d="M 380 307 L 530 307" stroke="#f43f5e" stroke-width="1.2" stroke-dasharray="4,3" fill="none" marker-end="url(#arrowRed)" />
+  <text x="450" y="299" fill="#fca5a5" font-size="9" text-anchor="middle">&lt;&lt;extend&gt;&gt;</text>
+
+  <!-- Protected -> 401 extend -->
+  <path d="M 390 455 L 530 455" stroke="#f43f5e" stroke-width="1.2" stroke-dasharray="4,3" fill="none" marker-end="url(#arrowRed)" />
+  <text x="455" y="447" fill="#fca5a5" font-size="9" text-anchor="middle">&lt;&lt;extend&gt;&gt;</text>
+
+  <!-- Register -> Validate include -->
+  <path d="M 340 200 L 400 225" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3,3" fill="none" marker-end="url(#arrow)" />
+  <text x="355" y="222" fill="#94a3b8" font-size="8">&lt;&lt;include&gt;&gt;</text>
+
+  <!-- Login -> Validate include -->
+  <path d="M 340 280 L 400 252" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3,3" fill="none" marker-end="url(#arrow)" />
+  <text x="355" y="260" fill="#94a3b8" font-size="8">&lt;&lt;include&gt;&gt;</text>
+
+  <!-- Protected Module -> UC-02.3 -->
+  <path d="M 830 440 L 495 455" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4,4" fill="none" marker-end="url(#arrowAmber)" />
+  <text x="690" y="475" fill="#fbbf24" font-size="10" font-weight="600" text-anchor="middle">Áp dụng @UseGuards(JwtAuthGuard)</text>
+
+  <!-- Footer Legend -->
+  <g transform="translate(230, 560)">
+    <rect x="0" y="0" width="530" height="30" rx="6" fill="#1e293b" />
+    <circle cx="20" cy="15" r="5" fill="#38bdf8" />
+    <text x="32" y="19" fill="#cbd5e1" font-size="10">Actor luồng chính</text>
+    <circle cx="140" cy="15" r="5" fill="#10b981" />
+    <text x="152" y="19" fill="#cbd5e1" font-size="10">Khách đã xác thực</text>
+    <circle cx="270" cy="15" r="5" fill="#f43f5e" />
+    <text x="282" y="19" fill="#cbd5e1" font-size="10">Nhánh xử lý lỗi (400, 401, 409)</text>
+    <circle cx="430" cy="15" r="5" fill="#f59e0b" />
+    <text x="442" y="19" fill="#cbd5e1" font-size="10">Consumer module</text>
+  </g>
+</svg>

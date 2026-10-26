@@ -1,0 +1,151 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1020 740" width="100%" height="100%" style="background-color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="loginHdr" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#8b5cf6" />
+      <stop offset="100%" stop-color="#ec4899" />
+    </linearGradient>
+
+    <!-- Markers -->
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#38bdf8" />
+    </marker>
+    <marker id="arrDash" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#94a3b8" />
+    </marker>
+    <marker id="arrErr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#f43f5e" />
+    </marker>
+    <marker id="arrOk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#10b981" />
+    </marker>
+
+    <!-- Filter -->
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#000000" flood-opacity="0.4" />
+    </filter>
+  </defs>
+
+  <!-- Banner -->
+  <rect x="25" y="15" width="970" height="55" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1" />
+  <rect x="25" y="15" width="8" height="55" rx="4" fill="url(#loginHdr)" />
+  <text x="45" y="40" fill="#f8fafc" font-size="16" font-weight="700">SƠ ĐỒ TUẦN TỰ — UC-02.2: ĐĂNG NHẬP VÀ CẤP PHÁT JWT (POST /auth/login)</text>
+  <text x="45" y="58" fill="#94a3b8" font-size="11">Xử lý xác thực email/password, so khớp bcrypt, nhánh sai credentials 401, cấp JWT accessToken (không refresh token bắt buộc)</text>
+
+  <!-- Lifeline Participants -->
+  <!-- 1: Client -->
+  <g transform="translate(60, 90)">
+    <rect x="-45" y="0" width="105" height="40" rx="6" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5" filter="url(#shadow)" />
+    <text x="7" y="24" fill="#f8fafc" font-size="12" font-weight="600" text-anchor="middle">Client (UI/App)</text>
+    <line x1="7" y1="40" x2="7" y2="600" stroke="#334155" stroke-width="1.5" stroke-dasharray="4,4" />
+  </g>
+
+  <!-- 2: ValidationPipe -->
+  <g transform="translate(230, 90)">
+    <rect x="-55" y="0" width="125" height="40" rx="6" fill="#1e293b" stroke="#64748b" stroke-width="1.5" filter="url(#shadow)" />
+    <text x="7" y="24" fill="#cbd5e1" font-size="12" font-weight="600" text-anchor="middle">ValidationPipe</text>
+    <line x1="7" y1="40" x2="7" y2="600" stroke="#334155" stroke-width="1.5" stroke-dasharray="4,4" />
+  </g>
+
+  <!-- 3: AuthController -->
+  <g transform="translate(420, 90)">
+    <rect x="-55" y="0" width="125" height="40" rx="6" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5" filter="url(#shadow)" />
+    <text x="7" y="24" fill="#f8fafc" font-size="12" font-weight="600" text-anchor="middle">AuthController</text>
+    <line x1="7" y1="40" x2="7" y2="600" stroke="#334155" stroke-width="1.5" stroke-dasharray="4,4" />
+  </g>
+
+  <!-- 4: AuthService -->
+  <g transform="translate(610, 90)">
+    <rect x="-50" y="0" width="120" height="40" rx="6" fill="#1e293b" stroke="#a855f7" stroke-width="1.5" filter="url(#shadow)" />
+    <text x="10" y="24" fill="#f8fafc" font-size="12" font-weight="600" text-anchor="middle">AuthService</text>
+    <line x1="10" y1="40" x2="10" y2="600" stroke="#334155" stroke-width="1.5" stroke-dasharray="4,4" />
+  </g>
+
+  <!-- 5: PrismaService / DB -->
+  <g transform="translate(790, 90)">
+    <rect x="-50" y="0" width="120" height="40" rx="6" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5" filter="url(#shadow)" />
+    <text x="10" y="24" fill="#f8fafc" font-size="12" font-weight="600" text-anchor="middle">Prisma / DB</text>
+    <line x1="10" y1="40" x2="10" y2="600" stroke="#334155" stroke-width="1.5" stroke-dasharray="4,4" />
+  </g>
+
+  <!-- 6: bcrypt &amp; JwtService -->
+  <g transform="translate(940, 90)">
+    <rect x="-40" y="0" width="105" height="40" rx="6" fill="#1e293b" stroke="#10b981" stroke-width="1.5" filter="url(#shadow)" />
+    <text x="12" y="24" fill="#f8fafc" font-size="12" font-weight="600" text-anchor="middle">bcrypt / JWT</text>
+    <line x1="12" y1="40" x2="12" y2="600" stroke="#334155" stroke-width="1.5" stroke-dasharray="4,4" />
+  </g>
+
+  <!-- STEP 1: POST /auth/login -->
+  <line x1="67" y1="155" x2="232" y2="155" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#arr)" />
+  <text x="150" y="148" fill="#e2e8f0" font-size="11" text-anchor="middle">POST /auth/login {email, password}</text>
+
+  <!-- ALT 1: DTO Validation error -->
+  <rect x="232" y="165" width="10" height="35" fill="#64748b" rx="2" />
+  <line x1="232" y1="185" x2="67" y2="185" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="3,3" marker-end="url(#arrErr)" />
+  <text x="150" y="180" fill="#fca5a5" font-size="10" text-anchor="middle">[Sai định dạng DTO] 400 Bad Request</text>
+
+  <!-- Forward to Controller & Service -->
+  <line x1="237" y1="215" x2="422" y2="215" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#arr)" />
+  <text x="330" y="208" fill="#e2e8f0" font-size="10" text-anchor="middle">DTO hợp lệ</text>
+
+  <line x1="427" y1="235" x2="615" y2="235" stroke="#a855f7" stroke-width="1.5" marker-end="url(#arr)" />
+  <text x="520" y="228" fill="#e2e8f0" font-size="10" text-anchor="middle">login(dto)</text>
+
+  <!-- Query User -->
+  <line x1="625" y1="260" x2="795" y2="260" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#arr)" />
+  <text x="710" y="253" fill="#fcd34d" font-size="10" text-anchor="middle">findUnique({ where: { email } })</text>
+
+  <!-- ALT 2: User not found -->
+  <g transform="translate(50, 285)">
+    <rect x="0" y="0" width="910" height="50" rx="6" fill="#2d121a" stroke="#f43f5e" stroke-width="1" stroke-dasharray="4,3" />
+    <rect x="0" y="0" width="130" height="18" rx="4" fill="#f43f5e" />
+    <text x="8" y="13" fill="#ffffff" font-size="10" font-weight="700">[ALT: User không tồn tại]</text>
+    <text x="750" y="25" fill="#fca5a5" font-size="10" text-anchor="middle">user === null</text>
+    <line x1="570" y1="32" x2="17" y2="32" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="3,3" marker-end="url(#arrErr)" />
+    <text x="290" y="26" fill="#fca5a5" font-size="10" text-anchor="middle">throw UnauthorizedException: HTTP 401 ("Email hoặc mật khẩu không đúng")</text>
+  </g>
+
+  <!-- User found -> Compare password -->
+  <line x1="795" y1="355" x2="625" y2="355" stroke="#f59e0b" stroke-width="1.2" stroke-dasharray="3,3" marker-end="url(#arrDash)" />
+  <text x="710" y="348" fill="#fcd34d" font-size="10" text-anchor="middle">return user {id, email, passwordHash}</text>
+
+  <line x1="625" y1="380" x2="945" y2="380" stroke="#10b981" stroke-width="1.5" marker-end="url(#arr)" />
+  <text x="785" y="373" fill="#6ee7b7" font-size="10" text-anchor="middle">bcrypt.compare(dto.password, user.passwordHash)</text>
+
+  <!-- ALT 3: Wrong Password -->
+  <g transform="translate(50, 405)">
+    <rect x="0" y="0" width="910" height="50" rx="6" fill="#2d121a" stroke="#f43f5e" stroke-width="1" stroke-dasharray="4,3" />
+    <rect x="0" y="0" width="115" height="18" rx="4" fill="#f43f5e" />
+    <text x="8" y="13" fill="#ffffff" font-size="10" font-weight="700">[ALT: Sai Mật Khẩu]</text>
+    <text x="800" y="25" fill="#fca5a5" font-size="10" text-anchor="middle">compare === false</text>
+    <line x1="570" y1="32" x2="17" y2="32" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="3,3" marker-end="url(#arrErr)" />
+    <text x="290" y="26" fill="#fca5a5" font-size="10" text-anchor="middle">throw UnauthorizedException: HTTP 401 ("Email hoặc mật khẩu không đúng")</text>
+  </g>
+
+  <!-- SUCCESS: Sign JWT -->
+  <line x1="625" y1="475" x2="945" y2="475" stroke="#10b981" stroke-width="1.5" marker-end="url(#arr)" />
+  <text x="785" y="468" fill="#6ee7b7" font-size="10" text-anchor="middle">jwt.signAsync({ sub: user.id, email: user.email }, expiresIn: '1d')</text>
+
+  <line x1="945" y1="500" x2="625" y2="500" stroke="#10b981" stroke-width="1.2" stroke-dasharray="3,3" marker-end="url(#arrDash)" />
+  <text x="785" y="493" fill="#6ee7b7" font-size="10" text-anchor="middle">return accessToken (JWT string)</text>
+
+  <!-- SUCCESS RESPONSE -->
+  <g transform="translate(50, 525)">
+    <rect x="0" y="0" width="910" height="65" rx="6" fill="#063223" stroke="#10b981" stroke-width="1" />
+    <rect x="0" y="0" width="150" height="18" rx="4" fill="#10b981" />
+    <text x="8" y="13" fill="#ffffff" font-size="10" font-weight="700">[THÀNH CÔNG: 201/200]</text>
+
+    <line x1="570" y1="30" x2="17" y2="30" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrOk)" />
+    <text x="290" y="24" fill="#6ee7b7" font-size="11" font-weight="600" text-anchor="middle">HTTP 201/200 OK { accessToken: "eyJhbGci..." }</text>
+
+    <!-- Client storage action -->
+    <path d="M 17 40 C 45 40 45 55 19 55" stroke="#38bdf8" stroke-width="1.2" fill="none" marker-end="url(#arr)" />
+    <text x="50" y="52" fill="#93c5fd" font-size="10">localStorage.setItem('token', accessToken) [Lưu ý rủi ro XSS - Guide D]</text>
+  </g>
+
+  <!-- Footer -->
+  <g transform="translate(25, 695)">
+    <rect x="0" y="0" width="970" height="30" rx="6" fill="#1e293b" />
+    <text x="20" y="19" fill="#94a3b8" font-size="11">DoD Check: Login hợp lệ trả accessToken | Sai pass/email trả 401 | Không dùng refresh token bắt buộc (chưa duyệt) | Lưu trữ localStorage an toàn</text>
+  </g>
+</svg>

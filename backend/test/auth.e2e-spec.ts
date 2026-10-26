@@ -55,55 +55,101 @@ describe('Identity (e2e)', () => {
     await app.close();
   });
 
-  it('covers register, duplicate email, login, invalid password, and JWT guard', async () => {
-    // Kiểm tra validate DTO (400 Bad Request)
-    await request(app.getHttpServer())
-      .post('/auth/register')
-      .send({ email: 'not-an-email', password: 'secret123' })
-      .expect(400);
+  let validToken: string;
 
-    await request(app.getHttpServer())
-      .post('/auth/register')
-      .send({ email: 'valid@example.com', password: '123' })
-      .expect(400);
+  describe('Register (POST /auth/register)', () => {
+    it('returns 400 Bad Request when email format is invalid', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email: 'not-an-email', password: 'secret123' })
+        .expect(400);
+    });
 
-    const registration = await request(app.getHttpServer())
-      .post('/auth/register')
-      .send({ email: 'user@example.com', password: 'secret123' })
-      .expect(201);
-    expect(registration.body).toEqual({ id: 1, email: 'user@example.com' });
-    expect(users[0].passwordHash).not.toBe('secret123');
+    it('returns 400 Bad Request when password has fewer than 6 characters', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email: 'valid@example.com', password: '123' })
+        .expect(400);
+    });
 
-    await request(app.getHttpServer())
-      .post('/auth/register')
-      .send({ email: 'USER@example.com', password: 'secret123' })
-      .expect(409);
+    it('returns 201 Created and safe user info without exposing passwordHash', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email: 'user@example.com', password: 'secret123' })
+        .expect(201);
 
-    const login = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({ email: 'user@example.com', password: 'secret123' })
-      .expect(201);
-    expect(login.body.accessToken).toEqual(expect.any(String));
+      expect(res.body).toEqual({ id: 1, email: 'user@example.com' });
+      expect(users[0].passwordHash).not.toBe('secret123');
+      expect((res.body as { passwordHash?: string }).passwordHash).toBeUndefined();
+    });
 
-    await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({ email: 'user@example.com', password: 'wrong-password' })
-      .expect(401);
+    it('returns 409 Conflict when registering with an existing email (case-insensitive)', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email: 'USER@example.com', password: 'secret123' })
+        .expect(409);
 
-    // Route guard: thiếu token -> 401
-    await request(app.getHttpServer()).get('/auth-test/me').expect(401);
+      expect(res.body.message).toContain('Email đã được đăng ký');
+    });
+  });
 
-    // Route guard: token không hợp lệ -> 401
-    await request(app.getHttpServer())
-      .get('/auth-test/me')
-      .set('Authorization', 'Bearer invalid-jwt-token')
-      .expect(401);
+  describe('Login (POST /auth/login)', () => {
+    it('returns 400 Bad Request when login payload violates DTO', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: 'invalid-email', password: '' })
+        .expect(400);
+    });
 
-    // Route guard: token hợp lệ -> 200
-    await request(app.getHttpServer())
-      .get('/auth-test/me')
-      .set('Authorization', `Bearer ${login.body.accessToken}`)
-      .expect(200)
-      .expect({ userId: 1, email: 'user@example.com' });
-  }, 15000);
+    it('returns 201/200 and a valid JWT accessToken for correct credentials', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: 'user@example.com', password: 'secret123' })
+        .expect(201);
+
+      expect(res.body.accessToken).toEqual(expect.any(String));
+      expect(res.body.accessToken.split('.')).toHaveLength(3); // JWT structure: header.payload.signature
+      validToken = res.body.accessToken;
+    });
+
+    it('returns 401 Unauthorized when password does not match', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: 'user@example.com', password: 'wrong-password' })
+        .expect(401);
+
+      expect(res.body.message).toContain('Email hoặc mật khẩu không đúng');
+    });
+
+    it('returns 401 Unauthorized when email does not exist', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: 'unknown@example.com', password: 'secret123' })
+        .expect(401);
+
+      expect(res.body.message).toContain('Email hoặc mật khẩu không đúng');
+    });
+  });
+
+  describe('Protected API Access (JwtAuthGuard & @CurrentUser)', () => {
+    it('returns 401 Unauthorized when Authorization header is missing', async () => {
+      await request(app.getHttpServer()).get('/auth-test/me').expect(401);
+    });
+
+    it('returns 401 Unauthorized when Bearer token is invalid or malformed', async () => {
+      await request(app.getHttpServer())
+        .get('/auth-test/me')
+        .set('Authorization', 'Bearer invalid-jwt-token')
+        .expect(401);
+    });
+
+    it('returns 200 OK and injects AuthUser into @CurrentUser() when token is valid', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/auth-test/me')
+        .set('Authorization', `Bearer ${validToken}`)
+        .expect(200);
+
+      expect(res.body).toEqual({ userId: 1, email: 'user@example.com' });
+    });
+  });
 });

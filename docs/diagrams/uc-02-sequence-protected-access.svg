@@ -1,0 +1,147 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1020 730" width="100%" height="100%" style="background-color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="guardHdr" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#0284c7" />
+    </linearGradient>
+
+    <!-- Markers -->
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#38bdf8" />
+    </marker>
+    <marker id="arrDash" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#94a3b8" />
+    </marker>
+    <marker id="arrErr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#f43f5e" />
+    </marker>
+    <marker id="arrOk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#10b981" />
+    </marker>
+
+    <!-- Filter -->
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#000000" flood-opacity="0.4" />
+    </filter>
+  </defs>
+
+  <!-- Banner -->
+  <rect x="25" y="15" width="970" height="55" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1" />
+  <rect x="25" y="15" width="8" height="55" rx="4" fill="url(#guardHdr)" />
+  <text x="45" y="40" fill="#f8fafc" font-size="16" font-weight="700">SƠ ĐỒ TUẦN TỰ — UC-02.3: TRUY CẬP API BẢO VỆ (JwtAuthGuard &amp; @CurrentUser)</text>
+  <text x="45" y="58" fill="#94a3b8" font-size="11">Ranh giới Module D cung cấp cho E/F: chặn 401 khi thiếu/hết hạn token, giải mã payload và tiêm AuthUser vào controller</text>
+
+  <!-- Lifeline Participants -->
+  <!-- 1: Client -->
+  <g transform="translate(60, 90)">
+    <rect x="-45" y="0" width="105" height="40" rx="6" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5" filter="url(#shadow)" />
+    <text x="7" y="24" fill="#f8fafc" font-size="12" font-weight="600" text-anchor="middle">Client (UI/App)</text>
+    <line x1="7" y1="40" x2="7" y2="590" stroke="#334155" stroke-width="1.5" stroke-dasharray="4,4" />
+  </g>
+
+  <!-- 2: JwtAuthGuard -->
+  <g transform="translate(250, 90)">
+    <rect x="-65" y="0" width="135" height="40" rx="6" fill="#1e293b" stroke="#10b981" stroke-width="1.5" filter="url(#shadow)" />
+    <text x="2" y="19" fill="#34d399" font-size="11" font-weight="700" text-anchor="middle">JwtAuthGuard</text>
+    <text x="2" y="33" fill="#94a3b8" font-size="9" text-anchor="middle">(Owner: D | public.ts)</text>
+    <line x1="2" y1="40" x2="2" y2="590" stroke="#334155" stroke-width="1.5" stroke-dasharray="4,4" />
+  </g>
+
+  <!-- 3: JwtStrategy (Passport) -->
+  <g transform="translate(450, 90)">
+    <rect x="-60" y="0" width="130" height="40" rx="6" fill="#1e293b" stroke="#a855f7" stroke-width="1.5" filter="url(#shadow)" />
+    <text x="5" y="19" fill="#d8b4fe" font-size="11" font-weight="700" text-anchor="middle">JwtStrategy</text>
+    <text x="5" y="33" fill="#94a3b8" font-size="9" text-anchor="middle">(Passport verify)</text>
+    <line x1="5" y1="40" x2="5" y2="590" stroke="#334155" stroke-width="1.5" stroke-dasharray="4,4" />
+  </g>
+
+  <!-- 4: Controller (Consumer E / F) -->
+  <g transform="translate(680, 90)">
+    <rect x="-70" y="0" width="150" height="40" rx="6" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5" filter="url(#shadow)" />
+    <text x="5" y="19" fill="#fcd34d" font-size="11" font-weight="700" text-anchor="middle">Orders / Payments</text>
+    <text x="5" y="33" fill="#94a3b8" font-size="9" text-anchor="middle">Controller (Module E/F)</text>
+    <line x1="5" y1="40" x2="5" y2="590" stroke="#334155" stroke-width="1.5" stroke-dasharray="4,4" />
+  </g>
+
+  <!-- 5: Business Service -->
+  <g transform="translate(900, 90)">
+    <rect x="-60" y="0" width="130" height="40" rx="6" fill="#1e293b" stroke="#64748b" stroke-width="1.5" filter="url(#shadow)" />
+    <text x="5" y="19" fill="#cbd5e1" font-size="11" font-weight="700" text-anchor="middle">OrdersService</text>
+    <text x="5" y="33" fill="#94a3b8" font-size="9" text-anchor="middle">findMine(userId)</text>
+    <line x1="5" y1="40" x2="5" y2="590" stroke="#334155" stroke-width="1.5" stroke-dasharray="4,4" />
+  </g>
+
+  <!-- CASE 1: Missing Token -->
+  <g transform="translate(50, 150)">
+    <rect x="0" y="0" width="910" height="65" rx="6" fill="#2d121a" stroke="#f43f5e" stroke-width="1" stroke-dasharray="4,3" />
+    <rect x="0" y="0" width="165" height="18" rx="4" fill="#f43f5e" />
+    <text x="8" y="13" fill="#ffffff" font-size="10" font-weight="700">[ALT 1: Thiếu Bearer Token]</text>
+
+    <line x1="17" y1="35" x2="202" y2="35" stroke="#f43f5e" stroke-width="1.5" marker-end="url(#arrErr)" />
+    <text x="110" y="28" fill="#fca5a5" font-size="10" text-anchor="middle">GET /orders/me (Không header Auth)</text>
+
+    <line x1="202" y1="52" x2="17" y2="52" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="3,3" marker-end="url(#arrErr)" />
+    <text x="110" y="48" fill="#fca5a5" font-size="10" text-anchor="middle">HTTP 401 Unauthorized</text>
+  </g>
+
+  <!-- CASE 2: Invalid/Expired Token -->
+  <g transform="translate(50, 230)">
+    <rect x="0" y="0" width="910" height="95" rx="6" fill="#2d121a" stroke="#f43f5e" stroke-width="1" stroke-dasharray="4,3" />
+    <rect x="0" y="0" width="190" height="18" rx="4" fill="#f43f5e" />
+    <text x="8" y="13" fill="#ffffff" font-size="10" font-weight="700">[ALT 2: Sai chữ ký / Hết hạn token]</text>
+
+    <line x1="17" y1="35" x2="202" y2="35" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#arr)" />
+    <text x="110" y="28" fill="#93c5fd" font-size="10" text-anchor="middle">GET /orders/me [Bearer invalid-token]</text>
+
+    <line x1="202" y1="45" x2="405" y2="45" stroke="#a855f7" stroke-width="1.5" marker-end="url(#arr)" />
+    <text x="300" y="38" fill="#d8b4fe" font-size="10" text-anchor="middle">passport.authenticate('jwt')</text>
+
+    <path d="M 405 55 C 440 55 440 70 407 72" stroke="#f43f5e" stroke-width="1.2" fill="none" marker-end="url(#arrErr)" />
+    <text x="445" y="66" fill="#fca5a5" font-size="9">jwt.verify thất bại / hết hạn</text>
+
+    <line x1="202" y1="85" x2="17" y2="85" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="3,3" marker-end="url(#arrErr)" />
+    <text x="110" y="80" fill="#fca5a5" font-size="10" text-anchor="middle">HTTP 401 Unauthorized</text>
+  </g>
+
+  <!-- CASE 3: Valid Token -> Authenticated Access -->
+  <g transform="translate(50, 345)">
+    <rect x="0" y="0" width="910" height="235" rx="6" fill="#063223" stroke="#10b981" stroke-width="1" />
+    <rect x="0" y="0" width="180" height="18" rx="4" fill="#10b981" />
+    <text x="8" y="13" fill="#ffffff" font-size="10" font-weight="700">[THÀNH CÔNG: Token Hợp lệ]</text>
+
+    <!-- Step 1: Send valid token -->
+    <line x1="17" y1="35" x2="202" y2="35" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#arr)" />
+    <text x="110" y="28" fill="#93c5fd" font-size="10" text-anchor="middle">GET /orders/me [Bearer validToken]</text>
+
+    <!-- Step 2: Guard passes to Strategy -->
+    <line x1="202" y1="45" x2="405" y2="45" stroke="#a855f7" stroke-width="1.5" marker-end="url(#arr)" />
+    <text x="300" y="38" fill="#d8b4fe" font-size="10" text-anchor="middle">validate(payload: {sub: 1, email: "user@example.com"})</text>
+
+    <!-- Step 3: Map payload to AuthUser -->
+    <path d="M 405 55 C 445 55 445 75 407 80" stroke="#10b981" stroke-width="1.2" fill="none" marker-end="url(#arrOk)" />
+    <text x="450" y="70" fill="#a7f3d0" font-size="10">return {userId: payload.sub, email: payload.email}</text>
+
+    <!-- Step 4: Inject into req.user & Controller -->
+    <line x1="405" y1="105" x2="635" y2="105" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#arr)" />
+    <text x="520" y="98" fill="#fcd34d" font-size="10" text-anchor="middle">Gán req.user, inject @CurrentUser() user: AuthUser</text>
+
+    <!-- Step 5: Controller calls Service with trusted userId -->
+    <line x1="635" y1="135" x2="855" y2="135" stroke="#cbd5e1" stroke-width="1.5" marker-end="url(#arr)" />
+    <text x="745" y="128" fill="#e2e8f0" font-size="10" text-anchor="middle">ordersService.findMine(user.userId)</text>
+
+    <!-- Step 6: Service returns orders -->
+    <line x1="855" y1="165" x2="635" y2="165" stroke="#cbd5e1" stroke-width="1.2" stroke-dasharray="3,3" marker-end="url(#arrDash)" />
+    <text x="745" y="158" fill="#cbd5e1" font-size="10" text-anchor="middle">return userOrders[]</text>
+
+    <!-- Step 7: HTTP 200 OK -->
+    <line x1="635" y1="195" x2="17" y2="195" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrOk)" />
+    <text x="320" y="188" fill="#6ee7b7" font-size="11" font-weight="600" text-anchor="middle">HTTP 200 OK [{ id: 101, status: "PENDING", total: 45000, ... }]</text>
+  </g>
+
+  <!-- Footer -->
+  <g transform="translate(25, 685)">
+    <rect x="0" y="0" width="970" height="30" rx="6" fill="#1e293b" />
+    <text x="20" y="19" fill="#94a3b8" font-size="11">DoD Check: Chặn 401 khi thiếu token hoặc token hỏng | Trích xuất user chính xác và an toàn | Module E/F tách biệt qua public.ts</text>
+  </g>
+</svg>
