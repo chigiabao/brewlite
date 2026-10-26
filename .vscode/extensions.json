@@ -1,0 +1,14 @@
+{
+  "recommendations": [
+    "Prisma.prisma",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+    "ms-azuretools.vscode-docker",
+    "vitest.explorer",
+    "mikestead.dotenv",
+    "oxc.oxc-vscode",
+    "rangav.vscode-thunder-client",
+    "formulahendry.auto-rename-tag"
+  ]
+}
