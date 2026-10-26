@@ -1,0 +1,14 @@
+# LaTeX temporary & build files
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+*.xdv
+*.nav
+*.snm
+*.vrb
+*.bbl
+*.blg

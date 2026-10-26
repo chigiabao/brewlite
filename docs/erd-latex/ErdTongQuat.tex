@@ -1,0 +1,259 @@
+\documentclass[border=25pt]{standalone}
+\usepackage[utf8]{inputenc}
+\usepackage[T5]{fontenc}
+\usepackage[vietnamese]{babel}
+\usepackage{helvet}
+\renewcommand{\familydefault}{\sfdefault}
+\usepackage[table]{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, calc, shapes.geometric, backgrounds}
+
+% ========================================================
+% BẢNG MÀU CHUẨN THIẾT KẾ CƠ SỞ DỮ LIỆU
+% ========================================================
+\definecolor{headerBg}{HTML}{1E293B}     % Xanh đen Slate Header
+\definecolor{tableBorder}{HTML}{334155}   % Viền bảng Slate
+\definecolor{colHeaderBg}{HTML}{F1F5F9}  % Nền tiêu đề cột
+\definecolor{pkColor}{HTML}{D97706}       % Vàng cam PK
+\definecolor{fkColor}{HTML}{2563EB}       % Xanh dương FK
+\definecolor{uqColor}{HTML}{7C3AED}       % Tím Unique
+\definecolor{occColor}{HTML}{059669}      % Xanh lá OCC
+\definecolor{lineColor}{HTML}{475569}     % Mũi tên liên kết
+\definecolor{boxBg}{HTML}{F8FAFC}        % Nền ghi chú
+
+\begin{document}
+\begin{tikzpicture}[
+    x=1cm, y=1cm,
+    % Style cho đường nối quan hệ và nhãn Cardinality
+    rel/.style={draw=lineColor, line width=1.4pt, -{Stealth[length=2.8mm, width=2mm]}},
+    relone/.style={draw=lineColor, line width=1.4pt},
+    card/.style={font=\scriptsize\bfseries, fill=white, inner sep=1.5pt, text=lineColor},
+    labelnode/.style={font=\footnotesize\itshape, text=lineColor, fill=white, inner sep=2pt}
+]
+
+    % ========================================================
+    % TIÊU ĐỀ SƠ ĐỒ
+    % ========================================================
+    \node[anchor=west] at (-13.2, 12.0) {
+        \begin{tabular}{l}
+            \textbf{\LARGE BREWLITE --- SƠ ĐỒ THỰC THỂ LIÊN KẾT (ERD-01)} \\[4pt]
+            \textsf{\small Kiến trúc CSDL: PostgreSQL 16 $\bullet$ ORM: Prisma $\bullet$ Sprint 2 $\bullet$ Owner: A}
+        \end{tabular}
+    };
+
+    % ========================================================
+    % 1. THỰC THỂ USER (Bên trái)
+    % ========================================================
+    \node[inner sep=0pt] (USER) at (-10.5, 1.5) {
+        \begin{tabular}{|c|l|l|}
+        \hline
+        \rowcolor{headerBg}\multicolumn{3}{|c|}{\textbf{\textsf{\textcolor{white}{USER}}}} \\
+        \hline
+        \rowcolor{colHeaderBg}\textit{\tiny Key} & \textit{\tiny Tên trường} & \textit{\tiny Kiểu dữ liệu / Ràng buộc} \\
+        \hline
+        \textcolor{pkColor}{\textbf{\tiny PK}} & \textbf{id} & \textsf{Int (autoincrement)} \\
+        \textcolor{uqColor}{\textbf{\tiny UQ}} & email & \textsf{String (unique)} \\
+        & passwordHash & \textsf{String (bcrypt)} \\
+        & loyaltyPoints & \textsf{Int (default: 0)} \\
+        \hline
+        \end{tabular}
+    };
+
+    % ========================================================
+    % 2. THỰC THỂ ORDER (Trung tâm)
+    % ========================================================
+    \node[inner sep=0pt] (ORDER) at (0, 1.5) {
+        \begin{tabular}{|c|l|l|}
+        \hline
+        \rowcolor{headerBg}\multicolumn{3}{|c|}{\textbf{\textsf{\textcolor{white}{ORDER}}}} \\
+        \hline
+        \rowcolor{colHeaderBg}\textit{\tiny Key} & \textit{\tiny Tên trường} & \textit{\tiny Kiểu dữ liệu / Ràng buộc} \\
+        \hline
+        \textcolor{pkColor}{\textbf{\tiny PK}} & \textbf{id} & \textsf{Int (autoincrement)} \\
+        \textcolor{fkColor}{\textbf{\tiny FK}} & userId & \textsf{Int $\rightarrow$ User.id} \\
+        & status & \textsf{OrderStatus (default: PENDING)} \\
+        & subtotal & \textsf{Int} \\
+        & discountTotal & \textsf{Int (default: 0)} \\
+        & pointsRedeemed & \textsf{Int (default: 0)} \\
+        & total & \textsf{Int (authoritative)} \\
+        \textcolor{fkColor}{\textbf{\tiny FK}} & couponCode & \textsf{String? $\rightarrow$ Coupon.code} \\
+        & createdAt & \textsf{DateTime (default: now())} \\
+        \hline
+        \end{tabular}
+    };
+
+    % ========================================================
+    % 3. THỰC THỂ ORDER_ITEM (Bên phải Order)
+    % ========================================================
+    \node[inner sep=0pt] (ORDER_ITEM) at (9.5, 1.5) {
+        \begin{tabular}{|c|l|l|}
+        \hline
+        \rowcolor{headerBg}\multicolumn{3}{|c|}{\textbf{\textsf{\textcolor{white}{ORDER\_ITEM}}}} \\
+        \hline
+        \rowcolor{colHeaderBg}\textit{\tiny Key} & \textit{\tiny Tên trường} & \textit{\tiny Kiểu dữ liệu / Ràng buộc} \\
+        \hline
+        \textcolor{pkColor}{\textbf{\tiny PK}} & \textbf{id} & \textsf{Int (autoincrement)} \\
+        \textcolor{fkColor}{\textbf{\tiny FK}} & orderId & \textsf{Int $\rightarrow$ Order.id} \\
+        \textcolor{fkColor}{\textbf{\tiny FK}} & productId & \textsf{Int $\rightarrow$ Product.id} \\
+        & size & \textsf{String ('S' $|$ 'M' $|$ 'L')} \\
+        & toppings & \textsf{Json / String[]} \\
+        & qty & \textsf{Int (min: 1)} \\
+        & unitPrice & \textsf{Int (price snapshot)} \\
+        & lineTotal & \textsf{Int (unitPrice $\times$ qty)} \\
+        \hline
+        \end{tabular}
+    };
+
+    % ========================================================
+    % 4. THỰC THỂ PRODUCT (Ngoài cùng bên phải)
+    % ========================================================
+    \node[inner sep=0pt] (PRODUCT) at (18.5, 1.5) {
+        \begin{tabular}{|c|l|l|}
+        \hline
+        \rowcolor{headerBg}\multicolumn{3}{|c|}{\textbf{\textsf{\textcolor{white}{PRODUCT}}}} \\
+        \hline
+        \rowcolor{colHeaderBg}\textit{\tiny Key} & \textit{\tiny Tên trường} & \textit{\tiny Kiểu dữ liệu / Ràng buộc} \\
+        \hline
+        \textcolor{pkColor}{\textbf{\tiny PK}} & \textbf{id} & \textsf{Int (autoincrement)} \\
+        & name & \textsf{String} \\
+        & price & \textsf{Int (base price)} \\
+        & imageUrl & \textsf{String} \\
+        & stock & \textsf{Int (default: 100)} \\
+        \textcolor{occColor}{\textbf{\tiny OCC}} & \textbf{version} & \textbf{\textsf{Int (default: 0) [Khóa OCC]}} \\
+        \hline
+        \end{tabular}
+    };
+
+    % ========================================================
+    % 5. THỰC THỂ COUPON (Phía trên Order)
+    % ========================================================
+    \node[inner sep=0pt] (COUPON) at (0, 8.5) {
+        \begin{tabular}{|c|l|l|}
+        \hline
+        \rowcolor{headerBg}\multicolumn{3}{|c|}{\textbf{\textsf{\textcolor{white}{COUPON}}}} \\
+        \hline
+        \rowcolor{colHeaderBg}\textit{\tiny Key} & \textit{\tiny Tên trường} & \textit{\tiny Kiểu dữ liệu / Ràng buộc} \\
+        \hline
+        \textcolor{pkColor}{\textbf{\tiny PK}} & \textbf{code} & \textsf{String (uppercase)} \\
+        & discountPercent & \textsf{Int? (1..100)} \\
+        & discountAmount & \textsf{Int? (fixed VNĐ)} \\
+        & minOrderValue & \textsf{Int (default: 0)} \\
+        & maxUses & \textsf{Int? (null = unlimited)} \\
+        & usedCount & \textsf{Int (default: 0)} \\
+        & expiresAt & \textsf{DateTime} \\
+        & active & \textsf{Boolean (default: true)} \\
+        \hline
+        \end{tabular}
+    };
+
+    % ========================================================
+    % 6. THỰC THỂ PAYMENT (Phía dưới Order)
+    % ========================================================
+    \node[inner sep=0pt] (PAYMENT) at (0, -6.5) {
+        \begin{tabular}{|c|l|l|}
+        \hline
+        \rowcolor{headerBg}\multicolumn{3}{|c|}{\textbf{\textsf{\textcolor{white}{PAYMENT}}}} \\
+        \hline
+        \rowcolor{colHeaderBg}\textit{\tiny Key} & \textit{\tiny Tên trường} & \textit{\tiny Kiểu dữ liệu / Ràng buộc} \\
+        \hline
+        \textcolor{pkColor}{\textbf{\tiny PK}} & \textbf{id} & \textsf{Int (autoincrement)} \\
+        \textcolor{fkColor}{\textbf{\tiny FK}}\textcolor{uqColor}{\textbf{\tiny UQ}} & \textbf{orderId} & \textbf{\textsf{Int (unique) $\rightarrow$ Order.id}} \\
+        \textcolor{uqColor}{\textbf{\tiny UQ}} & \textbf{idempotencyKey} & \textbf{\textsf{String (unique)}} \\
+        & amount & \textsf{Int (= Order.total)} \\
+        & method & \textsf{String ('WALLET' $|$ 'CARD')} \\
+        & createdAt & \textsf{DateTime (default: now())} \\
+        \hline
+        \end{tabular}
+    };
+
+    % ========================================================
+    % 7. THỰC THỂ LOYALTY_ENTRY (Dưới User & Order)
+    % ========================================================
+    \node[inner sep=0pt] (LOYALTY) at (-10.5, -6.5) {
+        \begin{tabular}{|c|l|l|}
+        \hline
+        \rowcolor{headerBg}\multicolumn{3}{|c|}{\textbf{\textsf{\textcolor{white}{LOYALTY\_ENTRY}}}} \\
+        \hline
+        \rowcolor{colHeaderBg}\textit{\tiny Key} & \textit{\tiny Tên trường} & \textit{\tiny Kiểu dữ liệu / Ràng buộc} \\
+        \hline
+        \textcolor{pkColor}{\textbf{\tiny PK}} & \textbf{id} & \textsf{Int (autoincrement)} \\
+        \textcolor{fkColor}{\textbf{\tiny FK}} & userId & \textsf{Int $\rightarrow$ User.id} \\
+        \textcolor{fkColor}{\textbf{\tiny FK}} & orderId & \textsf{Int $\rightarrow$ Order.id} \\
+        & kind & \textsf{String ('EARN' $|$ 'REDEEM')} \\
+        & points & \textsf{Int (1 point = 1 VNĐ)} \\
+        & createdAt & \textsf{DateTime (default: now())} \\
+        \hline
+        \rowcolor{colHeaderBg}\multicolumn{3}{|c|}{\textcolor{uqColor}{\textbf{\tiny @@unique([orderId, kind])}}} \\
+        \hline
+        \end{tabular}
+    };
+
+    % ========================================================
+    % CÁC ĐƯỜNG LIÊN KẾT (RELATIONSHIPS & CARDINALITY)
+    % ========================================================
+    
+    % 1. USER -> ORDER (1 to 0..*)
+    \draw[rel] (USER.east) -- (ORDER.west);
+    \node[card, anchor=south west] at ($(USER.east)+(0.1, 0.1)$) {1};
+    \node[card, anchor=south east] at ($(ORDER.west)+(-0.1, 0.1)$) {0..*};
+    \node[labelnode] at ($(USER.east)!0.5!(ORDER.west)$) {places};
+
+    % 2. ORDER -> ORDER_ITEM (1 to 1..*)
+    \draw[rel] (ORDER.east) -- (ORDER_ITEM.west);
+    \node[card, anchor=south west] at ($(ORDER.east)+(0.1, 0.1)$) {1};
+    \node[card, anchor=south east] at ($(ORDER_ITEM.west)+(-0.1, 0.1)$) {1..*};
+    \node[labelnode] at ($(ORDER.east)!0.5!(ORDER_ITEM.west)$) {contains};
+
+    % 3. PRODUCT -> ORDER_ITEM (1 to 0..*)
+    \draw[rel] (PRODUCT.west) -- (ORDER_ITEM.east);
+    \node[card, anchor=south east] at ($(PRODUCT.west)+(-0.1, 0.1)$) {1};
+    \node[card, anchor=south west] at ($(ORDER_ITEM.east)+(0.1, 0.1)$) {0..*};
+    \node[labelnode] at ($(PRODUCT.west)!0.5!(ORDER_ITEM.east)$) {ordered in};
+
+    % 4. COUPON -> ORDER (0..1 to 0..*)
+    \draw[rel] (COUPON.south) -- (ORDER.north);
+    \node[card, anchor=north west] at ($(COUPON.south)+(0.1, -0.1)$) {0..1};
+    \node[card, anchor=south west] at ($(ORDER.north)+(0.1, 0.1)$) {0..*};
+    \node[labelnode] at ($(COUPON.south)!0.5!(ORDER.north)$) {applied to};
+
+    % 5. ORDER -> PAYMENT (1 to 0..1 [1:1])
+    \draw[rel] (ORDER.south) -- (PAYMENT.north);
+    \node[card, anchor=north west] at ($(ORDER.south)+(0.1, -0.1)$) {1};
+    \node[card, anchor=south west] at ($(PAYMENT.north)+(0.1, 0.1)$) {0..1};
+    \node[labelnode] at ($(ORDER.south)!0.5!(PAYMENT.north)$) {settled by [1:1]};
+
+    % 6. USER -> LOYALTY_ENTRY (1 to 0..*)
+    \draw[rel] (USER.south) -- (LOYALTY.north);
+    \node[card, anchor=north west] at ($(USER.south)+(0.1, -0.1)$) {1};
+    \node[card, anchor=south west] at ($(LOYALTY.north)+(0.1, 0.1)$) {0..*};
+    \node[labelnode] at ($(USER.south)!0.5!(LOYALTY.north)$) {accumulates};
+
+    % 7. ORDER -> LOYALTY_ENTRY (1 to 0..2)
+    \draw[rel] (ORDER.south west) -- (LOYALTY.north east);
+    \node[card, anchor=north east] at ($(ORDER.south west)+(-0.1, -0.1)$) {1};
+    \node[card, anchor=south west] at ($(LOYALTY.north east)+(0.1, 0.1)$) {0..2};
+    \node[labelnode] at ($(ORDER.south west)!0.5!(LOYALTY.north east)$) {audits (max 2)};
+
+    % ========================================================
+    % GHI CHÚ KIẾN TRÚC & CHÚ GIẢI (LEGEND)
+    % ========================================================
+    
+    % Hộp chú giải ký hiệu và OCC
+    \node[anchor=north west, draw=tableBorder, fill=boxBg, rounded corners=3pt, line width=1pt, text width=12cm, inner sep=8pt] 
+    at (6.2, 10.8) {
+        \textbf{\textsf{QUY ƯỚC RÀNG BUỘC VÀ TÍNH TOÀN VẸN (INTEGRITY)}} \\[4pt]
+        \footnotesize
+        \begin{tabular}{ll}
+            $\bullet$ \textcolor{pkColor}{\textbf{[PK]}}: Primary Key (Khóa chính) & 
+            $\bullet$ \textcolor{fkColor}{\textbf{[FK]}}: Foreign Key (Khóa ngoại tham chiếu) \\
+            $\bullet$ \textcolor{uqColor}{\textbf{[UQ]}}: Khóa Unique bảo đảm tính duy nhất & 
+            $\bullet$ \textcolor{occColor}{\textbf{[OCC]}}: Optimistic Concurrency Control (\textsf{Product.version})
+        \end{tabular} \\[4pt]
+        \textit{Ràng buộc nâng cao:} \\
+        - \textsf{Payment.idempotencyKey [UQ]}: Chống trừ tiền / tạo transaction 2 lần khi mạng chập chờn. \\
+        - \textsf{LoyaltyEntry @@unique([orderId, kind])}: Khóa chống cộng/trừ điểm lặp (chỉ 1 REDEEM, 1 EARN / đơn). \\
+        - \textsf{Product.version}: Điều kiện cập nhật \textsf{WHERE id = :id AND version = :v} chống oversell khi đặt đồng thời.
+    };
+
+\end{tikzpicture}
+\end{document}

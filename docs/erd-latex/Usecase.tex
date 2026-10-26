@@ -1,0 +1,134 @@
+\documentclass[border=15pt]{standalone}
+\usepackage[utf8]{inputenc}
+\usepackage[vietnamese]{babel}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds, calc}
+
+% Macro tự động vẽ hình người (Stickman Actor) chuẩn UML
+\newcommand{\drawactor}[3]{
+    \node (#1) at (#2) [minimum width=1.2cm, minimum height=1.8cm] {};
+    \draw[thick] (#1.center) ++(0,0.45) circle (0.22cm); % Đầu
+    \draw[thick] (#1.center) ++(0,0.23) -- ++(0,-0.55);  % Thân
+    \draw[thick] (#1.center) ++(-0.35,0.05) -- ++(0.7,0); % Tay
+    \draw[thick] (#1.center) ++(0,-0.32) -- ++(-0.3,-0.45); % Chân trái
+    \draw[thick] (#1.center) ++(0,-0.32) -- ++(0.3,-0.45);  % Chân phải
+    \node[below=2pt of #1, align=center, font=\bfseries\small] (#1_lbl) {#3};
+}
+
+\begin{document}
+\begin{tikzpicture}[
+    % Định nghĩa style cho Use Case, Package, Note và Mũi tên
+    uc/.style={ellipse, draw=black, thick, fill=gray!10, minimum width=3.2cm, minimum height=0.85cm, align=center, font=\small, inner sep=2pt},
+    pkg/.style={draw=black, thick, dashed, fill=gray!3, inner sep=14pt, rounded corners=3pt},
+    sys/.style={draw=black, very thick, inner sep=22pt},
+    note/.style={draw=black, fill=yellow!15, align=left, font=\footnotesize, inner sep=6pt, rounded corners=1pt},
+    assoc/.style={-{Stealth[length=2.5mm]}, thick},
+    inherit/.style={-{Triangle[open, length=3mm, width=2.5mm]}, thick},
+    dep/.style={-{Stealth[open, length=2.5mm]}, thick, dashed},
+    lbl/.style={font=\scriptsize\itshape, fill=white, inner sep=1pt}
+]
+
+    % ==========================================
+    % 1. CỘT 1: MVP - Catalog / Cart / Identity
+    % ==========================================
+    \node[uc] (UC01) at (0, 0)     {Xem menu};
+    \node[uc] (UC02) at (0, -1.3)  {Xem chi tiết món};
+    \node[uc] (UC03) at (0, -2.6)  {Chọn size / topping};
+    \node[uc] (UC04) at (0, -3.9)  {Thêm món vào giỏ};
+    \node[uc] (UC05) at (0, -5.2)  {Xem giỏ và tổng tiền};
+    \node[uc] (UC06) at (0, -6.5)  {Sửa số lượng / xóa món};
+    \node[uc] (UC07) at (0, -7.8)  {Đăng ký tài khoản};
+    \node[uc] (UC08) at (0, -9.1)  {Đăng nhập};
+
+    % ==========================================
+    % 2. CỘT 2 & 3: MVP - Ordering / Payments / Rewards
+    % ==========================================
+    \node[uc] (UC11) at (6.2, 0)     {Xem xác nhận /\\trạng thái đơn};
+    \node[uc] (UC12) at (6.2, -1.4)  {Xem lịch sử đơn};
+    \node[uc] (UC15) at (6.2, -2.7)  {Xem điểm tích lũy};
+    \node[uc] (UC16) at (6.2, -4.1)  {Sử dụng điểm tích lũy};
+    \node[uc] (UC09) at (6.2, -5.6)  {Đặt đơn hàng};
+    \node[uc] (UC14) at (6.2, -7.1)  {Áp dụng coupon};
+    \node[uc] (UC13) at (6.2, -8.6)  {Kiểm tra mã coupon};
+    \node[uc] (UC10) at (6.2, -10.1) {Thanh toán ví / thẻ};
+    \node[uc] (UC17) at (6.2, -11.6) {Thử lại thanh toán lỗi};
+
+    % Use case phụ trợ bên phải cột 2
+    \node[uc, minimum width=4.2cm] (UC18) at (12.2, -5.6) {Kiểm tra giá và tồn kho,\\giữ/trừ hàng khi tạo đơn};
+
+    % ==========================================
+    % 3. NGOÀI MVP
+    % ==========================================
+    \node[uc] (UC19) at (6.2, -14.2) {Nhân viên cập nhật\\trạng thái chế biến};
+
+    % ==========================================
+    % 4. ĐÓNG KHUNG PACKAGE & SYSTEM BOUNDARY
+    % ==========================================
+    \begin{scope}[on background layer]
+        \node[pkg, fit=(UC01) (UC08), label={[anchor=south west, font=\bfseries\small]north west:MVP - Catalog / Cart / Identity}] (pkg1) {};
+        \node[pkg, fit=(UC11) (UC17) (UC18), label={[anchor=south west, font=\bfseries\small]north west:MVP - Ordering / Payments / Rewards}] (pkg2) {};
+        \node[pkg, fit=(UC19), label={[anchor=south west, font=\bfseries\small]north west:NGOÀI MVP}] (pkg3) {};
+        
+        \node[sys, fit=(pkg1) (pkg2) (pkg3), label={[anchor=south, font=\bfseries\large]north:HỆ THỐNG BREWLITE}] (system) {};
+    \end{scope}
+
+    % ==========================================
+    % 5. CÁC TÁC NHÂN (ACTORS)
+    % ==========================================
+    \drawactor{Guest}{-5.5, -3.5}{Khách vãng lai}
+    \drawactor{Customer}{-5.5, -9.5}{Khách đã đăng nhập}
+    \drawactor{Gateway}{18.5, -10.1}{Cổng thanh toán\\giả lập}
+    \drawactor{Staff}{18.5, -14.2}{Nhân viên quầy}
+
+    % Quan hệ kế thừa: Khách đã đăng nhập --|> Khách vãng lai
+    \draw[inherit] (Customer.north) -- (Guest_lbl.south);
+
+    % ==========================================
+    % 6. CÁC GHI CHÚ (NOTES)
+    % ==========================================
+    \node[note] (note18) at (18.5, -5.6) {
+        \textbf{POST /orders:}\\
+        - Tính lại giá trên backend\\
+        - Kiểm tra tồn kho\\
+        - Giữ/trừ tồn kho bằng transaction\\
+        - Tạo đơn PENDING
+    };
+    \draw[dashed] (UC18.east) -- (note18.west);
+
+    \node[note] (note10) at (12.2, -11.6) {
+        \textbf{POST /payments:}\\
+        - Thành công: PAID\\
+        - Thất bại: PAYMENT\_FAILED\\
+        - Giữ giỏ khi thanh toán thất bại\\
+        - Cộng loyalty sau PAID
+    };
+    \draw[dashed] (UC10.south east) -- (note10.north west);
+
+    % ==========================================
+    % 7. ĐƯỜNG NỐI TƯƠNG TÁC (ASSOCIATIONS)
+    % ==========================================
+    % Tương tác của Khách vãng lai
+    \foreach \u in {UC01, UC02, UC03, UC04, UC05, UC06, UC07, UC08} {
+        \draw[assoc] (Guest.east) -- (\u.west);
+    }
+
+    % Tương tác của Khách đã đăng nhập
+    \foreach \u in {UC11, UC12, UC15, UC16, UC09, UC14, UC13, UC10, UC17} {
+        \draw[assoc] (Customer.east) -- (\u.west);
+    }
+
+    % Tương tác hệ thống ngoài & Nhân viên
+    \draw[assoc] (UC10.east) -- (Gateway.west);
+    \draw[assoc] (Staff.west) -- (UC19.east);
+
+    % ==========================================
+    % 8. QUAN HỆ INCLUDE & EXTEND
+    % ==========================================
+    \draw[dep] (UC09.east) -- node[lbl, above] {$\ll$include$\gg$} (UC18.west);
+    \draw[dep] (UC14.south) -- node[lbl] {$\ll$include$\gg$} (UC13.north);
+    \draw[dep] (UC14.north) -- node[lbl] {$\ll$extend$\gg$} (UC09.south);
+    \draw[dep] (UC16.south) -- node[lbl] {$\ll$extend$\gg$} (UC09.north);
+    \draw[dep] (UC17.north) -- node[lbl] {$\ll$extend$\gg$} (UC10.south);
+
+\end{tikzpicture}
+\end{document}

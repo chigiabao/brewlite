@@ -1,0 +1,28 @@
+% ==============================================================================
+% MẪU TẠO TABLE MỚI TRONG TIKZ ERD
+% ==============================================================================
+% Bạn có thể copy khối mẫu này vào file brewlite-erd.tex hoặc file .tex riêng
+
+% 1. Khai báo Node Table:
+% \node[table, right=3.5cm of <node_goc>] (<ten_node>) {
+%     \textbf{\textcolor{tableheadertext}{<TenBang>}}
+%     \nodepart{two}
+%     \underline{\textcolor{pkcolor}{id}} : Int \textbf{[PK]} \\
+%     \textcolor{fkcolor}{foreignId} : Int \textbf{[FK]} \\
+%     tenThuocTinh : String \\
+%     trangThai : Int (def 0) \\
+%     createdAt : DateTime
+% };
+
+% 2. Khai báo Quan hệ (Relationship) giữa 2 bảng:
+% - Đường thẳng nối bảng cha (1) sang bảng con (N):
+% \draw[relation] (<bang_cha>.east) -- 
+%     node[cardinality, above, pos=0.08] {1} 
+%     node[cardinality, above, pos=0.92] {N} 
+%     (<bang_con>.west);
+
+% - Đường cong nếu các bảng nằm lệch hàng / tránh chồng chéo:
+% \draw[relation] (<bang_cha>.south) to[out=-90, in=180] 
+%     node[cardinality, right, pos=0.08] {1} 
+%     node[cardinality, above, pos=0.92] {N} 
+%     (<bang_con>.west);

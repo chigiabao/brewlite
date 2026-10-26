@@ -1,0 +1,156 @@
+\documentclass[border=20pt]{standalone}
+\usepackage[utf8]{inputenc}
+\usepackage[T5]{fontenc}
+\usepackage[vietnamese]{babel}
+\usepackage{helvet}
+\renewcommand{\familydefault}{\sfdefault}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, calc}
+
+% Định nghĩa bảng màu chuẩn theo mã Hex từ draw.io
+\definecolor{cTitle}{HTML}{242424}
+\definecolor{cSub}{HTML}{666666}
+\definecolor{cText}{HTML}{555555}
+\definecolor{cBorderMain}{HTML}{444444}
+\definecolor{cBorderSub}{HTML}{777777}
+\definecolor{cBorderGray}{HTML}{B0B0B0}
+\definecolor{cFillGray}{HTML}{F6F6F6}
+\definecolor{cArrow}{HTML}{333333}
+
+\begin{document}
+\begin{tikzpicture}[
+    % Phóng to toàn bộ khung hình và khoảng cách lên 1.65 lần
+    x=1.65cm, y=1.65cm,
+    mainbox/.style={draw=cBorderMain, line width=1.4pt, fill=white},
+    graybox/.style={draw=cBorderGray, line width=0.9pt, fill=cFillGray},
+    whitebox/.style={draw=cBorderSub, line width=1.1pt, fill=white},
+    arr/.style={-{Stealth[length=3.2mm, width=2.2mm]}, draw=cArrow, line width=1.3pt},
+    arlbl/.style={font=\footnotesize, text=cArrow, align=center}
+]
+
+    % =========================================================
+    % TIÊU ĐỀ CHÍNH
+    % =========================================================
+    \node[anchor=west, font=\huge\bfseries, text=cTitle] at (2.8, -2.5) {BREWLITE --- KIẾN TRÚC HỆ THỐNG};
+
+    % =========================================================
+    % 1. KHỐI BROWSER
+    % =========================================================
+    \draw[mainbox] (2.8, -3.32) rectangle (5.5, -8.47);
+    \node[anchor=north west, font=\Large\bfseries, text=cTitle] at (2.98, -3.50) {BROWSER};
+    \node[anchor=north west, font=\small, text=cSub] at (2.98, -3.92) {Giao diện chạy trong trình duyệt};
+
+    % Sub-box 1: Menu / UI
+    \draw[graybox] (3.04, -4.46) rectangle (5.26, -5.18);
+    \node[anchor=west, font=\small, text=cTitle, align=left] at (3.14, -4.82) {Menu $\bullet$ Chi tiết món $\bullet$ Giỏ hàng\\[2pt]Đăng nhập $\bullet$ Checkout};
+
+    % Sub-box 2: Zustand Cart
+    \draw[whitebox] (3.04, -5.69) rectangle (5.26, -6.48);
+    \node[anchor=north west, font=\normalsize\bfseries, text=cTitle] at (3.14, -5.78) {Zustand Cart};
+    \node[anchor=north west, font=\small, text=cText] at (3.14, -6.12) {items $\bullet$ qty $\bullet$ giá tạm tính};
+
+    % Sub-box 3: localStorage
+    \draw[whitebox] (3.04, -7.01) rectangle (5.26, -7.78);
+    \node[anchor=north west, font=\normalsize\bfseries, text=cTitle] at (3.14, -7.10) {localStorage};
+    \node[anchor=north west, font=\small, text=cText] at (3.14, -7.42) {Lưu giỏ sau refresh};
+
+    % Mũi tên nội bộ: Zustand Cart -> localStorage
+    \draw[arr] (4.15, -6.48) -- node[right=3pt, font=\footnotesize, text=cText] {persist} (4.15, -7.01);
+
+
+    % =========================================================
+    % 2. KHỐI NEXT.JS
+    % =========================================================
+    \draw[mainbox] (6.35, -3.83) rectangle (9.13, -7.98);
+    \node[anchor=north west, font=\Large\bfseries, text=cTitle] at (6.54, -4.00) {NEXT.JS};
+    \node[anchor=north west, font=\small, text=cSub] at (6.54, -4.40) {Frontend $\bullet$ :3000};
+
+    % Sub-box 1: App Router / Pages
+    \draw[graybox] (6.59, -4.82) rectangle (8.89, -5.87);
+    \node[anchor=north west, font=\normalsize\bfseries, text=cTitle] at (6.70, -4.92) {App Router / Pages};
+    \node[anchor=north west, font=\small, text=cText, align=left] at (6.70, -5.28) {/ \quad /products/[id] \quad /cart\\[2pt]/login \quad /checkout \quad /orders};
+
+    % Sub-box 2: REST API Client
+    \draw[whitebox] (6.59, -6.39) rectangle (8.89, -7.24);
+    \node[anchor=north west, font=\normalsize\bfseries, text=cTitle] at (6.70, -6.50) {REST API Client};
+    \node[anchor=north west, font=\small, text=cText] at (6.70, -6.84) {Bearer JWT $\bullet$ JSON requests};
+
+
+    % =========================================================
+    % 3. KHỐI NESTJS — MODULAR MONOLITH
+    % =========================================================
+    \draw[mainbox] (10.08, -3.20) rectangle (15.56, -8.95);
+    \node[anchor=north west, font=\Large\bfseries, text=cTitle] at (10.32, -3.40) {NESTJS --- MODULAR MONOLITH};
+    \node[anchor=north west, font=\small, text=cSub] at (10.32, -3.80) {Backend REST API $\bullet$ :3001};
+
+    % Hàng 1: Auth & Products
+    \draw[whitebox] (10.35, -4.19) rectangle (12.66, -5.10);
+    \node[anchor=north west, font=\normalsize\bfseries, text=cTitle] at (10.46, -4.28) {Auth};
+    \node[anchor=north west, font=\small, text=cText, align=left] at (10.46, -4.58) {POST /auth/register\\POST /auth/login};
+
+    \draw[whitebox] (13.01, -4.19) rectangle (15.32, -5.10);
+    \node[anchor=north west, font=\normalsize\bfseries, text=cTitle] at (13.12, -4.28) {Products};
+    \node[anchor=north west, font=\small, text=cText, align=left] at (13.12, -4.58) {GET /products\\GET /products/:id};
+
+    % Hàng 2: Orders & Payments
+    \draw[whitebox] (10.35, -5.32) rectangle (12.66, -6.23);
+    \node[anchor=north west, font=\normalsize\bfseries, text=cTitle] at (10.46, -5.41) {Orders};
+    \node[anchor=north west, font=\small, text=cText, align=left] at (10.46, -5.71) {POST /orders\\GET /orders/me};
+
+    \draw[whitebox] (13.01, -5.32) rectangle (15.32, -6.23);
+    \node[anchor=north west, font=\normalsize\bfseries, text=cTitle] at (13.12, -5.41) {Payments};
+    \node[anchor=north west, font=\small, text=cText, align=left] at (13.12, -5.71) {POST /payments\\Idempotency-Key};
+
+    % Hàng 3: Rewards & Prisma Client / ORM
+    \draw[whitebox] (10.35, -6.45) rectangle (12.66, -7.36);
+    \node[anchor=north west, font=\normalsize\bfseries, text=cTitle] at (10.46, -6.54) {Rewards};
+    \node[anchor=north west, font=\small, text=cText, align=left] at (10.46, -6.84) {POST /coupons/validate\\Điểm thưởng sau PAID};
+
+    \draw[whitebox] (13.01, -6.45) rectangle (15.32, -7.36);
+    \node[anchor=north west, font=\normalsize\bfseries, text=cTitle] at (13.12, -6.54) {Prisma Client / ORM};
+    \node[anchor=north west, font=\small, text=cText, align=left] at (13.12, -6.84) {Truy vấn / ghi DB\\Chạy trong NestJS};
+
+
+    % =========================================================
+    % 4. KHỐI POSTGRESQL
+    % =========================================================
+    \draw[mainbox] (16.85, -3.50) rectangle (19.35, -5.56);
+    \node[anchor=north west, font=\Large\bfseries, text=cTitle] at (17.04, -3.66) {POSTGRESQL};
+    \node[anchor=north west, font=\small, text=cSub] at (17.04, -4.06) {Database $\bullet$ :5432};
+
+    \draw[graybox] (17.07, -4.55) rectangle (19.12, -5.22);
+    \node[anchor=west, font=\small, text=cTitle, align=left] at (17.16, -4.88) {User $\bullet$ Product $\bullet$ Order\\[2pt]Payment $\bullet$ Coupon $\bullet$ Loyalty};
+
+
+    % =========================================================
+    % 5. KHỐI MOCK GATEWAY
+    % =========================================================
+    \draw[mainbox] (16.85, -6.57) rectangle (19.35, -8.50);
+    \node[anchor=north west, font=\Large\bfseries, text=cTitle] at (17.04, -6.76) {MOCK GATEWAY};
+    \node[anchor=north west, font=\small, text=cSub] at (17.04, -7.14) {Không gọi thanh toán thật};
+
+    \draw[graybox] (17.07, -7.52) rectangle (19.12, -8.19);
+    \node[anchor=west, font=\small, text=cTitle, align=left] at (17.16, -7.85) {WALLET / CARD\\[2pt]Success / Failure};
+
+
+    % =========================================================
+    % 6. CÁC MŨI TÊN KẾT NỐI GIỮA CÁC KHỐI
+    % =========================================================
+    % Browser <-> Next.js
+    \draw[arr] (5.50, -4.79) -- node[above=3pt, arlbl] {HTTP} (6.35, -4.79);
+    \draw[arr] (6.35, -5.27) -- node[below=3pt, arlbl] {HTML / UI} (5.50, -5.27);
+
+    % Next.js <-> NestJS
+    \draw[arr] (9.13, -4.78) -- node[above=3pt, arlbl] {REST} (10.08, -4.78);
+    \draw[arr] (10.08, -5.27) -- node[below=3pt, arlbl] {JSON} (9.13, -5.27);
+
+    % NestJS <-> PostgreSQL
+    \draw[arr] (15.56, -4.45) -- node[above=3pt, arlbl] {ORM query} (16.85, -4.45);
+    \draw[arr] (16.85, -4.99) -- node[below=3pt, arlbl] {DB result} (15.56, -4.99);
+
+    % NestJS <-> Mock Gateway
+    \draw[arr] (15.56, -7.22) -- node[above=3pt, arlbl] {Pay request} (16.85, -7.22);
+    \draw[arr] (16.85, -7.85) -- node[below=3pt, arlbl] {Result} (15.56, -7.85);
+
+\end{tikzpicture}
+\end{document}
