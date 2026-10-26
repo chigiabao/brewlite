@@ -4,12 +4,13 @@ import { Suspense } from 'react';
 import './globals.css';
 import Providers from './providers';
 
+import { CartLink } from '@/components/cart-link';
+
 export const metadata: Metadata = {
   title: 'BrewLite',
   description: 'Đặt cà phê không dùng tiền mặt',
 };
 
-// TODO(C – Task 5): thêm badge số lượng giỏ hàng lên header (lấy từ useCart).
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi">
@@ -19,10 +20,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" className="text-xl font-bold">
               ☕ BrewLite
             </Link>
-            <nav className="flex gap-4">
-              <Link href="/cart" className="hover:underline">
-                Giỏ hàng
-              </Link>
+            <nav className="flex gap-4 items-center">
+              <CartLink />
               <Link href="/orders" className="hover:underline">
                 Lịch sử đơn
               </Link>

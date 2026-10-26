@@ -34,8 +34,14 @@ describe('POST /payments (e2e, fixture order)', () => {
 
   beforeEach(async () => {
     nextReference = 'MOCK-OK1234';
-    await prisma.payment.deleteMany({ where: { order: { userId: 1 } } });
-    await prisma.order.deleteMany({ where: { userId: 1 } });
+    const orders = await prisma.order.findMany({ where: { userId: 1 }, select: { id: true } });
+    const orderIds = orders.map((o) => o.id);
+    if (orderIds.length > 0) {
+      await prisma.payment.deleteMany({ where: { orderId: { in: orderIds } } });
+      await prisma.order.deleteMany({ where: { id: { in: orderIds } } });
+    } else {
+      await prisma.order.deleteMany({ where: { userId: 1 } });
+    }
     await prisma.user.upsert({
       where: { id: 1 },
       update: {},
@@ -160,5 +166,29 @@ describe('POST /payments (e2e, fixture order)', () => {
 
     const updated = await prisma.order.findUnique({ where: { id: order.id } });
     expect(updated?.status).toBe('PAYMENT_FAILED');
+  });
+
+  it('decline -> 402, retry key mới -> 200, order PAID', async () => {
+    const order = await seedOrder();
+    nextReference = 'MOCK-DECL0000';
+
+    const declined = await request(app.getHttpServer())
+      .post('/payments')
+      .set('Idempotency-Key', 'e2e-decline-retry-1')
+      .send({ orderId: order.id, method: 'CARD' });
+    expect(declined.status).toBe(402);
+
+    nextReference = 'MOCK-OK5678';
+    const retried = await request(app.getHttpServer())
+      .post('/payments')
+      .set('Idempotency-Key', 'e2e-decline-retry-2')
+      .send({ orderId: order.id, method: 'WALLET' });
+
+    expect(retried.status).toBe(200);
+    expect(retried.body.orderStatus).toBe('PAID');
+
+    const updated = await prisma.order.findUnique({ where: { id: order.id } });
+    expect(updated?.status).toBe('PAID');
+    expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(2);
   });
 });
