@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { RewardsModule } from '../rewards/rewards.module.js';
 import {
   GATEWAY_REFERENCE_GENERATOR,
   MockGatewayService,
@@ -9,6 +10,9 @@ import { PaymentsController } from './payments.controller.js';
 import { PaymentsService } from './payments.service.js';
 
 @Module({
+  imports: [
+    RewardsModule, // G-02: cần REWARDS_PORT để finalizeRewardsOnPaid sau PAID
+  ],
   controllers: [PaymentsController],
   providers: [
     PaymentsService,

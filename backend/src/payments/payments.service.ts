@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import type { Payment } from '../generated/prisma/client.js';
 import { OrderStatus, PaymentStatus } from '../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { REWARDS_PORT, type RewardsPort } from '../rewards/rewards-port.js';
 import { MockGatewayService } from './mock-gateway.service.js';
 import {
   ORDERS_PAYMENT_PORT,
@@ -65,6 +66,7 @@ export class PaymentsService {
     private readonly prisma: PrismaService,
     private readonly gateway: MockGatewayService,
     @Inject(ORDERS_PAYMENT_PORT) private readonly orders: OrdersPaymentPort,
+    @Inject(REWARDS_PORT) private readonly rewards: RewardsPort,
   ) {}
 
   async pay(input: PayInput): Promise<PaymentResult> {
@@ -122,12 +124,25 @@ export class PaymentsService {
       return this.handleGatewayFailure(payment, error);
     }
 
+    // G-02: markPaid + finalizeRewardsOnPaid trong cùng transaction → exactly-once
     await this.prisma.$transaction(async (tx) => {
       await tx.payment.update({
         where: { id: payment.id },
         data: { status: PaymentStatus.SUCCEEDED, transactionId: reference },
       });
       await this.orders.markPaid(payment.orderId, payment.id, tx);
+
+      // Lấy thông tin userId và total để cộng điểm; idempotent (unique LoyaltyEntry guard).
+      const order = await tx.order.findUnique({
+        where: { id: payment.orderId },
+        select: { userId: true, total: true },
+      });
+      if (order) {
+        await this.rewards.finalizeRewardsOnPaid(
+          { orderId: payment.orderId, userId: order.userId, totalPaid: order.total },
+          tx,
+        );
+      }
     });
 
     this.logger.log(
