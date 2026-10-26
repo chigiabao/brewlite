@@ -17,6 +17,17 @@ export default function LoginPage() {
     setError('');
     setIsSubmitting(true);
 
+    if (!email.trim()) {
+      setError('Vui lòng nhập email hợp lệ');
+      setIsSubmitting(false);
+      return;
+    }
+    if (password.length < 6) {
+      setError('Mật khẩu phải có tối thiểu 6 ký tự');
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       if (mode === 'register') {
         await api<{ id: number; email: string }>('/auth/register', {
@@ -29,6 +40,9 @@ export default function LoginPage() {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       });
+      // Ghi chú bảo mật (Guide D): Lưu JWT trong localStorage theo yêu cầu của bài lab.
+      // Lưu ý rủi ro XSS: mã độc JavaScript có thể đọc token từ localStorage nếu có lỗ hổng XSS.
+      // Giải pháp khuyến nghị cho production là sử dụng HttpOnly Secure Cookie.
       localStorage.setItem('token', result.accessToken);
       router.push('/');
     } catch (submitError) {

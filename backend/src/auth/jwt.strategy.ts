@@ -5,8 +5,8 @@ import type { AuthUser } from './current-user.decorator.js';
 
 type JwtPayload = { sub: number; email: string };
 
-function getJwtSecret(): string {
-  const secret = process.env.JWT_SECRET;
+export function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET ?? (process.env.NODE_ENV === 'test' ? 'brewlite-test-jwt-secret-minimum-32-chars' : undefined);
   if (!secret) {
     throw new Error('JWT_SECRET phải được cấu hình trước khi khởi động xác thực');
   }

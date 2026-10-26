@@ -1,4 +1,4 @@
-import { JwtStrategy } from './jwt.strategy.js';
+import { JwtStrategy, getJwtSecret } from './jwt.strategy.js';
 
 describe('JwtStrategy', () => {
   beforeEach(() => {
@@ -12,5 +12,16 @@ describe('JwtStrategy', () => {
       userId: 42,
       email: 'user@example.com',
     });
+  });
+
+  it('throws error in production when JWT_SECRET is missing', () => {
+    delete process.env.JWT_SECRET;
+    const oldEnv = process.env.NODE_ENV;
+    try {
+      process.env.NODE_ENV = 'production';
+      expect(() => getJwtSecret()).toThrow('JWT_SECRET phải được cấu hình');
+    } finally {
+      process.env.NODE_ENV = oldEnv;
+    }
   });
 });

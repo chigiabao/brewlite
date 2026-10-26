@@ -52,11 +52,23 @@ describe('AuthService', () => {
     expect(jwtMock.signAsync).toHaveBeenCalledWith({ sub: 7, email: 'user@example.com' });
   });
 
-  it('returns 401 for unknown or invalid credentials', async () => {
+  it('returns 401 for unknown user', async () => {
     prisma.user.findUnique.mockResolvedValue(null);
 
     await expect(
       service.login({ email: 'user@example.com', password: 'wrong' }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('returns 401 when password does not match', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 7,
+      email: 'user@example.com',
+      passwordHash: await hash('correct-password', 4),
+    });
+
+    await expect(
+      service.login({ email: 'user@example.com', password: 'wrong-password' }),
     ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 });

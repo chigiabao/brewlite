@@ -1,4 +1,4 @@
-import { Controller, Get, INestApplication, UseGuards } from '@nestjs/common';
+import { Controller, Get, INestApplication, UseGuards, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types.js';
@@ -45,6 +45,9 @@ describe('Identity (e2e)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+    );
     await app.init();
   });
 
@@ -53,6 +56,17 @@ describe('Identity (e2e)', () => {
   });
 
   it('covers register, duplicate email, login, invalid password, and JWT guard', async () => {
+    // Kiểm tra validate DTO (400 Bad Request)
+    await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({ email: 'not-an-email', password: 'secret123' })
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({ email: 'valid@example.com', password: '123' })
+      .expect(400);
+
     const registration = await request(app.getHttpServer())
       .post('/auth/register')
       .send({ email: 'user@example.com', password: 'secret123' })
@@ -76,7 +90,16 @@ describe('Identity (e2e)', () => {
       .send({ email: 'user@example.com', password: 'wrong-password' })
       .expect(401);
 
+    // Route guard: thiếu token -> 401
     await request(app.getHttpServer()).get('/auth-test/me').expect(401);
+
+    // Route guard: token không hợp lệ -> 401
+    await request(app.getHttpServer())
+      .get('/auth-test/me')
+      .set('Authorization', 'Bearer invalid-jwt-token')
+      .expect(401);
+
+    // Route guard: token hợp lệ -> 200
     await request(app.getHttpServer())
       .get('/auth-test/me')
       .set('Authorization', `Bearer ${login.body.accessToken}`)
