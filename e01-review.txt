@@ -1,0 +1,584 @@
+﻿diff --git a/backend/src/orders/order-state.spec.ts b/backend/src/orders/order-state.spec.ts
+index 0a24b32..b6209df 100644
+--- a/backend/src/orders/order-state.spec.ts
++++ b/backend/src/orders/order-state.spec.ts
+@@ -1,6 +1,76 @@
+ // Test bß║»t buß╗Öc (a) cß╗ºa Task 10 ΓÇô E viß║┐t.
++// describe('Order State Machine', () => {
++//   it.todo('chß║╖n PENDING ΓåÆ COMPLETED');
++//   it.todo('cho ph├⌐p PENDING ΓåÆ PAID');
++//   it.todo('trß║íng th├íi kß║┐t th├║c (COMPLETED, CANCELLED) kh├┤ng chuyß╗ân tiß║┐p ─æ╞░ß╗úc');
++// });
++
++import { BadRequestException } from '@nestjs/common';
++import { OrderStatus } from '../generated/prisma/enums.js';
++import { assertTransition } from './order-state.js';
++
+ describe('Order State Machine', () => {
+-  it.todo('chß║╖n PENDING ΓåÆ COMPLETED');
+-  it.todo('cho ph├⌐p PENDING ΓåÆ PAID');
+-  it.todo('trß║íng th├íi kß║┐t th├║c (COMPLETED, CANCELLED) kh├┤ng chuyß╗ân tiß║┐p ─æ╞░ß╗úc');
++  it('chß║╖n PENDING ΓåÆ COMPLETED', () => {
++    expect(() =>
++      assertTransition(OrderStatus.PENDING, OrderStatus.COMPLETED),
++    ).toThrow(BadRequestException);
++  });
++
++  it('cho ph├⌐p PENDING ΓåÆ PAID', () => {
++    expect(() =>
++      assertTransition(OrderStatus.PENDING, OrderStatus.PAID),
++    ).not.toThrow();
++  });
++
++  it('trß║íng th├íi kß║┐t th├║c (COMPLETED, CANCELLED) kh├┤ng chuyß╗ân tiß║┐p ─æ╞░ß╗úc', () => {
++    expect(() =>
++      assertTransition(OrderStatus.COMPLETED, OrderStatus.PENDING),
++    ).toThrow(BadRequestException);
++
++    expect(() =>
++      assertTransition(OrderStatus.CANCELLED, OrderStatus.PENDING),
++    ).toThrow(BadRequestException);
++  });
++
++  it('cho ph├⌐p c├íc chuyß╗ân tiß║┐p hß╗úp lß╗ç theo luß╗ông ─æß║╖t h├áng', () => {
++    expect(() =>
++      assertTransition(OrderStatus.PAID, OrderStatus.PREPARING),
++    ).not.toThrow();
++
++    expect(() =>
++      assertTransition(OrderStatus.PREPARING, OrderStatus.READY),
++    ).not.toThrow();
++
++    expect(() =>
++      assertTransition(OrderStatus.READY, OrderStatus.COMPLETED),
++    ).not.toThrow();
++  });
++
++  it('cho ph├⌐p PAYMENT_FAILED thß╗¡ lß║íi v├á hß╗ºy ─æ╞ín', () => {
++    expect(() =>
++      assertTransition(OrderStatus.PENDING, OrderStatus.PAYMENT_FAILED),
++    ).not.toThrow();
++
++    expect(() =>
++      assertTransition(OrderStatus.PAYMENT_FAILED, OrderStatus.PENDING),
++    ).not.toThrow();
++
++    expect(() =>
++      assertTransition(OrderStatus.PAYMENT_FAILED, OrderStatus.CANCELLED),
++    ).not.toThrow();
++  });
++
++  it('chß║╖n c├íc chuyß╗ân tiß║┐p kh├┤ng hß╗úp lß╗ç', () => {
++    expect(() =>
++      assertTransition(OrderStatus.PENDING, OrderStatus.PREPARING),
++    ).toThrow(BadRequestException);
++
++    expect(() =>
++      assertTransition(OrderStatus.PAID, OrderStatus.COMPLETED),
++    ).toThrow(BadRequestException);
++
++    expect(() =>
++      assertTransition(OrderStatus.READY, OrderStatus.PREPARING),
++    ).toThrow(BadRequestException);
++  });
+ });
+diff --git a/backend/src/orders/order-state.ts b/backend/src/orders/order-state.ts
+index 25b50ea..54d73d0 100644
+--- a/backend/src/orders/order-state.ts
++++ b/backend/src/orders/order-state.ts
+@@ -1,23 +1,64 @@
++// import { OrderStatus } from '../generated/prisma/enums.js';
++
++// // Ng╞░ß╗¥i phß╗Ñ tr├ích: E (Task 10.1 ΓÇô Order State Machine)
++// // Luß╗ông: PENDING ΓåÆ PAID ΓåÆ PREPARING ΓåÆ READY ΓåÆ COMPLETED
++// // Ngoß║íi lß╗ç: PAYMENT_FAILED (thß╗¡ lß║íi ─æ╞░ß╗úc), CANCELLED. COMPLETED v├á CANCELLED l├á trß║íng th├íi kß║┐t th├║c.
++// // Mß╗ìi chß╗ù ─æß╗òi order.status phß║úi gß╗ìi assertTransition() tr╞░ß╗¢c.
++
++// // TODO(E): ─æiß╗ün c├íc chuyß╗ân tiß║┐p hß╗úp lß╗ç theo s╞í ─æß╗ô ß╗ƒ mß╗Ñc 9.1 cß╗ºa ─æß╗ü.
++// export const ALLOWED: Record<OrderStatus, OrderStatus[]> = {
++//   PENDING: [],
++//   PAID: [],
++//   PAYMENT_FAILED: [],
++//   PREPARING: [],
++//   READY: [],
++//   COMPLETED: [],
++//   CANCELLED: [],
++// };
++
++// // TODO(E): n├⌐m BadRequestException nß║┐u from ΓåÆ to kh├┤ng c├│ trong ALLOWED.
++// export function assertTransition(from: OrderStatus, to: OrderStatus): void {
++//   void from;
++//   void to;
++// }
++
++import { BadRequestException } from '@nestjs/common';
+ import { OrderStatus } from '../generated/prisma/enums.js';
+ 
+ // Ng╞░ß╗¥i phß╗Ñ tr├ích: E (Task 10.1 ΓÇô Order State Machine)
+-// Luß╗ông: PENDING ΓåÆ PAID ΓåÆ PREPARING ΓåÆ READY ΓåÆ COMPLETED
+-// Ngoß║íi lß╗ç: PAYMENT_FAILED (thß╗¡ lß║íi ─æ╞░ß╗úc), CANCELLED. COMPLETED v├á CANCELLED l├á trß║íng th├íi kß║┐t th├║c.
+ // Mß╗ìi chß╗ù ─æß╗òi order.status phß║úi gß╗ìi assertTransition() tr╞░ß╗¢c.
+ 
+-// TODO(E): ─æiß╗ün c├íc chuyß╗ân tiß║┐p hß╗úp lß╗ç theo s╞í ─æß╗ô ß╗ƒ mß╗Ñc 9.1 cß╗ºa ─æß╗ü.
+ export const ALLOWED: Record<OrderStatus, OrderStatus[]> = {
+-  PENDING: [],
+-  PAID: [],
+-  PAYMENT_FAILED: [],
+-  PREPARING: [],
+-  READY: [],
++  PENDING: [
++    OrderStatus.PAID,
++    OrderStatus.PAYMENT_FAILED,
++    OrderStatus.CANCELLED,
++  ],
++  PAID: [
++    OrderStatus.PREPARING,
++    OrderStatus.CANCELLED,
++  ],
++  PAYMENT_FAILED: [
++    OrderStatus.PENDING,
++    OrderStatus.CANCELLED,
++  ],
++  PREPARING: [
++    OrderStatus.READY,
++  ],
++  READY: [
++    OrderStatus.COMPLETED,
++  ],
+   COMPLETED: [],
+   CANCELLED: [],
+ };
+ 
+-// TODO(E): n├⌐m BadRequestException nß║┐u from ΓåÆ to kh├┤ng c├│ trong ALLOWED.
+-export function assertTransition(from: OrderStatus, to: OrderStatus): void {
+-  void from;
+-  void to;
++export function assertTransition(
++  from: OrderStatus,
++  to: OrderStatus,
++): void {
++  if (!ALLOWED[from].includes(to)) {
++    throw new BadRequestException(
++      `Invalid order status transition: ${from} -> ${to}`,
++    );
++  }
+ }
+diff --git a/backend/src/orders/orders.controller.ts b/backend/src/orders/orders.controller.ts
+index f3f0781..59b61dd 100644
+--- a/backend/src/orders/orders.controller.ts
++++ b/backend/src/orders/orders.controller.ts
+@@ -1,22 +1,53 @@
+-import { Body, Controller, Get, Post } from '@nestjs/common';
++// import { Body, Controller, Get, Post } from '@nestjs/common';
++// import { CreateOrderDto } from './orders.dto.js';
++// import { OrdersService } from './orders.service.js';
++
++// // TODO(D ΓÇô Task 7): khi JwtStrategy xong, th├¬m @UseGuards(JwtAuthGuard) cho controller
++// // v├á lß║Ñy user bß║▒ng @CurrentUser() thay cho userId tß║ím.
++// const TEMP_USER_ID = 1;
++
++// @Controller('orders')
++// export class OrdersController {
++//   constructor(private readonly orders: OrdersService) {}
++
++//   // Ng╞░ß╗¥i phß╗Ñ tr├ích: E (Task 6)
++//   @Post()
++//   create(@Body() dto: CreateOrderDto) {
++//     return this.orders.create(TEMP_USER_ID, dto);
++//   }
++
++//   // Ng╞░ß╗¥i phß╗Ñ tr├ích: E (Task 9)
++//   @Get('me')
++//   mine() {
++//     return this.orders.findMine(TEMP_USER_ID);
++//   }
++// }
++
++import {
++  Body,
++  Controller,
++  Get,
++  Headers,
++  Post,
++} from '@nestjs/common';
+ import { CreateOrderDto } from './orders.dto.js';
+ import { OrdersService } from './orders.service.js';
+ 
+-// TODO(D ΓÇô Task 7): khi JwtStrategy xong, th├¬m @UseGuards(JwtAuthGuard) cho controller
+-// v├á lß║Ñy user bß║▒ng @CurrentUser() thay cho userId tß║ím.
++// TODO(D): thay bß║▒ng JWT v├á @CurrentUser() khi t├¡ch hß╗úp Auth.
+ const TEMP_USER_ID = 1;
+ 
+ @Controller('orders')
+ export class OrdersController {
+   constructor(private readonly orders: OrdersService) {}
+ 
+-  // Ng╞░ß╗¥i phß╗Ñ tr├ích: E (Task 6)
+   @Post()
+-  create(@Body() dto: CreateOrderDto) {
+-    return this.orders.create(TEMP_USER_ID, dto);
++  create(
++    @Body() dto: CreateOrderDto,
++    @Headers('idempotency-key') idempotencyKey?: string,
++  ) {
++    return this.orders.create(TEMP_USER_ID, dto, idempotencyKey);
+   }
+ 
+-  // Ng╞░ß╗¥i phß╗Ñ tr├ích: E (Task 9)
+   @Get('me')
+   mine() {
+     return this.orders.findMine(TEMP_USER_ID);
+diff --git a/backend/src/orders/orders.service.ts b/backend/src/orders/orders.service.ts
+index 7499865..9659728 100644
+--- a/backend/src/orders/orders.service.ts
++++ b/backend/src/orders/orders.service.ts
+@@ -1,20 +1,266 @@
+-import { Injectable, NotImplementedException } from '@nestjs/common';
++// // @Injectable()
++// // export class OrdersService {
++// //   constructor(private readonly prisma: PrismaService) {}
++
++// //   // TODO(E ΓÇô Task 6): lß║Ñy gi├í gß╗æc tß╗½ DB, t├¡nh lß║íi bß║▒ng unitPrice() (common/pricing.ts),
++// //   // l╞░u Order trß║íng th├íi PENDING k├¿m OrderItem, trß║ú { id, status, total }.
++// //   // TODO(E ΓÇô Task 10): trß╗½ tß╗ôn kho trong transaction (stock.service.ts) v├á ├íp couponCode qua hß╗úp ─æß╗ông Rewards (G), E chß╗ïu tr├ích nhiß╗çm transaction.
++// //   create(userId: number, dto: CreateOrderDto) {
++// //     throw new NotImplementedException('POST /orders ch╞░a l├ám (E ΓÇô Task 6)');
++// //   }
++
++// //   // TODO(E ΓÇô Task 9): trß║ú [{ id, status, total, createdAt }] cß╗ºa user, mß╗¢i nhß║Ñt tr╞░ß╗¢c.
++// //   findMine(userId: number) {
++// //     throw new NotImplementedException('GET /orders/me ch╞░a l├ám (E ΓÇô Task 9)');
++// //   }
++// // }
++
++import { createHash } from 'node:crypto';
++import {
++  ConflictException,
++  BadRequestException,
++  Injectable,
++  NotFoundException,
++} from '@nestjs/common';
++import { Prisma } from '../generated/prisma/client.js';
++import { unitPrice } from '../common/pricing.js';
++import type { Size } from '../common/pricing.js';
+ import { PrismaService } from '../prisma/prisma.service.js';
+ import { CreateOrderDto } from './orders.dto.js';
++import { StockService } from './stock.service.js';
+ 
+ @Injectable()
+ export class OrdersService {
+-  constructor(private readonly prisma: PrismaService) {}
++  constructor(
++    private readonly prisma: PrismaService,
++    private readonly stock: StockService,
++  ) {}
++
++  async create(userId: number, dto: CreateOrderDto, idempotencyKey?: string) {
++    const key = idempotencyKey?.trim();
++
++    if (!key) {
++      throw new BadRequestException('IDEMPOTENCY_KEY_REQUIRED');
++    }
++
++    if (key.length > 200) {
++      throw new BadRequestException('IDEMPOTENCY_KEY_TOO_LONG');
++    }
++
++    // Hash dß╗» liß╗çu ─æß║ºu v├áo theo thß╗⌐ tß╗▒ ß╗òn ─æß╗ïnh.
++    const normalizedPayload = {
++      items: dto.items.map((item) => ({
++        productId: item.productId,
++        size: item.size,
++        toppings: [...item.toppings].sort(),
++        qty: item.qty,
++      })),
++      couponCode: dto.couponCode ?? null,
++      pointsToRedeem: dto.pointsToRedeem ?? 0,
++    };
++
++    const requestHash = createHash('sha256')
++      .update(JSON.stringify(normalizedPayload))
++      .digest('hex');
++
++    const existing = await this.prisma.order.findFirst({
++      where: { userId, idempotencyKey: key },
++      select: {
++        id: true,
++        status: true,
++        subtotal: true,
++        discountTotal: true,
++        pointsRedeemed: true,
++        total: true,
++        requestHash: true,
++      },
++    });
++
++    if (existing) {
++      if (existing.requestHash !== requestHash) {
++        throw new ConflictException('IDEMPOTENCY_KEY_PAYLOAD_MISMATCH');
++      }
++
++      const { requestHash: _hash, ...result } = existing;
++      return result;
++    }
++
++    try {
++      return await this.prisma.$transaction(async (tx) => {
++        // Kiß╗âm tra lß║íi trong transaction tr╞░ß╗¢c khi xß╗¡ l├╜ ─æ╞ín.
++        const duplicate = await tx.order.findFirst({
++          where: { userId, idempotencyKey: key },
++          select: {
++            id: true,
++            status: true,
++            subtotal: true,
++            discountTotal: true,
++            pointsRedeemed: true,
++            total: true,
++            requestHash: true,
++          },
++        });
++
++        if (duplicate) {
++          if (duplicate.requestHash !== requestHash) {
++            throw new ConflictException('IDEMPOTENCY_KEY_PAYLOAD_MISMATCH');
++          }
++
++          const { requestHash: _hash, ...result } = duplicate;
++          return result;
++        }
++
++        const productIds = [
++          ...new Set(dto.items.map((item) => item.productId)),
++        ].sort((a, b) => a - b);
++
++        const products = await tx.product.findMany({
++          where: { id: { in: productIds } },
++        });
++
++        if (products.length !== productIds.length) {
++          throw new NotFoundException('PRODUCT_NOT_FOUND');
++        }
++
++        const productsById = new Map(
++          products.map((product) => [product.id, product]),
++        );
++
++        const pricedItems = dto.items.map((item) => {
++          const product = productsById.get(item.productId);
++
++          if (!product) {
++            throw new NotFoundException('PRODUCT_NOT_FOUND');
++          }
++
++          const price = unitPrice(
++            product.price,
++            item.size as Size,
++            item.toppings,
++          );
++
++          return {
++            productId: item.productId,
++            size: item.size,
++            toppings: item.toppings,
++            qty: item.qty,
++            unitPrice: price,
++            lineTotal: price * item.qty,
++          };
++        });
++
++        const subtotal = pricedItems.reduce(
++          (sum, item) => sum + item.lineTotal,
++          0,
++        );
++
++        // Chß╗¥ hß╗úp ─æß╗ông Rewards (G) ─æß╗â xß╗¡ l├╜ coupon v├á ─æß╗òi ─æiß╗âm.
++        const discountTotal = 0;
++        const pointsRedeemed = 0;
++        const total = subtotal;
++
++        await this.stock.reserve(tx, dto.items, products);
++
++        return tx.order.create({
++          data: {
++            userId,
++            idempotencyKey: key,
++            requestHash,
++            status: 'PENDING',
++            subtotal,
++            discountTotal,
++            pointsRedeemed,
++            total,
++            couponCode: null,
++            items: {
++              create: pricedItems,
++            },
++          },
++          select: {
++            id: true,
++            status: true,
++            subtotal: true,
++            discountTotal: true,
++            pointsRedeemed: true,
++            total: true,
++          },
++        });
++      });
++      // } catch (error: unknown) {
++      //   // Request ─æß╗ông thß╗¥i c├│ thß╗â thua unique constraint.
++      //   // Transaction thß║Ñt bß║íi sß║╜ rollback cß║ú phß║ºn trß╗½ kho.
++      //   if (
++      //     error instanceof Prisma.PrismaClientKnownRequestError &&
++      //     error.code === 'P2002'
++      //   ) {
++      //     const winner = await this.prisma.order.findFirst({
++      //       where: { userId, idempotencyKey: key },
++      //       select: {
++      //         id: true,
++      //         status: true,
++      //         subtotal: true,
++      //         discountTotal: true,
++      //         pointsRedeemed: true,
++      //         total: true,
++      //         requestHash: true,
++      //       },
++      //     });
++
++      //     if (winner) {
++      //       if (winner.requestHash !== requestHash) {
++      //         throw new ConflictException(
++      //           'IDEMPOTENCY_KEY_PAYLOAD_MISMATCH',
++      //         );
++      //       }
++
++      //       const { requestHash: _hash, ...result } = winner;
++      //       return result;
++      //     }
++      //   }
++
++      //   throw error;
++      // }
++    } catch (error: unknown) {
++      // Request ─æß╗ông thß╗¥i c├│ thß╗â thua unique constraint
++      // hoß║╖c gß║╖p xung ─æß╗Öt khi giß╗» tß╗ôn kho.
++      if (key) {
++        const winner = await this.prisma.order.findFirst({
++          where: { userId, idempotencyKey: key },
++          select: {
++            id: true,
++            status: true,
++            subtotal: true,
++            discountTotal: true,
++            pointsRedeemed: true,
++            total: true,
++            requestHash: true,
++          },
++        });
++
++        if (winner) {
++          if (winner.requestHash !== requestHash) {
++            throw new ConflictException('IDEMPOTENCY_KEY_PAYLOAD_MISMATCH');
++          }
++
++          const { requestHash: _hash, ...result } = winner;
++          return result;
++        }
++      }
+ 
+-  // TODO(E ΓÇô Task 6): lß║Ñy gi├í gß╗æc tß╗½ DB, t├¡nh lß║íi bß║▒ng unitPrice() (common/pricing.ts),
+-  // l╞░u Order trß║íng th├íi PENDING k├¿m OrderItem, trß║ú { id, status, total }.
+-  // TODO(E ΓÇô Task 10): trß╗½ tß╗ôn kho trong transaction (stock.service.ts) v├á ├íp couponCode qua hß╗úp ─æß╗ông Rewards (G), E chß╗ïu tr├ích nhiß╗çm transaction.
+-  create(userId: number, dto: CreateOrderDto) {
+-    throw new NotImplementedException('POST /orders ch╞░a l├ám (E ΓÇô Task 6)');
++      throw error;
++    }
+   }
+ 
+-  // TODO(E ΓÇô Task 9): trß║ú [{ id, status, total, createdAt }] cß╗ºa user, mß╗¢i nhß║Ñt tr╞░ß╗¢c.
+-  findMine(userId: number) {
+-    throw new NotImplementedException('GET /orders/me ch╞░a l├ám (E ΓÇô Task 9)');
++  async findMine(userId: number) {
++    return this.prisma.order.findMany({
++      where: { userId },
++      orderBy: { createdAt: 'desc' },
++      select: {
++        id: true,
++        status: true,
++        total: true,
++        createdAt: true,
++      },
++    });
+   }
+ }
+diff --git a/backend/src/orders/stock.service.ts b/backend/src/orders/stock.service.ts
+index 1a03453..4499c6d 100644
+--- a/backend/src/orders/stock.service.ts
++++ b/backend/src/orders/stock.service.ts
+@@ -2,4 +2,67 @@
+ // Trong transaction cß╗ºa POST /orders: ─æß╗ìc Product (stock, version), rß╗ôi
+ // updateMany({ where: { id, version }, data: { stock: { decrement }, version: { increment: 1 } } }).
+ // count = 0 ngh─⌐a l├á c├│ ng╞░ß╗¥i kh├íc vß╗½a ─æß╗òi ΓåÆ thß╗¡ lß║íi hoß║╖c b├ío hß║┐t h├áng.
+-export {};
++// export {};
++
++import {
++  ConflictException,
++  Injectable,
++  NotFoundException,
++} from '@nestjs/common';
++import type { Prisma, Product } from '../generated/prisma/client.js';
++import type { OrderItemDto } from './orders.dto.js';
++
++@Injectable()
++export class StockService {
++  async reserve(
++    tx: Prisma.TransactionClient,
++    items: OrderItemDto[],
++    products: Product[],
++  ): Promise<void> {
++    // Gom sß╗æ l╞░ß╗úng nß║┐u c├╣ng mß╗Öt sß║ún phß║⌐m xuß║Ñt hiß╗çn nhiß╗üu lß║ºn.
++    const demand = new Map<number, number>();
++
++    for (const item of items) {
++      demand.set(
++        item.productId,
++        (demand.get(item.productId) ?? 0) + item.qty,
++      );
++    }
++
++    // Lu├┤n cß║¡p nhß║¡t theo thß╗⌐ tß╗▒ ID ─æß╗â giß║úm nguy c╞í deadlock.
++    const productIds = [...demand.keys()].sort((a, b) => a - b);
++    const productsById = new Map(
++      products.map((product) => [product.id, product]),
++    );
++
++    for (const productId of productIds) {
++      const qty = demand.get(productId)!;
++      const product = productsById.get(productId);
++
++      if (!product) {
++        throw new NotFoundException('PRODUCT_NOT_FOUND');
++      }
++
++      if (product.stock < qty) {
++        throw new ConflictException('OUT_OF_STOCK');
++      }
++
++      // Chß╗ë trß╗½ kho nß║┐u version ch╞░a thay ─æß╗òi v├á stock vß║½n ─æß╗º.
++      const result = await tx.product.updateMany({
++        where: {
++          id: product.id,
++          version: product.version,
++          stock: { gte: qty },
++        },
++        data: {
++          stock: { decrement: qty },
++          version: { increment: 1 },
++        },
++      });
++
++      if (result.count !== 1) {
++        throw new ConflictException('STOCK_VERSION_CONFLICT');
++      }
++    }
++  }
++}
