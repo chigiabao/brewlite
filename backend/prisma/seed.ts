@@ -13,6 +13,8 @@ const SEED_PRODUCTS = [
   { name: 'Americano', price: 40000, imageUrl: '/img/americano.jpg', stock: 100 },
   { name: 'Cappuccino', price: 45000, imageUrl: '/img/cappuccino.jpg', stock: 100 },
   { name: 'Trà đào', price: 39000, imageUrl: '/img/tradao.jpg', stock: 100 },
+  { name: 'Latte', price: 45000, imageUrl: '/img/latte.jpg', stock: 100 },
+  { name: 'Matcha Latte', price: 49000, imageUrl: '/img/matchalatte.jpg', stock: 100 },
 ] as const;
 
 const SEED_COUPONS = [
@@ -84,4 +86,11 @@ async function main(): Promise<void> {
   await seedCoupons();
 }
 
-main().finally(() => prisma.$disconnect());
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
