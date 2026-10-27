@@ -5,6 +5,9 @@ export const TOPPING_PRICE = 5000;
 
 export type Size = keyof typeof SIZE_EXTRA;
 
-export function unitPrice(base: number, size: Size, toppings: string[]): number {
-  return base + SIZE_EXTRA[size] + toppings.length * TOPPING_PRICE;
+export function calculateUnitPrice(basePrice: number, size: Size, toppings: string[]): number {
+  return basePrice + SIZE_EXTRA[size] + toppings.length * TOPPING_PRICE;
 }
+
+// Giữ lại alias unitPrice để đảm bảo tương thích ngược
+export const unitPrice = calculateUnitPrice;
