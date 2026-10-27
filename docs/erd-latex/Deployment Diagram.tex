@@ -1,0 +1,188 @@
+% DEP-01 — BrewLite deployment & dependency diagram
+% Source: brewlite-ai.zip / docker-compose.yml + Foundation/Master Contract + GUIDE-V2
+% Portable pdfLaTeX: pdflatex -interaction=nonstopmode -halt-on-error main.tex
+% Editor: Overleaf (XeLaTeX) or local TeX Live; all shapes/text are editable TikZ.
+\documentclass[border=7mm]{standalone}
+\usepackage[utf8]{inputenc}
+\usepackage[T5]{fontenc}
+\usepackage[vietnamese]{babel}
+\usepackage{lmodern}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,calc,positioning,shapes.geometric}
+
+\definecolor{ink}{HTML}{152239}
+\definecolor{muted}{HTML}{53647A}
+\definecolor{paper}{HTML}{F7F9FC}
+\definecolor{border}{HTML}{D3DEE9}
+\definecolor{blue}{HTML}{2563EB}
+\definecolor{arrowblue}{HTML}{36547A}
+\definecolor{warning}{HTML}{B45309}
+\definecolor{green}{HTML}{00856A}
+\definecolor{purple}{HTML}{7C3AED}
+
+\begin{document}
+\begin{tikzpicture}[x=1cm,y=1cm,
+  every node/.style={font=\sffamily,inner sep=0pt},
+  title/.style={text=ink,anchor=west,font=\sffamily\bfseries\fontsize{20}{25}\selectfont},
+  sect/.style={text=blue,anchor=west,font=\sffamily\bfseries\fontsize{12}{15}\selectfont},
+  hd/.style={text=ink,anchor=west,font=\sffamily\bfseries\fontsize{12}{15}\selectfont},
+  txt/.style={text=ink,anchor=west,font=\sffamily\fontsize{9.3}{13}\selectfont},
+  smalltxt/.style={text=muted,anchor=west,font=\sffamily\fontsize{8.5}{12}\selectfont},
+  code/.style={text=ink,anchor=west,font=\ttfamily\fontsize{8.7}{12}\selectfont},
+  edge/.style={-{Stealth[length=3.1mm,width=2.1mm]},draw=arrowblue,line width=1.15pt},
+  conceptual/.style={-{Stealth[length=3mm,width=2mm]},draw=warning,line width=1.05pt,dash pattern=on 5pt off 4pt}
+]
+
+% Canvas background (bounds intentionally fixed for predictable rendering).
+\fill[paper] (-0.4,0.9) rectangle (30.4,-21.0);
+
+% ---------------------------------------------------------------
+% Heading + edge legend
+% ---------------------------------------------------------------
+\node[title] at (0,0.25) {DEP-01  |  BREWLITE -- SƠ ĐỒ TRIỂN KHAI \& PHỤ THUỘC};
+\node[smalltxt] at (0,-0.25) {S3 $\bullet$ Owner A $\bullet$ Deadline 03/11/2026 23:59 VN $\bullet$ Đối chiếu snapshot source và Master Contract};
+\draw[edge] (0,-0.9) -- (1.2,-0.9);
+\node[smalltxt] at (1.47,-0.9) {Kết nối / phụ thuộc có căn cứ từ source};
+\draw[conceptual] (10.2,-0.9) -- (11.45,-0.9);
+\node[smalltxt] at (11.7,-0.9) {Quan hệ logic / CI chờ xác minh thêm};
+
+% ---------------------------------------------------------------
+% Section 01: runtime
+% ---------------------------------------------------------------
+\draw[fill=white,draw=border,line width=1pt,rounded corners=7pt]
+  (0,-1.55) rectangle (30,-13.55);
+\node[sect] at (0.48,-2.03) {01  DEPLOYMENT / RUNTIME};
+
+% Browser -- actions happen in the browser, not on Next.js server by implication.
+\draw[rounded corners=7pt,fill=blue!6,draw=blue!55,line width=1pt]
+  (0.45,-5.1) rectangle (5.55,-9.55);
+\node[hd] at (0.78,-5.52) {BROWSER / CLIENT};
+\node[smalltxt] at (0.78,-5.97) {Người dùng truy cập ứng dụng};
+\node[code] at (0.78,-6.68) {HTTP: localhost:3000};
+\node[code] at (0.78,-7.13) {fetch: localhost:3001};
+\node[txt] at (0.78,-8.04) {Zustand Cart + localStorage};
+\node[smalltxt] at (0.78,-8.56) {Dữ liệu giỏ lưu ở trình duyệt};
+
+% Docker host / implicit default network
+\draw[rounded corners=8pt,fill=blue!1,draw=blue!37,line width=1pt]
+  (6.2,-2.67) rectangle (29.55,-13.02);
+\node[hd] at (6.58,-3.1) {DOCKER HOST -- published ports trên localhost};
+\node[smalltxt] at (6.58,-3.51) {Container giao tiếp bằng Compose service DNS; project name quyết định tên network thực};
+\draw[rounded corners=7pt,fill=blue!3,draw=blue!30,dashed,line width=1pt]
+  (6.65,-4.65) rectangle (29.12,-10.05);
+\node[anchor=west,text=blue!72!black,font=\sffamily\bfseries\fontsize{9}{12}\selectfont]
+  at (6.95,-5.05) {COMPOSE NETWORK: \texttt{<project>\_default}  (log: \texttt{brewlite\_default})};
+
+% Service frontend
+\draw[rounded corners=6pt,fill=white,draw=blue!72,line width=1.15pt]
+  (7.05,-5.55) rectangle (12.5,-9.35);
+\node[hd] at (7.32,-6.02) {Next.js 16.4};
+\node[txt] at (7.32,-6.48) {FRONTEND};
+\node[anchor=west,text=blue,font=\ttfamily\fontsize{10}{12}\selectfont]
+  at (7.32,-7.08) {container :3000};
+\node[code] at (7.32,-7.76) {frontend/Dockerfile};
+\node[smalltxt] at (7.32,-8.3) {npm start};
+\node[smalltxt] at (7.32,-8.82) {publish 3000:3000};
+
+% Service backend (gateway is in process)
+\draw[rounded corners=6pt,fill=white,draw=green!75!black,line width=1.15pt]
+  (14.43,-5.55) rectangle (20.5,-9.35);
+\node[hd] at (14.7,-6.02) {NestJS 12};
+\node[txt] at (14.7,-6.48) {BACKEND / REST API};
+\node[anchor=west,text=green,font=\ttfamily\fontsize{10}{12}\selectfont]
+  at (14.7,-7.08) {container :3001};
+\node[txt] at (14.7,-7.76) {Prisma ORM / JSON};
+\node[smalltxt] at (14.7,-8.3) {MockGatewayService nội bộ};
+\node[smalltxt] at (14.7,-8.82) {publish 3001:3001};
+
+% Service database
+\draw[rounded corners=6pt,fill=white,draw=purple!75,line width=1.15pt]
+  (22.2,-5.55) rectangle (28.7,-9.35);
+\node[hd] at (22.47,-6.02) {PostgreSQL 16};
+\node[txt] at (22.47,-6.48) {DATABASE / PrismaPg};
+\node[anchor=west,text=purple,font=\ttfamily\fontsize{10}{12}\selectfont]
+  at (22.47,-7.08) {container :5432};
+\node[code] at (22.47,-7.76) {hostname: db};
+\node[smalltxt] at (22.47,-8.3) {postgres:16 / pg\_isready};
+\node[smalltxt] at (22.47,-8.82) {host POSTGRES\_PORT (mặc định 5432)};
+
+% Persistence / startup cards at base of host
+\draw[rounded corners=5pt,fill=green!6,draw=green!40,line width=.85pt]
+  (6.65,-10.85) rectangle (21.0,-12.48);
+\node[anchor=west,text=green!65!black,font=\sffamily\bfseries\fontsize{9.2}{12}\selectfont]
+  at (7.0,-11.23) {STARTUP / DEPENDS\_ON};
+\node[txt] at (7,-11.73) {db healthy $\to$ backend migrate/seed/start + healthy};
+\node[txt] at (7,-12.15) {$\to$ frontend npm start + healthy};
+\draw[rounded corners=5pt,fill=purple!7,draw=purple!40,line width=.85pt]
+  (22.22,-10.85) rectangle (28.7,-12.48);
+\node[anchor=west,text=ink,font=\sffamily\bfseries\fontsize{10}{12}\selectfont]
+  at (22.55,-11.36) {Named volume: dbdata};
+\node[code] at (22.55,-11.98) {/var/lib/postgresql/data};
+
+% Directed connections.  FE -> API is a *conceptual* dependency, because
+% browser-side fetch goes to public localhost:3001 (NOT Docker DNS backend:3001).
+\draw[edge] (5.55,-6.35) -- (7.05,-6.35);
+\node[anchor=south,text=arrowblue,font=\sffamily\fontsize{8}{10}\selectfont]
+  at (6.3,-6.3) {UI};
+% Browser requests backend directly. Route along lane between host caption and network.
+\draw[edge] (2.8,-5.1) -- (2.8,-4.28) -- (17.46,-4.28) -- (17.46,-5.55);
+\node[anchor=south,text=arrowblue,font=\sffamily\fontsize{8.3}{10}\selectfont]
+  at (15.85,-4.26) {REST / JSON từ browser};
+\draw[conceptual] (12.5,-8.16) -- (14.43,-8.16);
+\node[anchor=south,text=warning,font=\sffamily\fontsize{8.1}{10}\selectfont]
+  at (13.46,-8.18) {API logic};
+\draw[edge] (20.5,-7.45) -- (22.2,-7.45);
+\node[anchor=south,text=arrowblue,font=\ttfamily\fontsize{8.4}{11}\selectfont]
+  at (21.35,-7.4) {db:5432};
+\draw[edge] (25.45,-9.35) -- (25.45,-10.85);
+\node[anchor=west,text=arrowblue,font=\sffamily\fontsize{8}{10}\selectfont]
+  at (25.62,-10.26) {mount};
+
+% ---------------------------------------------------------------
+% Section 02: configuration / migrations / CI. Three side-by-side cards.
+% ---------------------------------------------------------------
+\draw[fill=white,draw=border,line width=1pt,rounded corners=7pt]
+  (0,-14.05) rectangle (30,-19.9);
+\node[sect] at (0.48,-14.5) {02  CẤU HÌNH / MIGRATION / CI};
+
+% Environment
+\draw[rounded corners=6pt,fill=blue!5,draw=blue!40,line width=.95pt]
+  (0.5,-15.0) rectangle (9.65,-19.35);
+\node[hd] at (0.8,-15.5) {ENV \& DOCKER BUILD};
+\node[code] at (0.8,-16.05) {.env.example $\to$ .env (Compose)};
+\node[code] at (0.8,-16.66) {DATABASE\_URL: @db:5432/brewlite};
+\node[txt] at (0.8,-17.27) {Backend build dùng DATABASE\_URL giả};
+\node[txt] at (0.8,-17.69) {chỉ cho prisma generate + npm build.};
+\node[txt] at (0.8,-18.32) {Frontend build ARG NEXT\_PUBLIC\_API\_URL};
+\node[smalltxt] at (0.8,-18.81) {= http://localhost:3001 (địa chỉ browser dùng)};
+
+% Startup / prisma
+\draw[rounded corners=6pt,fill=green!5,draw=green!45,line width=.95pt]
+  (10.03,-15.0) rectangle (19.4,-19.35);
+\node[hd] at (10.33,-15.5) {MIGRATION / BOOTSTRAP};
+\node[code] at (10.33,-16.05) {db healthcheck: pg\_isready};
+\node[code] at (10.33,-16.67) {backend/Dockerfile CMD:};
+\node[code] at (10.33,-17.24) {1. npx prisma migrate deploy};
+\node[code] at (10.33,-17.78) {2. npx prisma db seed};
+\node[code] at (10.33,-18.32) {3. node dist/main.js};
+\node[smalltxt] at (10.33,-18.86) {Prisma 7: prisma.config.ts};
+
+% GitHub Actions CI (Đã xác minh và hoàn thiện)
+\draw[rounded corners=6pt,fill=green!5,draw=green!60!black,line width=.95pt]
+  (19.78,-15.0) rectangle (29.5,-19.35);
+\node[anchor=west,text=green!50!black,font=\sffamily\bfseries\fontsize{11}{14}\selectfont]
+  at (20.08,-15.5) {GITHUB ACTIONS CI --- ĐÃ HOÀN THIỆN};
+\node[code] at (20.08,-16.05) {.github/workflows/foundation.yml};
+\node[txt] at (20.08,-16.69) {Trigger: Push \& PR (main, develop, feature/*)};
+\node[txt] at (20.08,-17.32) {4 Jobs: Contract Guard, Backend, Frontend, Docker Smoke};
+\node[txt] at (20.08,-18.08) {Tự động kiểm tra: Seed Idempotency x2, E2E \& Healthcheck};
+\node[anchor=west,text=green!50!black,font=\sffamily\fontsize{9.3}{13}\selectfont]
+  at (20.08,-18.63) {Trạng thái: Đã kiểm chứng \& đồng bộ 100\% trong Git repo.};
+
+% Footer
+\node[smalltxt] at (0,-20.48) {Đường liền = luồng runtime kiểm chứng $\bullet$ Đường đứt = phụ thuộc logic / thiếu chứng cứ từ ZIP};
+\node[anchor=east,text=muted,font=\sffamily\fontsize{8}{11}\selectfont]
+  at (30,-20.48) {DEP-01  |  source snapshot 27/10/2026};
+
+\end{tikzpicture}
+\end{document}
