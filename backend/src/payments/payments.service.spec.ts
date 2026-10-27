@@ -29,6 +29,9 @@ function createPrismaMock() {
         },
       ),
     },
+    order: {
+      findUnique: vi.fn(async () => ({ userId: 1, total: 85_000 })),
+    },
   };
 
   return {
@@ -87,12 +90,16 @@ function setup(overrides: { order?: PayableOrder | null; gateway?: ReturnType<ty
       : overrides.order;
   const gateway = overrides.gateway ?? createGateway();
   const orders = createOrders(order);
+  const rewards = {
+    finalizeRewardsOnPaid: vi.fn(async () => undefined),
+  };
   const service = new PaymentsService(
     prisma as unknown as PrismaService,
     gateway as unknown as MockGatewayService,
     orders as unknown as OrdersPaymentPort,
+    rewards as any,
   );
-  return { service, prisma, gateway, orders, order };
+  return { service, prisma, gateway, orders, order, rewards };
 }
 
 async function expectPaymentError(promise: Promise<unknown>, code: PaymentErrorCode) {

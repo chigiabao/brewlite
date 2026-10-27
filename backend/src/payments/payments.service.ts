@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import type { Payment } from '../generated/prisma/client.js';
 import { OrderStatus, PaymentStatus } from '../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { REWARDS_PORT, type RewardsPort } from '../rewards/rewards-port.js';
+import { REWARDS_PORT, type RewardsPort } from '../rewards/public.js';
 import { MockGatewayService } from './mock-gateway.service.js';
 import {
   ORDERS_PAYMENT_PORT,
