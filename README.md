@@ -54,4 +54,18 @@ frontend (Next.js) ──REST/JSON──▶ backend (NestJS) ──Prisma──�
 | 9 | Xác nhận, lịch sử, bàn giao | `frontend/app/orders/`, `docker-compose.yml` |
 | 10 | Nghiệp vụ nâng cao | `backend/src/orders/order-state.ts`, `stock.service.ts`, `backend/src/payments/` |
 
+## Tài khoản mẫu (Demo Accounts)
+
+Hệ thống đã chuẩn bị sẵn các tài khoản mẫu (được khởi tạo tự động trong CSDL) để kiểm thử luồng Đăng nhập (Task 7), Đặt đơn hàng và Tích/Đổi điểm thưởng:
+
+| Vai trò / Mục đích | Email | Mật khẩu | Điểm tích lũy (`loyaltyPoints`) |
+|---|---|---|---|
+| **Khách hàng thân thiết** | `customer@brewlite.vn` | `password123` | `50` |
+| **Quản trị viên / Demo** | `admin@brewlite.vn` | `password123` | `100` |
+| **Tài khoản mới** | `demo@brewlite.vn` | `password123` | `0` |
+
+> [!TIP]
+> - Mật khẩu mẫu tuân thủ quy chuẩn bảo mật độ dài từ 6 đến 72 ký tự (chuẩn an toàn thuật toán Bcrypt 12 rounds).
+> - Bạn có thể đăng nhập trực tiếp trên giao diện: [http://localhost:3000/login](http://localhost:3000/login) hoặc qua REST API `POST http://localhost:3001/auth/login`.
+
 Chi tiết: [backend/README.md](backend/README.md) · [frontend/README.md](frontend/README.md)

@@ -2,6 +2,7 @@
 // Chạy nhiều lần không tạo bản ghi trùng và không bỏ qua Coupon khi DB đã có Product:
 //   npx prisma db seed
 import 'dotenv/config';
+import * as bcrypt from 'bcryptjs';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client.js';
 
@@ -81,9 +82,35 @@ async function seedCoupons(): Promise<void> {
   }
 }
 
+const SEED_USERS = [
+  { email: 'customer@brewlite.vn', password: 'password123', loyaltyPoints: 50 },
+  { email: 'admin@brewlite.vn', password: 'password123', loyaltyPoints: 100 },
+  { email: 'demo@brewlite.vn', password: 'password123', loyaltyPoints: 0 },
+] as const;
+
+async function seedUsers(): Promise<void> {
+  for (const user of SEED_USERS) {
+    const existing = await prisma.user.findUnique({
+      where: { email: user.email },
+      select: { id: true },
+    });
+    if (!existing) {
+      const passwordHash = await bcrypt.hash(user.password, 12);
+      await prisma.user.create({
+        data: {
+          email: user.email,
+          passwordHash,
+          loyaltyPoints: user.loyaltyPoints,
+        },
+      });
+    }
+  }
+}
+
 async function main(): Promise<void> {
   await seedProducts();
   await seedCoupons();
+  await seedUsers();
 }
 
 main()
