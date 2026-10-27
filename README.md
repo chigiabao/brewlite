@@ -60,9 +60,9 @@ Hệ thống đã chuẩn bị sẵn các tài khoản mẫu (được khởi t�
 
 | Vai trò / Mục đích | Email | Mật khẩu | Điểm tích lũy (`loyaltyPoints`) |
 |---|---|---|---|
-| **Khách hàng thân thiết** | `customer@brewlite.vn` | `password123` | `50` |
-| **Quản trị viên / Demo** | `admin@brewlite.vn` | `password123` | `100` |
-| **Tài khoản mới** | `demo@brewlite.vn` | `password123` | `0` |
+| **Khách hàng thân thiết** | `customer@gmail.com` | `password123` | `50` |
+| **Quản trị viên / Demo** | `admin@gmail.com` | `password123` | `100` |
+| **Tài khoản mới** | `demo@gmail.com` | `password123` | `0` |
 
 > [!TIP]
 > - Mật khẩu mẫu tuân thủ quy chuẩn bảo mật độ dài từ 6 đến 72 ký tự (chuẩn an toàn thuật toán Bcrypt 12 rounds).

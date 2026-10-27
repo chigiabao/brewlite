@@ -83,9 +83,9 @@ async function seedCoupons(): Promise<void> {
 }
 
 const SEED_USERS = [
-  { email: 'customer@brewlite.vn', password: 'password123', loyaltyPoints: 50 },
-  { email: 'admin@brewlite.vn', password: 'password123', loyaltyPoints: 100 },
-  { email: 'demo@brewlite.vn', password: 'password123', loyaltyPoints: 0 },
+  { email: 'customer@gmail.com', password: 'password123', loyaltyPoints: 50 },
+  { email: 'admin@gmail.com', password: 'password123', loyaltyPoints: 100 },
+  { email: 'demo@gmail.com', password: 'password123', loyaltyPoints: 0 },
 ] as const;
 
 async function seedUsers(): Promise<void> {

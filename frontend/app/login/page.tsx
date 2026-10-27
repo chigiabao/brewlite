@@ -164,7 +164,7 @@ export default function LoginPage() {
         <label className="block text-xs font-semibold text-gray-800 mb-1">Email</label>
         <input
           type="email"
-          placeholder="user@example.com"
+          placeholder="user@gmail.com"
           autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -198,34 +198,6 @@ export default function LoginPage() {
       >
         {mode === 'login' ? 'Chưa có tài khoản? Đăng ký ngay' : 'Đã có tài khoản? Đăng nhập'}
       </button>
-
-      <div className="pt-2 border-t border-gray-100">
-        <p className="text-xs text-gray-500 mb-1.5 font-medium">Chọn nhanh tài khoản mẫu:</p>
-        <div className="flex flex-wrap gap-1.5">
-          <button
-            type="button"
-            onClick={() => {
-              setEmail('customer@brewlite.vn');
-              setPassword('password123');
-              setError('');
-            }}
-            className="text-xs bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 px-2.5 py-1 rounded transition font-medium"
-          >
-            customer@brewlite.vn
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setEmail('admin@brewlite.vn');
-              setPassword('password123');
-              setError('');
-            }}
-            className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 px-2.5 py-1 rounded transition font-medium"
-          >
-            admin@brewlite.vn
-          </button>
-        </div>
-      </div>
     </form>
   );
 }
