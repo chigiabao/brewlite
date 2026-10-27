@@ -1,11 +1,20 @@
-import { IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsInt, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { normalizeCouponCode } from './reward-rules.js';
 
-// G – Contract cho báo giá coupon. Frontend chỉ xem trước; E sẽ tính lại khi tạo đơn.
+/** Body POST /coupons/validate; chỉ là preview, không tiêu quota. */
 export class ValidateCouponDto {
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? normalizeCouponCode(value) : value,
+  )
   @IsString()
-  code: string;
+  @MinLength(1)
+  @MaxLength(64)
+  code!: string;
 
+  // Client gửi subtotal để xem trước; lúc tạo order, E PHẢI tính lại từ DB.
   @IsInt()
   @Min(0)
-  orderTotal: number;
+  @Max(Number.MAX_SAFE_INTEGER)
+  orderTotal!: number;
 }
