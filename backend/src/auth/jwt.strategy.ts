@@ -1,5 +1,29 @@
-// TODO(D – Task 7): viết JwtStrategy (passport-jwt) đọc token từ header
-// "Authorization: Bearer <token>", secret = process.env.JWT_SECRET,
-// validate() trả { userId, email } để controller dùng qua @CurrentUser().
-// Xong thì thêm vào providers của AuthModule và bật JwtAuthGuard.
-export {};
+import { Injectable } from '@nestjs/common';
+import { PassportStrategy } from '@nestjs/passport';
+import { ExtractJwt, Strategy } from 'passport-jwt';
+import type { AuthUser } from './current-user.decorator.js';
+
+type JwtPayload = { sub: number; email: string };
+
+export function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET ?? (process.env.NODE_ENV === 'test' ? 'brewlite-test-jwt-secret-minimum-32-chars' : undefined);
+  if (!secret) {
+    throw new Error('JWT_SECRET phải được cấu hình trước khi khởi động xác thực');
+  }
+  return secret;
+}
+
+@Injectable()
+export class JwtStrategy extends PassportStrategy(Strategy) {
+  constructor() {
+    super({
+      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      ignoreExpiration: false,
+      secretOrKey: getJwtSecret(),
+    });
+  }
+
+  validate(payload: JwtPayload): AuthUser {
+    return { userId: payload.sub, email: payload.email };
+  }
+}

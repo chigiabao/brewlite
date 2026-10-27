@@ -1,0 +1,208 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1060 760" width="100%" height="100%" style="background-color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="clsHdr" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#818cf8" />
+    </linearGradient>
+
+    <!-- Markers -->
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#94a3b8" />
+    </marker>
+    <marker id="inherit" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <polygon points="0,1 10,5 0,9" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5" />
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#10b981" />
+    </marker>
+    <marker id="arrowAmber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#f59e0b" />
+    </marker>
+
+    <!-- Filter -->
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#000000" flood-opacity="0.45" />
+    </filter>
+  </defs>
+
+  <!-- Title Banner -->
+  <rect x="25" y="15" width="1010" height="55" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1" />
+  <rect x="25" y="15" width="8" height="55" rx="4" fill="url(#clsHdr)" />
+  <text x="45" y="40" fill="#f8fafc" font-size="16" font-weight="700">SƠ ĐỒ CLASS &amp; KIẾN TRÚC RANH GIỚI MODULE — IDENTITY (OWNER: D)</text>
+  <text x="45" y="58" fill="#94a3b8" font-size="11">Ranh giới Module D (Auth), Facade công khai public.ts, tích hợp Prisma User Entity và người tiêu dùng (Module E, F)</text>
+
+  <!-- ================= MODULE D BOUNDARY ================= -->
+  <rect x="25" y="85" width="700" height="610" rx="12" fill="#090d16" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="8,4" />
+  <rect x="25" y="85" width="260" height="28" rx="6" fill="#1e293b" />
+  <text x="35" y="104" fill="#38bdf8" font-size="12" font-weight="700">MODULE D: backend/src/auth/</text>
+
+  <!-- CLASS: AuthController -->
+  <g transform="translate(50, 130)" filter="url(#shadow)">
+    <rect x="0" y="0" width="270" height="130" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1.5" />
+    <path d="M 0 0 L 270 0 L 270 32 L 0 32 Z" fill="#334155" />
+    <text x="135" y="16" fill="#38bdf8" font-size="10" font-weight="600" text-anchor="middle">&lt;&lt;Controller&gt;&gt;</text>
+    <text x="135" y="28" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">AuthController</text>
+    <line x1="0" y1="32" x2="270" y2="32" stroke="#475569" stroke-width="1" />
+    <text x="12" y="52" fill="#cbd5e1" font-size="10">- auth: AuthService</text>
+    <line x1="0" y1="62" x2="270" y2="62" stroke="#475569" stroke-width="1" />
+    <text x="12" y="82" fill="#f8fafc" font-size="10">+ register(dto: AuthDto): Promise</text>
+    <text x="12" y="102" fill="#94a3b8" font-size="9">  [POST /auth/register -&gt; 201, 400, 409]</text>
+    <text x="12" y="118" fill="#f8fafc" font-size="10">+ login(dto: AuthDto): Promise</text>
+    <text x="12" y="126" fill="#94a3b8" font-size="9">  [POST /auth/login -&gt; 201/200, 400, 401]</text>
+  </g>
+
+  <!-- CLASS: AuthDto -->
+  <g transform="translate(50, 290)" filter="url(#shadow)">
+    <rect x="0" y="0" width="270" height="100" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1.5" />
+    <path d="M 0 0 L 270 0 L 270 32 L 0 32 Z" fill="#334155" />
+    <text x="135" y="16" fill="#cbd5e1" font-size="10" font-weight="600" text-anchor="middle">&lt;&lt;DTO / Validation&gt;&gt;</text>
+    <text x="135" y="28" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">AuthDto</text>
+    <line x1="0" y1="32" x2="270" y2="32" stroke="#475569" stroke-width="1" />
+    <text x="12" y="52" fill="#cbd5e1" font-size="10">+ email: string  [@IsEmail, @MaxLength(254)]</text>
+    <text x="12" y="72" fill="#cbd5e1" font-size="10">+ password: string  [@MinLength(6), @MaxLength(72)]</text>
+    <text x="12" y="90" fill="#94a3b8" font-size="9">Bảo mật: Mật khẩu không bao giờ trả về API</text>
+  </g>
+
+  <!-- CLASS: AuthService -->
+  <g transform="translate(370, 130)" filter="url(#shadow)">
+    <rect x="0" y="0" width="330" height="175" rx="8" fill="#1e293b" stroke="#a855f7" stroke-width="1.5" />
+    <path d="M 0 0 L 330 0 L 330 32 L 0 32 Z" fill="#3b1d54" />
+    <text x="165" y="16" fill="#d8b4fe" font-size="10" font-weight="600" text-anchor="middle">&lt;&lt;Injectable Service&gt;&gt;</text>
+    <text x="165" y="28" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">AuthService</text>
+    <line x1="0" y1="32" x2="330" y2="32" stroke="#6b21a8" stroke-width="1" />
+    <text x="12" y="50" fill="#cbd5e1" font-size="10">- prisma: PrismaService</text>
+    <text x="12" y="66" fill="#cbd5e1" font-size="10">- jwt: JwtService</text>
+    <text x="12" y="82" fill="#cbd5e1" font-size="10">- PASSWORD_ROUNDS = 12</text>
+    <line x1="0" y1="92" x2="330" y2="92" stroke="#6b21a8" stroke-width="1" />
+    <text x="12" y="110" fill="#f8fafc" font-size="10">+ register(dto: AuthDto): Promise&lt;{id, email}&gt;</text>
+    <text x="12" y="126" fill="#cbd5e1" font-size="9">  Băm mật khẩu 12 rounds, bắt P2002 -&gt; 409</text>
+    <text x="12" y="146" fill="#f8fafc" font-size="10">+ login(dto: AuthDto): Promise&lt;{accessToken}&gt;</text>
+    <text x="12" y="162" fill="#cbd5e1" font-size="9">  So sánh bcrypt, sinh JWT token (expiresIn: 1d)</text>
+  </g>
+
+  <!-- CLASS: JwtStrategy -->
+  <g transform="translate(370, 335)" filter="url(#shadow)">
+    <rect x="0" y="0" width="330" height="120" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1.5" />
+    <path d="M 0 0 L 330 0 L 330 32 L 0 32 Z" fill="#334155" />
+    <text x="165" y="16" fill="#38bdf8" font-size="10" font-weight="600" text-anchor="middle">&lt;&lt;PassportStrategy('jwt')&gt;&gt;</text>
+    <text x="165" y="28" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">JwtStrategy</text>
+    <line x1="0" y1="32" x2="330" y2="32" stroke="#475569" stroke-width="1" />
+    <text x="12" y="52" fill="#cbd5e1" font-size="10">+ getJwtSecret(): string [JWT_SECRET]</text>
+    <text x="12" y="68" fill="#cbd5e1" font-size="10">+ ExtractJwt: fromAuthHeaderAsBearerToken()</text>
+    <line x1="0" y1="78" x2="330" y2="78" stroke="#475569" stroke-width="1" />
+    <text x="12" y="98" fill="#f8fafc" font-size="10">+ validate(payload: {sub, email}): AuthUser</text>
+    <text x="12" y="112" fill="#94a3b8" font-size="9">  Trả về { userId: payload.sub, email: payload.email }</text>
+  </g>
+
+  <!-- PUBLIC FACADE: public.ts -->
+  <g transform="translate(50, 480)" filter="url(#shadow)">
+    <rect x="0" y="0" width="650" height="190" rx="10" fill="#062e20" stroke="#10b981" stroke-width="2" />
+    <rect x="0" y="0" width="650" height="32" rx="10" fill="#065f46" />
+    <text x="325" y="21" fill="#ffffff" font-size="13" font-weight="700" text-anchor="middle">API CÔNG KHAI (FACADE): backend/src/auth/public.ts</text>
+
+    <!-- Component: JwtAuthGuard -->
+    <g transform="translate(25, 45)">
+      <rect x="0" y="0" width="220" height="65" rx="6" fill="#1e293b" stroke="#34d399" stroke-width="1" />
+      <text x="110" y="20" fill="#34d399" font-size="11" font-weight="700" text-anchor="middle">JwtAuthGuard</text>
+      <text x="110" y="36" fill="#94a3b8" font-size="9" text-anchor="middle">extends AuthGuard('jwt')</text>
+      <text x="110" y="52" fill="#cbd5e1" font-size="9" text-anchor="middle">Chặn 401 khi thiếu/sai JWT</text>
+    </g>
+
+    <!-- Component: CurrentUser -->
+    <g transform="translate(270, 45)">
+      <rect x="0" y="0" width="160" height="65" rx="6" fill="#1e293b" stroke="#34d399" stroke-width="1" />
+      <text x="80" y="20" fill="#34d399" font-size="11" font-weight="700" text-anchor="middle">@CurrentUser()</text>
+      <text x="80" y="36" fill="#94a3b8" font-size="9" text-anchor="middle">Param Decorator</text>
+      <text x="80" y="52" fill="#cbd5e1" font-size="9" text-anchor="middle">Lấy req.user an toàn</text>
+    </g>
+
+    <!-- Component: AuthUser Type -->
+    <g transform="translate(455, 45)">
+      <rect x="0" y="0" width="170" height="65" rx="6" fill="#1e293b" stroke="#34d399" stroke-width="1" />
+      <text x="85" y="20" fill="#34d399" font-size="11" font-weight="700" text-anchor="middle">type AuthUser</text>
+      <text x="85" y="38" fill="#cbd5e1" font-size="10" text-anchor="middle">userId: number</text>
+      <text x="85" y="54" fill="#cbd5e1" font-size="10" text-anchor="middle">email: string</text>
+    </g>
+
+    <text x="25" y="135" fill="#a7f3d0" font-size="10" font-weight="600">Quy tắc biên kiến trúc (scripts/verify-foundation.mjs):</text>
+    <text x="25" y="152" fill="#d1fae5" font-size="9.5">• Các module ngoài (E, F) CHỈ ĐƯỢC PHÉP import từ ../auth/public.js</text>
+    <text x="25" y="168" fill="#d1fae5" font-size="9.5">• CẤM tuyệt đối import trực tiếp controller, service, dto nội bộ của Auth module</text>
+  </g>
+
+  <!-- ================= EXTERNAL MODULES (E, F, DB) ================= -->
+
+  <!-- Prisma Entity: User -->
+  <g transform="translate(760, 110)" filter="url(#shadow)">
+    <rect x="0" y="0" width="270" height="150" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5" />
+    <path d="M 0 0 L 270 0 L 270 32 L 0 32 Z" fill="#0369a1" />
+    <text x="135" y="16" fill="#e0f2fe" font-size="10" font-weight="600" text-anchor="middle">&lt;&lt;Prisma Entity / DB Table&gt;&gt;</text>
+    <text x="135" y="28" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">User ("User")</text>
+    <line x1="0" y1="32" x2="270" y2="32" stroke="#0284c7" stroke-width="1" />
+    <text x="12" y="52" fill="#cbd5e1" font-size="10">+ id: Int  [PK, Autoincrement]</text>
+    <text x="12" y="70" fill="#cbd5e1" font-size="10">+ email: String  [Unique, Indexed]</text>
+    <text x="12" y="88" fill="#cbd5e1" font-size="10">+ passwordHash: String</text>
+    <text x="12" y="106" fill="#cbd5e1" font-size="10">+ createdAt: DateTime  [Default(now)]</text>
+    <text x="12" y="124" fill="#cbd5e1" font-size="10">+ updatedAt: DateTime  [Updated]</text>
+    <text x="12" y="142" fill="#94a3b8" font-size="9">Rel: orders Order[], payments Payment[]</text>
+  </g>
+
+  <!-- Consumer Module E: Orders -->
+  <g transform="translate(760, 310)" filter="url(#shadow)">
+    <rect x="0" y="0" width="270" height="135" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5" />
+    <path d="M 0 0 L 270 0 L 270 32 L 0 32 Z" fill="#78350f" />
+    <text x="135" y="16" fill="#fde68a" font-size="10" font-weight="600" text-anchor="middle">&lt;&lt;Consumer Module E (Ordering)&gt;&gt;</text>
+    <text x="135" y="28" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">OrdersController</text>
+    <line x1="0" y1="32" x2="270" y2="32" stroke="#b45309" stroke-width="1" />
+    <text x="12" y="52" fill="#cbd5e1" font-size="10">@UseGuards(JwtAuthGuard)</text>
+    <text x="12" y="70" fill="#fcd34d" font-size="10">+ create(@CurrentUser() user: AuthUser)</text>
+    <text x="12" y="86" fill="#94a3b8" font-size="9">  [POST /orders -&gt; Yêu cầu JWT]</text>
+    <text x="12" y="104" fill="#fcd34d" font-size="10">+ mine(@CurrentUser() user: AuthUser)</text>
+    <text x="12" y="120" fill="#94a3b8" font-size="9">  [GET /orders/me -&gt; Yêu cầu JWT]</text>
+  </g>
+
+  <!-- Consumer Module F: Payments -->
+  <g transform="translate(760, 480)" filter="url(#shadow)">
+    <rect x="0" y="0" width="270" height="110" rx="8" fill="#1e293b" stroke="#ec4899" stroke-width="1.5" />
+    <path d="M 0 0 L 270 0 L 270 32 L 0 32 Z" fill="#831843" />
+    <text x="135" y="16" fill="#fbcfe8" font-size="10" font-weight="600" text-anchor="middle">&lt;&lt;Consumer Module F (Payments)&gt;&gt;</text>
+    <text x="135" y="28" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">PaymentsController</text>
+    <line x1="0" y1="32" x2="270" y2="32" stroke="#db2777" stroke-width="1" />
+    <text x="12" y="52" fill="#cbd5e1" font-size="10">@UseGuards(JwtAuthGuard)</text>
+    <text x="12" y="70" fill="#f472b6" font-size="10">+ pay(@CurrentUser() user: AuthUser)</text>
+    <text x="12" y="86" fill="#94a3b8" font-size="9">  [POST /payments -&gt; JWT + Idempotency]</text>
+  </g>
+
+  <!-- Client App (UI) -->
+  <g transform="translate(760, 620)" filter="url(#shadow)">
+    <rect x="0" y="0" width="270" height="75" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5" />
+    <text x="135" y="24" fill="#38bdf8" font-size="11" font-weight="700" text-anchor="middle">Frontend: LoginPage (Owner: D)</text>
+    <text x="135" y="44" fill="#cbd5e1" font-size="10" text-anchor="middle">frontend/app/login/page.tsx</text>
+    <text x="135" y="60" fill="#94a3b8" font-size="9" text-anchor="middle">Gọi /auth/login, lưu token vào localStorage</text>
+  </g>
+
+  <!-- ================= CONNECTING ARROWS ================= -->
+
+  <!-- AuthController -> AuthService -->
+  <path d="M 320 195 L 370 195" stroke="#a855f7" stroke-width="1.5" fill="none" marker-end="url(#arrow)" />
+
+  <!-- AuthController uses AuthDto -->
+  <path d="M 185 260 L 185 290" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="3,3" fill="none" marker-end="url(#arrow)" />
+
+  <!-- AuthService -> Prisma User -->
+  <path d="M 700 200 L 760 170" stroke="#38bdf8" stroke-width="1.5" fill="none" marker-end="url(#arrow)" />
+  <text x="730" y="175" fill="#38bdf8" font-size="9">CRUD</text>
+
+  <!-- Public facade connections to Consumers -->
+  <path d="M 700 520 L 760 380" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4,4" fill="none" marker-end="url(#arrowGreen)" />
+  <text x="735" y="430" fill="#10b981" font-size="9" text-anchor="middle">import</text>
+
+  <path d="M 700 560 L 760 535" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4,4" fill="none" marker-end="url(#arrowGreen)" />
+  <text x="735" y="555" fill="#10b981" font-size="9" text-anchor="middle">import</text>
+
+  <!-- Footer -->
+  <g transform="translate(25, 715)">
+    <rect x="0" y="0" width="1010" height="30" rx="6" fill="#1e293b" />
+    <text x="20" y="19" fill="#94a3b8" font-size="11">Thiết kế tuân thủ Master Contract v1.0.0 | Ranh giới Module chuẩn hoá | Không lộ passwordHash | Không thêm chức năng ngoài hợp đồng</text>
+  </g>
+</svg>

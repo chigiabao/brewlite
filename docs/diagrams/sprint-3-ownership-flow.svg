@@ -1,0 +1,144 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1020 720" width="100%" height="100%" style="background-color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="ownHdr" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ec4899" />
+      <stop offset="100%" stop-color="#8b5cf6" />
+    </linearGradient>
+
+    <!-- Markers -->
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#38bdf8" />
+    </marker>
+    <marker id="arrErr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#f43f5e" />
+    </marker>
+    <marker id="arrOk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#10b981" />
+    </marker>
+
+    <!-- Filter -->
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#000000" flood-opacity="0.4" />
+    </filter>
+  </defs>
+
+  <!-- Banner -->
+  <rect x="25" y="15" width="970" height="55" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1" />
+  <rect x="25" y="15" width="8" height="55" rx="4" fill="url(#ownHdr)" />
+  <text x="45" y="40" fill="#f8fafc" font-size="16" font-weight="700">SƠ ĐỒ BẢO VỆ QUYỀN SỞ HỮU TÀI NGUYÊN (ORDER &amp; PAYMENT OWNERSHIP) — SPRINT 3</text>
+  <text x="45" y="58" fill="#94a3b8" font-size="11">Phân quyền dựa trên danh tính JWT (@CurrentUser): User B không thể đọc hoặc thanh toán Order của User A (HTTP 404/403)</text>
+
+  <!-- Lifeline Participants -->
+  <!-- 1: User A -->
+  <g transform="translate(60, 90)">
+    <rect x="-45" y="0" width="105" height="40" rx="6" fill="#1e293b" stroke="#10b981" stroke-width="1.5" filter="url(#shadow)" />
+    <text x="7" y="24" fill="#6ee7b7" font-size="12" font-weight="700" text-anchor="middle">User A (Chủ sở hữu)</text>
+    <line x1="7" y1="40" x2="7" y2="580" stroke="#334155" stroke-width="1.5" stroke-dasharray="4,4" />
+  </g>
+
+  <!-- 2: User B -->
+  <g transform="translate(250, 90)">
+    <rect x="-45" y="0" width="105" height="40" rx="6" fill="#1e293b" stroke="#f43f5e" stroke-width="1.5" filter="url(#shadow)" />
+    <text x="7" y="24" fill="#fca5a5" font-size="12" font-weight="700" text-anchor="middle">User B (Bên thứ ba)</text>
+    <line x1="7" y1="40" x2="7" y2="580" stroke="#334155" stroke-width="1.5" stroke-dasharray="4,4" />
+  </g>
+
+  <!-- 3: JwtAuthGuard -->
+  <g transform="translate(460, 90)">
+    <rect x="-60" y="0" width="125" height="40" rx="6" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5" filter="url(#shadow)" />
+    <text x="2" y="19" fill="#38bdf8" font-size="11" font-weight="700" text-anchor="middle">JwtAuthGuard</text>
+    <text x="2" y="33" fill="#94a3b8" font-size="9" text-anchor="middle">(Owner: D | public.ts)</text>
+    <line x1="2" y1="40" x2="2" y2="580" stroke="#334155" stroke-width="1.5" stroke-dasharray="4,4" />
+  </g>
+
+  <!-- 4: Orders/Payments API -->
+  <g transform="translate(710, 90)">
+    <rect x="-75" y="0" width="155" height="40" rx="6" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5" filter="url(#shadow)" />
+    <text x="2" y="19" fill="#fcd34d" font-size="11" font-weight="700" text-anchor="middle">Orders / Payments API</text>
+    <text x="2" y="33" fill="#94a3b8" font-size="9" text-anchor="middle">(Module E / F Protected)</text>
+    <line x1="2" y1="40" x2="2" y2="580" stroke="#334155" stroke-width="1.5" stroke-dasharray="4,4" />
+  </g>
+
+  <!-- 5: DB Order 101 -->
+  <g transform="translate(930, 90)">
+    <rect x="-45" y="0" width="105" height="40" rx="6" fill="#1e293b" stroke="#a855f7" stroke-width="1.5" filter="url(#shadow)" />
+    <text x="7" y="19" fill="#d8b4fe" font-size="11" font-weight="700" text-anchor="middle">DB: Order 101</text>
+    <text x="7" y="33" fill="#cbd5e1" font-size="9" text-anchor="middle">userId: 1 (User A)</text>
+    <line x1="7" y1="40" x2="7" y2="580" stroke="#334155" stroke-width="1.5" stroke-dasharray="4,4" />
+  </g>
+
+  <!-- SCENARIO 1: User B tries to read Order 101 -->
+  <g transform="translate(50, 150)">
+    <rect x="0" y="0" width="910" height="95" rx="6" fill="#2d121a" stroke="#f43f5e" stroke-width="1" stroke-dasharray="4,3" />
+    <rect x="0" y="0" width="280" height="18" rx="4" fill="#f43f5e" />
+    <text x="8" y="13" fill="#ffffff" font-size="10" font-weight="700">[SCENARIO 1: User B cố đọc đơn hàng 101 của User A]</text>
+
+    <line x1="207" y1="35" x2="408" y2="35" stroke="#f43f5e" stroke-width="1.5" marker-end="url(#arrErr)" />
+    <text x="310" y="28" fill="#fca5a5" font-size="10" text-anchor="middle">GET /orders/101 [Bearer Token_User_B]</text>
+
+    <line x1="412" y1="45" x2="655" y2="45" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#arr)" />
+    <text x="530" y="38" fill="#93c5fd" font-size="10" text-anchor="middle">Token valid -> Inject @CurrentUser() {userId: 2}</text>
+
+    <line x1="660" y1="60" x2="880" y2="60" stroke="#f59e0b" stroke-width="1.2" marker-end="url(#arr)" />
+    <text x="770" y="55" fill="#fcd34d" font-size="9" text-anchor="middle">findOrder(id: 101, userId: 2) -> null (Lệch chủ sở hữu)</text>
+
+    <line x1="655" y1="80" x2="207" y2="80" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="3,3" marker-end="url(#arrErr)" />
+    <text x="430" y="75" fill="#fca5a5" font-size="10" font-weight="600" text-anchor="middle">HTTP 404 / 403 ("Không tìm thấy đơn hàng của bạn") -> Chặn thành công</text>
+  </g>
+
+  <!-- SCENARIO 2: User B tries to pay for Order 101 -->
+  <g transform="translate(50, 260)">
+    <rect x="0" y="0" width="910" height="95" rx="6" fill="#2d121a" stroke="#f43f5e" stroke-width="1" stroke-dasharray="4,3" />
+    <rect x="0" y="0" width="315" height="18" rx="4" fill="#f43f5e" />
+    <text x="8" y="13" fill="#ffffff" font-size="10" font-weight="700">[SCENARIO 2: User B cố thanh toán đơn hàng 101 của User A]</text>
+
+    <line x1="207" y1="35" x2="408" y2="35" stroke="#f43f5e" stroke-width="1.5" marker-end="url(#arrErr)" />
+    <text x="310" y="28" fill="#fca5a5" font-size="10" text-anchor="middle">POST /payments {orderId: 101} [Bearer Token_User_B]</text>
+
+    <line x1="412" y1="45" x2="655" y2="45" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#arr)" />
+    <text x="530" y="38" fill="#93c5fd" font-size="10" text-anchor="middle">Token valid -> Inject @CurrentUser() {userId: 2}</text>
+
+    <line x1="660" y1="60" x2="880" y2="60" stroke="#f59e0b" stroke-width="1.2" marker-end="url(#arr)" />
+    <text x="770" y="55" fill="#fcd34d" font-size="9" text-anchor="middle">findOrderForUser(101, 2) -> null</text>
+
+    <line x1="655" y1="80" x2="207" y2="80" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="3,3" marker-end="url(#arrErr)" />
+    <text x="430" y="75" fill="#fca5a5" font-size="10" font-weight="600" text-anchor="middle">HTTP 404 ORDER_NOT_FOUND ("Không tìm thấy đơn hàng của bạn")</text>
+  </g>
+
+  <!-- SCENARIO 3: User A reads and pays for own Order 101 -->
+  <g transform="translate(50, 370)">
+    <rect x="0" y="0" width="910" height="195" rx="6" fill="#063223" stroke="#10b981" stroke-width="1" />
+    <rect x="0" y="0" width="310" height="18" rx="4" fill="#10b981" />
+    <text x="8" y="13" fill="#ffffff" font-size="10" font-weight="700">[SCENARIO 3: User A đọc và thanh toán đúng đơn hàng của mình]</text>
+
+    <!-- Read order -->
+    <line x1="17" y1="35" x2="408" y2="35" stroke="#10b981" stroke-width="1.5" marker-end="url(#arrOk)" />
+    <text x="210" y="28" fill="#a7f3d0" font-size="10" text-anchor="middle">GET /orders/101 [Bearer Token_User_A]</text>
+
+    <line x1="412" y1="45" x2="655" y2="45" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#arr)" />
+    <text x="530" y="38" fill="#93c5fd" font-size="10" text-anchor="middle">Token valid -> Inject @CurrentUser() {userId: 1}</text>
+
+    <line x1="660" y1="60" x2="880" y2="60" stroke="#10b981" stroke-width="1.2" marker-end="url(#arrOk)" />
+    <text x="770" y="55" fill="#a7f3d0" font-size="9" text-anchor="middle">findOrder(101, 1) -> Match Order 101</text>
+
+    <line x1="655" y1="80" x2="17" y2="80" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3,3" marker-end="url(#arrOk)" />
+    <text x="330" y="75" fill="#6ee7b7" font-size="10" font-weight="600" text-anchor="middle">HTTP 200 OK { id: 101, total: 55000, status: "PENDING" }</text>
+
+    <!-- Pay order -->
+    <line x1="17" y1="110" x2="655" y2="110" stroke="#10b981" stroke-width="1.5" marker-end="url(#arrOk)" />
+    <text x="330" y="103" fill="#a7f3d0" font-size="10" text-anchor="middle">POST /payments {orderId: 101, method: "WALLET"} [Bearer Token_User_A]</text>
+
+    <line x1="660" y1="125" x2="880" y2="125" stroke="#10b981" stroke-width="1.2" marker-end="url(#arrOk)" />
+    <text x="770" y="120" fill="#a7f3d0" font-size="9" text-anchor="middle">findOrderForUser(101, 1) -> Match -> Thực hiện thanh toán</text>
+
+    <line x1="655" y1="150" x2="17" y2="150" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3,3" marker-end="url(#arrOk)" />
+    <text x="330" y="145" fill="#6ee7b7" font-size="11" font-weight="700" text-anchor="middle">HTTP 200/201 OK { orderId: 101, status: "PAID", paidByUserId: 1 }</text>
+  </g>
+
+  <!-- Footer -->
+  <g transform="translate(25, 675)">
+    <rect x="0" y="0" width="970" height="30" rx="6" fill="#1e293b" />
+    <text x="20" y="19" fill="#94a3b8" font-size="11">DoD Check: User B bị chặn 404 khi cố tình thao tác Order của User A | User A thao tác thành công 200 | Bảo vệ tuyệt đối ranh giới dữ liệu</text>
+  </g>
+</svg>

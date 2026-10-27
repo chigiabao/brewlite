@@ -1,16 +1,55 @@
 // Trang đăng nhập / đăng ký. Người phụ trách: D (Task 7), C hỗ trợ giao diện.
 'use client';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { api } from '../../lib/api';
 
 export default function LoginPage() {
+  const router = useRouter();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // TODO(D – Task 7): gọi POST /auth/login hoặc /auth/register qua api(),
-  // lưu accessToken vào localStorage('token'), rồi quay lại trang trước (giỏ hàng/thanh toán).
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+    setIsSubmitting(true);
+
+    if (!email.trim()) {
+      setError('Vui lòng nhập email hợp lệ');
+      setIsSubmitting(false);
+      return;
+    }
+    if (password.length < 6) {
+      setError('Mật khẩu phải có tối thiểu 6 ký tự');
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      if (mode === 'register') {
+        await api<{ id: number; email: string }>('/auth/register', {
+          method: 'POST',
+          body: JSON.stringify({ email, password }),
+        });
+      }
+
+      const result = await api<{ accessToken: string }>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      });
+      // Ghi chú bảo mật (Guide D): Lưu JWT trong localStorage theo yêu cầu của bài lab.
+      // Lưu ý rủi ro XSS: mã độc JavaScript có thể đọc token từ localStorage nếu có lỗ hổng XSS.
+      // Giải pháp khuyến nghị cho production là sử dụng HttpOnly Secure Cookie.
+      localStorage.setItem('token', result.accessToken);
+      router.push('/');
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : 'Không thể xác thực tài khoản');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -30,8 +69,12 @@ export default function LoginPage() {
         onChange={(e) => setPassword(e.target.value)}
         className="w-full border rounded px-3 py-2"
       />
-      <button className="w-full bg-amber-600 text-white py-2 rounded hover:bg-amber-700">
-        {mode === 'login' ? 'Đăng nhập' : 'Đăng ký'}
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <button
+        disabled={isSubmitting}
+        className="w-full bg-amber-600 text-white py-2 rounded hover:bg-amber-700 disabled:opacity-50"
+      >
+        {isSubmitting ? 'Đang xử lý...' : mode === 'login' ? 'Đăng nhập' : 'Đăng ký'}
       </button>
       <button
         type="button"
