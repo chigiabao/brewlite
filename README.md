@@ -65,6 +65,7 @@ Hệ thống đã chuẩn bị sẵn các tài khoản mẫu (được khởi t�
 | **Tài khoản mới** | `demo@gmail.com` | `password123` | `0` |
 
 > [!TIP]
+> - Định dạng Email: Toàn bộ địa chỉ email và đuôi tên miền `@gmail.com` luôn được viết và chuẩn hóa bằng chữ thường (lowercase).
 > - Mật khẩu mẫu tuân thủ quy chuẩn bảo mật độ dài từ 6 đến 72 ký tự (chuẩn an toàn thuật toán Bcrypt 12 rounds).
 > - Bạn có thể đăng nhập trực tiếp trên giao diện: [http://localhost:3000/login](http://localhost:3000/login) hoặc qua REST API `POST http://localhost:3001/auth/login`.
 

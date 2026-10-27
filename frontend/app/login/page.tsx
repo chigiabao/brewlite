@@ -69,8 +69,8 @@ export default function LoginPage() {
     setSuccess('');
     setIsSubmitting(true);
 
-    const trimmedEmail = email.trim();
-    if (!trimmedEmail) {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
       setError('Vui lòng nhập email hợp lệ');
       setIsSubmitting(false);
       return;
@@ -90,14 +90,14 @@ export default function LoginPage() {
       if (mode === 'register') {
         await api<{ id: number; email: string }>('/auth/register', {
           method: 'POST',
-          body: JSON.stringify({ email: trimmedEmail, password }),
+          body: JSON.stringify({ email: normalizedEmail, password }),
         });
         setSuccess('Đăng ký thành công! Đang tự động đăng nhập...');
       }
 
       const result = await api<{ accessToken: string }>('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ email: trimmedEmail, password }),
+        body: JSON.stringify({ email: normalizedEmail, password }),
       });
 
       // Ghi chú bảo mật (Guide D): Lưu JWT trong localStorage theo yêu cầu của bài lab.
@@ -167,8 +167,8 @@ export default function LoginPage() {
           placeholder="user@gmail.com"
           autoComplete="email"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+          onChange={(e) => setEmail(e.target.value.toLowerCase())}
+          className="w-full border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 lowercase"
         />
       </div>
 
