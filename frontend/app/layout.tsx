@@ -5,6 +5,7 @@ import './globals.css';
 import Providers from './providers';
 
 import { CartLink } from '@/components/cart-link';
+import { AuthHeader } from '@/components/auth-header';
 
 export const metadata: Metadata = {
   title: 'BrewLite',
@@ -25,10 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/orders" className="hover:underline">
                 Lịch sử đơn
               </Link>
-              <Link href="/login" className="hover:underline">
-                Đăng nhập
-              </Link>
-              {/* TODO(D – Task 7): đổi thành Đăng xuất khi đã có token */}
+              <AuthHeader />
             </nav>
           </header>
           <main className="flex-1 p-4">

@@ -1,0 +1,306 @@
+\documentclass[a3paper,landscape]{article}
+\usepackage[margin=0.8cm]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[vietnamese]{babel}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,shapes.geometric}
+
+\pagestyle{empty}
+
+\begin{document}
+\centering
+
+\begin{tikzpicture}[
+  >=Stealth,
+  font=\small,
+  act/.style={
+    draw,rounded corners=4pt,
+    fill=white,
+    text width=3.5cm,
+    minimum height=0.85cm,
+    align=center,
+    inner sep=4pt
+  },
+  dec/.style={
+    draw,diamond,
+    aspect=2.2,
+    align=center,
+    inner sep=2pt
+  },
+  flow/.style={draw,thick,-{Stealth}},
+  lane/.style={draw,thick},
+  merge/.style={
+    draw,diamond,
+    aspect=1,
+    minimum size=5mm,
+    inner sep=0pt,
+    fill=white
+  },
+  start/.style={circle,fill=black,minimum size=4mm,inner sep=0pt},
+  finish/.style={circle,draw,thick,minimum size=6mm,inner sep=0pt}
+]
+
+% ==================================================
+% SWIMLANES
+% ==================================================
+\draw[lane] (0,0) rectangle (5,29);
+\draw[lane] (5,0) rectangle (15,29);
+\draw[lane] (15,0) rectangle (25,29);
+\draw[thick] (0,28)--(25,28);
+
+\node[font=\bfseries\large] at (2.5,28.5) {Customer};
+\node[font=\bfseries\large] at (10,28.5) {E - Ordering};
+\node[font=\bfseries\large] at (20,28.5) {G - Rewards};
+
+% ==================================================
+% CUSTOMER
+% ==================================================
+\node[start] (start) at (2.5,26.8) {};
+
+\node[act] (choose) at (2.5,25.3) {Chọn Cart};
+\node[act] (submit) at (2.5,23.3) {Nhấn Đặt hàng};
+
+\node[act] (cartError) at (2.5,17.8)
+  {Thông báo Cart không hợp lệ};
+
+\node[act] (stockError) at (2.5,7.2)
+  {Thông báo Stock không đủ};
+
+\node[act] (keepCart) at (2.5,5.2)
+  {Giữ Cart};
+
+\node[finish] (endError) at (2.5,3.7) {};
+
+\node[act] (orderResult) at (2.5,11)
+  {Nhận thông tin Order};
+
+\node[finish] (endSuccess) at (2.5,9.5) {};
+
+% ==================================================
+% E - ORDERING
+% ==================================================
+\node[act] (receive) at (10,23.3)
+  {Nhận yêu cầu tạo Order};
+
+\node[act] (checkCart) at (10,21.3)
+  {Kiểm tra Cart hợp lệ};
+
+\node[dec] (cartDecision) at (10,19.5)
+  {Cart hợp lệ?};
+
+\node[act] (readProduct) at (10,17)
+  {Đọc thông tin sản phẩm,\\số lượng và giá};
+
+\node[act] (pricing) at (10,12.3)
+  {Tính giá đơn hàng\\và tổng tiền phải thanh toán};
+
+\node[act] (reserve) at (10,10)
+  {Kiểm tra / Reserve Stock};
+
+\node[dec] (stockDecision) at (10,8)
+  {Stock đủ và\\reserve thành công?};
+
+\node[act] (createOrder) at (7.5,5.5)
+  {Tạo Order};
+
+\node[act] (saveOrder) at (7.5,3.5)
+  {Lưu thông tin Order};
+
+\node[act] (returnOrder) at (7.5,1.5)
+  {Trả thông tin Order};
+
+\node[act] (cancelOrder) at (12.5,5.5)
+  {Hủy thao tác tạo Order};
+
+\node[act] (stockReply) at (12.5,3.5)
+  {Trả lỗi Stock};
+
+% ==================================================
+% G - REWARDS: COUPON
+% ==================================================
+\node[dec] (hasCoupon) at (20,26)
+  {Có Coupon?};
+
+\node[act] (validateCoupon) at (20,24)
+  {Validate Coupon};
+
+\node[dec] (couponDecision) at (20,22)
+  {Coupon hợp lệ?};
+
+\node[act] (applyCoupon) at (17.5,19.8)
+  {Xác định ưu đãi Coupon};
+
+\node[act] (skipCoupon) at (22.5,19.8)
+  {Bỏ qua Coupon};
+
+% Coupon merge
+\node[merge] (mergeCoupon) at (20,18)
+  {};
+
+% ==================================================
+% G - REWARDS: POINTS
+% ==================================================
+\node[dec] (hasPoints) at (20,16.2)
+  {Có sử dụng Points?};
+
+\node[act] (checkPoints) at (17.5,13.8)
+  {Kiểm tra điều kiện\\sử dụng Points};
+
+\node[act] (applyPoints) at (17.5,11.5)
+  {Xác định giá trị\\Points được áp dụng};
+
+\node[act] (skipPoints) at (22.5,13.8)
+  {Bỏ qua Points};
+
+% Points merge
+\node[merge] (mergePoints) at (20,10.5)
+  {};
+
+\node[act] (rewardResult) at (20,8.5)
+  {Trả kết quả Rewards};
+
+% ==================================================
+% CUSTOMER START
+% ==================================================
+\draw[flow] (start)--(choose);
+\draw[flow] (choose)--(submit);
+
+% Customer -> E
+\draw[flow] (submit.east)--(5.8,23.3)
+  --(receive.west);
+
+% ==================================================
+% E: CART VALIDATION
+% ==================================================
+\draw[flow] (receive)--(checkCart);
+\draw[flow] (checkCart)--(cartDecision);
+
+% Yes
+\draw[flow] (cartDecision.south)--(readProduct.north)
+  node[midway,right]{Có};
+
+% No
+\draw[flow] (cartDecision.west)--(6.5,19.5)
+  node[midway,above]{Không}
+  --(6.5,17.8)--(cartError.east);
+
+% Cart error -> end
+\draw[flow] (cartError.south)--(2.5,15.8)
+  --(0.5,15.8)--(0.5,5.2)
+  --(keepCart.west);
+
+\draw[flow] (keepCart)--(endError);
+
+% ==================================================
+% E -> G: REWARDS INPUT
+% ==================================================
+\draw[flow] (readProduct.east)--(15.6,17)
+  --(15.6,26)--(hasCoupon.west);
+
+% ==================================================
+% COUPON DECISION
+% ==================================================
+% Coupon exists
+\draw[flow] (hasCoupon.south)--(validateCoupon.north)
+  node[midway,right]{Có};
+
+\draw[flow] (validateCoupon)--(couponDecision);
+
+% No coupon: bypass to merge
+\draw[flow] (hasCoupon.east)--(24,26)
+  node[midway,above]{Không}
+  --(24,18)--(mergeCoupon.east);
+
+% Valid: apply coupon
+\draw[flow] (couponDecision.west)--(16.8,22)
+  node[midway,above]{Có}
+  --(16.8,19.8)--(applyCoupon.west);
+
+% Invalid: bypass coupon
+\draw[flow] (couponDecision.east)--(23.2,22)
+  node[midway,above]{Không}
+  --(23.2,19.8)--(skipCoupon.east);
+
+% Apply -> merge
+\draw[flow] (applyCoupon.south)--(17.5,18)
+  --(mergeCoupon.west);
+
+% Skip -> merge
+\draw[flow] (skipCoupon.south)--(22.5,18)
+  --(mergeCoupon.east);
+
+% Merge -> Points decision
+\draw[flow] (mergeCoupon.south)--(hasPoints.north);
+
+% ==================================================
+% POINTS DECISION
+% ==================================================
+% Yes: check points
+\draw[flow] (hasPoints.west)--(16.8,16.2)
+  node[midway,above]{Có}
+  --(16.8,13.8)--(checkPoints.west);
+
+\draw[flow] (checkPoints)--(applyPoints);
+
+% No: skip points
+\draw[flow] (hasPoints.east)--(23.2,16.2)
+  node[midway,above]{Không}
+  --(23.2,13.8)--(skipPoints.east);
+
+% Apply points -> merge
+\draw[flow] (applyPoints.south)--(17.5,10.5)
+  --(mergePoints.west);
+
+% Skip points -> merge
+\draw[flow] (skipPoints.south)--(22.5,10.5)
+  --(mergePoints.east);
+
+% Merge -> Rewards result
+\draw[flow] (mergePoints.south)--(rewardResult.north);
+
+% ==================================================
+% REWARDS -> E: ONE RESULT FLOW
+% ==================================================
+\draw[flow] (rewardResult.west)--(15.4,8.5)
+  --(15.4,12.3)--(pricing.east);
+
+% ==================================================
+% E: PRICING AND STOCK
+% ==================================================
+\draw[flow] (readProduct.south)--(10,14.8)
+  --(8,14.8)--(8,12.3)
+  --(pricing.west);
+
+\draw[flow] (pricing)--(reserve);
+\draw[flow] (reserve)--(stockDecision);
+
+% Stock success
+\draw[flow] (stockDecision.west)--(7.5,8)
+  node[midway,above]{Có}
+  --(createOrder.north);
+
+\draw[flow] (createOrder)--(saveOrder);
+\draw[flow] (saveOrder)--(returnOrder);
+
+% Order response -> Customer
+\draw[flow] (returnOrder.west)--(5.7,1.5)
+  --(5.7,11)--(orderResult.east);
+
+\draw[flow] (orderResult)--(endSuccess);
+
+% Stock failure
+\draw[flow] (stockDecision.east)--(12.5,8)
+  node[midway,above]{Không}
+  --(cancelOrder.north);
+
+\draw[flow] (cancelOrder)--(stockReply);
+
+% Stock failure -> Customer
+\draw[flow] (stockReply.east)--(14.5,3.5)
+  --(14.5,7.2)--(stockError.east);
+
+\draw[flow] (stockError)--(keepCart);
+
+\end{tikzpicture}
+\end{document}

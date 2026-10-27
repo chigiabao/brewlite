@@ -1,0 +1,136 @@
+\documentclass[a4paper,landscape]{article}
+\usepackage[margin=1cm]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[vietnamese]{babel}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,shapes.geometric}
+
+\pagestyle{empty}
+
+\begin{document}
+\centering
+
+\begin{tikzpicture}[
+  >=Stealth,
+  font=\small,
+  uc/.style={
+    draw,
+    shape=ellipse,
+    minimum width=3.5cm,
+    minimum height=0.9cm,
+    align=center
+  },
+  actor/.style={font=\small},
+  assoc/.style={draw,thick},
+  dep/.style={draw,dashed,-{Stealth},thick}
+]
+
+% System boundary
+\draw[thick] (0,0) rectangle (18,12);
+\node[font=\bfseries] at (9,11.6) {BrewLite System};
+
+% Actor
+\node[actor] (customer) at (-1.5,8.3) {Customer};
+
+% E - Ordering
+\node[font=\bfseries] at (4.5,10.9) {E - Ordering};
+
+\node[uc] (create) at (4.5,9.7)
+  {Tao don hang tu Cart};
+
+\node[uc] (cart) at (4.5,8.1)
+  {Kiem tra Cart};
+
+\node[uc] (price) at (4.5,6.5)
+  {Tinh gia don hang};
+
+\node[uc] (stock) at (4.5,4.9)
+  {Kiem tra Stock};
+
+\node[uc] (stockerr) at (4.5,3.3)
+  {Xu ly loi Stock};
+
+% G - Rewards
+\node[font=\bfseries] at (13.5,10.9) {G - Rewards};
+
+\node[uc] (coupon) at (13.5,9.7)
+  {Ap dung Coupon};
+
+\node[uc] (validate) at (13.5,8.1)
+  {Validate Coupon};
+
+\node[uc] (points) at (13.5,6.5)
+  {Su dung Points};
+
+% F - Payments
+\node[font=\bfseries] at (9,4.9) {F - Payments};
+
+\node[uc] (pay) at (9,3.8)
+  {Thanh toan don hang};
+
+\node[uc] (wallet) at (6,2.2)
+  {Thanh toan WALLET};
+
+\node[uc] (card) at (12,2.2)
+  {Thanh toan CARD};
+
+\node[uc] (confirm) at (9,0.9)
+  {Xac nhan ket qua thanh toan};
+
+% Payment error cases
+\node[uc] (decline) at (15.2,3.8)
+  {Payment decline};
+
+\node[uc] (retry) at (15.2,1.5)
+  {Thu thanh toan lai};
+
+% Customer associations
+\draw[assoc] (customer.east) -- (create.west);
+
+% Include: create order
+\draw[dep]
+  (create.west) to[out=200,in=160,looseness=1.3]
+  node[pos=0.55,left,fill=white,inner sep=2pt]
+  {\scriptsize <<include>>}
+  (cart.west);
+
+\draw[dep]
+  (create.south west) to[out=230,in=130,looseness=1.2]
+  node[pos=0.55,left,fill=white,inner sep=2pt]
+  {\scriptsize <<include>>}
+  (price.west);
+
+\draw[dep]
+  (create.south) to[out=260,in=100,looseness=1.2]
+  node[pos=0.55,right,fill=white,inner sep=2pt]
+  {\scriptsize <<include>>}
+  (stock.north);
+
+
+% Stock error
+\draw[dep] (stockerr) -- node[right,fill=white]
+  {\scriptsize <<extend>>} (stock);
+
+% Coupon validation
+\draw[dep] (coupon) -- node[right,fill=white]
+  {\scriptsize <<include>>} (validate);
+
+% Payment method associations
+\draw[dep] (wallet) -- (pay);
+\draw[dep] (card) -- (pay);
+
+% Payment result
+\draw[dep] (pay) -- node[right,fill=white]
+  {\scriptsize <<include>>} (confirm);
+
+% Payment decline
+\draw[dep] (decline) -- node[right,fill=white]
+  {\scriptsize <<extend>>} (pay);
+
+% Retry
+\draw[dep] (retry) -- node[right,fill=white]
+  {\scriptsize <<extend>>} (pay);
+
+\end{tikzpicture}
+\end{document}

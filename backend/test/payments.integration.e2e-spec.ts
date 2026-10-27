@@ -33,21 +33,54 @@ describe('Payments idempotency (integration, real PostgreSQL)', () => {
     await moduleRef.close();
   });
 
-  beforeEach(async () => {
-    const orders = await prisma.order.findMany({ where: { userId: USER_ID }, select: { id: true } });
-    const orderIds = orders.map((o) => o.id);
-    if (orderIds.length > 0) {
-      await prisma.payment.deleteMany({ where: { orderId: { in: orderIds } } });
-      await prisma.order.deleteMany({ where: { id: { in: orderIds } } });
-    } else {
-      await prisma.order.deleteMany({ where: { userId: USER_ID } });
-    }
-    await prisma.user.upsert({
-      where: { id: USER_ID },
-      update: {},
-      create: { id: USER_ID, email: 'fixture-int@brewlite.test', passwordHash: 'fixture' },
-    });
+  // beforeEach(async () => {
+  //   const orders = await prisma.order.findMany({ where: { userId: USER_ID }, select: { id: true } });
+  //   const orderIds = orders.map((o) => o.id);
+  //   if (orderIds.length > 0) {
+  //     await prisma.payment.deleteMany({ where: { orderId: { in: orderIds } } });
+  //     await prisma.order.deleteMany({ where: { id: { in: orderIds } } });
+  //   } else {
+  //     await prisma.order.deleteMany({ where: { userId: USER_ID } });
+  //   }
+  //   await prisma.user.upsert({
+  //     where: { id: USER_ID },
+  //     update: {},
+  //     create: { id: USER_ID, email: 'fixture-int@brewlite.test', passwordHash: 'fixture' },
+  //   });
+  // });
+beforeEach(async () => {
+  const orders = await prisma.order.findMany({
+    where: { userId: USER_ID },
+    select: { id: true },
   });
+
+  const orderIds = orders.map((o) => o.id);
+
+  if (orderIds.length > 0) {
+    await prisma.payment.deleteMany({
+      where: { orderId: { in: orderIds } },
+    });
+
+    await prisma.loyaltyEntry.deleteMany({
+      where: { orderId: { in: orderIds } },
+    });
+
+    await prisma.order.deleteMany({
+      where: { id: { in: orderIds } },
+    });
+  }
+
+  await prisma.user.upsert({
+    where: { id: USER_ID },
+    update: {},
+    create: {
+      id: USER_ID,
+      email: 'fixture-int@brewlite.test',
+      passwordHash: 'fixture',
+    },
+  });
+});
+
 
   function seedOrder(total = 50_000) {
     return prisma.order.create({ data: { userId: USER_ID, total } });

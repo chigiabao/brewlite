@@ -1,0 +1,180 @@
+
+\documentclass[a4paper,landscape]{article}
+\usepackage[margin=1cm]{geometry}
+\usepackage{tikz}
+\usepackage[utf8]{inputenc}
+\usepackage[T5]{fontenc}
+\usetikzlibrary{arrows.meta,backgrounds}
+
+\pagestyle{empty}
+
+\begin{document}
+\centering
+
+\begin{tikzpicture}[
+    font=\scriptsize,
+    doiTuong/.style={
+        draw, rounded corners=2pt,
+        minimum width=2.5cm,
+        minimum height=0.8cm,
+        align=center, fill=blue!8
+    },
+    gui/.style={-{Stealth}, thick},
+    phanHoi/.style={-{Stealth}, dashed},
+    hoatDong/.style={draw=blue!70, fill=blue!20}
+]
+
+% =========================
+% 1. CAC DOI TUONG
+% =========================
+\node[doiTuong] (KH) at (0,0) {Khách hàng};
+\node[doiTuong] (CTRL) at (3.5,0) {Bộ điều khiển\\đơn hàng};
+\node[doiTuong] (DTO) at (7,0) {Kiểm tra\\dữ liệu DTO};
+\node[doiTuong] (SERVICE) at (10.5,0) {Dịch vụ\\đơn hàng};
+\node[doiTuong] (STOCK) at (14,0) {Dịch vụ\\tồn kho};
+\node[doiTuong] (DB) at (17.5,0) {Cơ sở dữ liệu};
+
+% =========================
+% 2. DUONG DOI TUONG
+% =========================
+\foreach \x in {0,3.5,7,10.5,14,17.5} {
+    \draw[dashed,gray] (\x,-0.5)--(\x,-16.5);
+}
+
+% =========================
+% 3. VUNG HOAT DONG
+% =========================
+\begin{scope}[on background layer]
+    % Khach hang
+    \draw[hoatDong] (-0.08,-1) rectangle (0.08,-15.5);
+
+    % Bo dieu khien
+    \draw[hoatDong] (3.42,-1) rectangle (3.58,-14.8);
+
+    % Kiem tra DTO
+    \draw[hoatDong] (6.92,-1.8) rectangle (7.08,-2.5);
+
+    % Dich vu don hang
+    \draw[hoatDong] (10.42,-3) rectangle (10.58,-14);
+
+    % Dich vu ton kho
+    \draw[hoatDong] (13.92,-8.5) rectangle (14.08,-10.8);
+
+    % Cac lan xu ly co so du lieu
+    \draw[hoatDong] (17.42,-4) rectangle (17.58,-4.6);
+    \draw[hoatDong] (17.42,-5.5) rectangle (17.58,-6.1);
+    \draw[hoatDong] (17.42,-9.2) rectangle (17.58,-10);
+    \draw[hoatDong] (17.42,-11) rectangle (17.58,-12);
+    \draw[hoatDong] (17.42,-12.8) rectangle (17.58,-13.4);
+\end{scope}
+
+% =========================
+% 4. GUI YEU CAU TAO DON
+% =========================
+\draw[gui] (0,-1)--(3.5,-1)
+node[midway,above,align=center]
+{Gửi yêu cầu tạo đơn hàng\\kèm khóa chống trùng};
+
+% =========================
+% 5. KIEM TRA DU LIEU
+% =========================
+\draw[gui] (3.5,-1.8)--(7,-1.8)
+node[midway,above]{Kiểm tra dữ liệu đầu vào};
+
+\draw[phanHoi] (7,-2.5)--(3.5,-2.5)
+node[midway,above]{Dữ liệu hợp lệ};
+
+% =========================
+% 6. XU LY TAO DON
+% =========================
+\draw[gui] (3.5,-3)--(10.5,-3)
+node[midway,above]{Gọi xử lý tạo đơn hàng};
+
+% =========================
+% 7. KIEM TRA KHOA CHONG TRUNG
+% =========================
+\draw[gui] (10.5,-4)--(17.5,-4)
+node[midway,above]{Tìm đơn theo khóa chống trùng};
+
+\draw[phanHoi] (17.5,-4.6)--(10.5,-4.6)
+node[midway,above]{Kết quả tìm kiếm};
+
+% =========================
+% 8. LAY THONG TIN SAN PHAM
+% =========================
+\draw[gui] (10.5,-5.5)--(17.5,-5.5)
+node[midway,above]{Lấy thông tin và giá sản phẩm};
+
+\draw[phanHoi] (17.5,-6.1)--(10.5,-6.1)
+node[midway,above]{Thông tin sản phẩm};
+
+% =========================
+% 9. TINH GIA
+% =========================
+\node[draw,fill=yellow!15,align=left,text width=5.5cm]
+at (10.5,-7.3)
+{Tính giá từ dữ liệu trong CSDL\\
+Lưu giá tại thời điểm đặt hàng:\\
+đơn giá và thành tiền};
+
+% =========================
+% 10. KIEM TRA VA CAP NHAT TON KHO
+% =========================
+\draw[gui] (10.5,-8.5)--(14,-8.5)
+node[midway,above]{Yêu cầu giữ/trừ tồn kho};
+
+\draw[gui] (14,-9.2)--(17.5,-9.2)
+node[midway,above]{Kiểm tra và cập nhật tồn kho};
+
+\draw[phanHoi] (17.5,-10)--(14,-10)
+node[midway,above]{Kết quả tồn kho};
+
+\draw[phanHoi] (14,-10.8)--(10.5,-10.8)
+node[midway,above]{Kết quả xử lý tồn kho};
+
+% =========================
+% 11. LUU DON HANG
+% =========================
+\draw[gui] (10.5,-11)--(17.5,-11)
+node[midway,above]{Lưu đơn hàng và chi tiết đơn};
+
+\draw[phanHoi] (17.5,-12)--(10.5,-12)
+node[midway,above]{Kết quả lưu đơn};
+
+% =========================
+% 12. XAC NHAN GIAO DICH
+% =========================
+\draw[gui] (10.5,-12.8)--(17.5,-12.8)
+node[midway,above]{Xác nhận giao dịch};
+
+\draw[phanHoi] (17.5,-13.4)--(10.5,-13.4)
+node[midway,above]{Giao dịch thành công};
+
+% =========================
+% 13. TRA KET QUA
+% =========================
+\draw[phanHoi] (10.5,-14)--(3.5,-14)
+node[midway,above]{Trả thông tin đơn hàng};
+
+\draw[phanHoi] (3.5,-14.8)--(0,-14.8)
+node[midway,above]{Trả kết quả tạo đơn};
+
+% =========================
+% 14. GHI CHU
+% =========================
+\node[draw,rounded corners,fill=yellow!15,
+align=left,text width=7cm]
+at (4,-16)
+{Trạng thái ban đầu: PENDING (Chờ thanh toán)\\
+Có thể thất bại do dữ liệu không hợp lệ, hết hàng\\
+hoặc lỗi CSDL. Giao dịch cần được hoàn tác khi lỗi.};
+
+\node[draw,rounded corners,fill=yellow!15,
+align=left,text width=7cm]
+at (13,-16)
+{Xử lý khóa chống trùng:\\
+Cùng khóa, cùng yêu cầu: trả đơn đã có\\
+Cùng khóa, khác yêu cầu: từ chối xung đột};
+
+\end{tikzpicture}
+\end{document}
