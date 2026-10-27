@@ -6,4 +6,3 @@ dist/
 backend/src/generated/
 *.tsbuildinfo
 *.zip
-zip-for-ai.bat
