@@ -1,0 +1,13 @@
+Running 10 tests using 1 worker
+
+[1/10] [chromium] › e2e\cart.spec.ts:10:7 › BrewLite Cart E2E Test Suite (CART-E01 -> CART-E10) › CART-E01: Mở Product Detail -> chọn size/topping -> Add -> badge tăng
+[2/10] [chromium] › e2e\cart.spec.ts:20:7 › BrewLite Cart E2E Test Suite (CART-E01 -> CART-E10) › CART-E02: Vào /cart thấy đúng name/size/topping/price
+[3/10] [chromium] › e2e\cart.spec.ts:33:7 › BrewLite Cart E2E Test Suite (CART-E01 -> CART-E10) › CART-E03: Refresh browser -> cart vẫn còn (Persistence)
+[4/10] [chromium] › e2e\cart.spec.ts:45:7 › BrewLite Cart E2E Test Suite (CART-E01 -> CART-E10) › CART-E04: +/- thay qty và cập nhật total
+[5/10] [chromium] › e2e\cart.spec.ts:64:7 › BrewLite Cart E2E Test Suite (CART-E01 -> CART-E10) › CART-E05: Xóa item -> item biến mất
+[6/10] [chromium] › e2e\cart.spec.ts:76:7 › BrewLite Cart E2E Test Suite (CART-E01 -> CART-E10) › CART-E06: Empty cart hiển thị trạng thái trống
+[7/10] [chromium] › e2e\cart.spec.ts:83:7 › BrewLite Cart E2E Test Suite (CART-E01 -> CART-E10) › CART-E07: “Thanh toán” -> chuyển hướng sang /checkout
+[8/10] [chromium] › e2e\cart.spec.ts:92:7 › BrewLite Cart E2E Test Suite (CART-E01 -> CART-E10) › CART-E08: Hai cấu hình cùng Product được giữ thành hai dòng
+[9/10] [chromium] › e2e\cart.spec.ts:105:7 › BrewLite Cart E2E Test Suite (CART-E01 -> CART-E10) › CART-E09: Payment fail -> Cart còn nguyên (retry)
+[10/10] [chromium] › e2e\cart.spec.ts:119:7 › BrewLite Cart E2E Test Suite (CART-E01 -> CART-E10) › CART-E10: Payment success -> Cart bị clear
+  10 passed (43.3s)
