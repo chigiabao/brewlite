@@ -17,10 +17,17 @@ export type PayableOrder = {
 };
 
 export interface OrdersPaymentPort {
-  findOrderForUser(orderId: number, userId: number): Promise<PayableOrder | null>;
+  findOrderForUser(
+    orderId: number,
+    userId: number,
+  ): Promise<PayableOrder | null>;
   markPending(orderId: number, tx?: PaymentTx): Promise<void>;
   markPaid(orderId: number, paymentId: number, tx?: PaymentTx): Promise<void>;
-  markPaymentFailed(orderId: number, paymentId: number, tx?: PaymentTx): Promise<void>;
+  markPaymentFailed(
+    orderId: number,
+    paymentId: number,
+    tx?: PaymentTx,
+  ): Promise<void>;
 }
 
 @Injectable()
@@ -29,7 +36,10 @@ export class MockOrdersPaymentAdapter implements OrdersPaymentPort {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async findOrderForUser(orderId: number, userId: number): Promise<PayableOrder | null> {
+  async findOrderForUser(
+    orderId: number,
+    userId: number,
+  ): Promise<PayableOrder | null> {
     return this.prisma.order.findFirst({
       where: { id: orderId, userId },
       select: { id: true, userId: true, status: true, total: true },
@@ -44,7 +54,11 @@ export class MockOrdersPaymentAdapter implements OrdersPaymentPort {
     return this.transition(orderId, OrderStatus.PAID, paymentId, tx);
   }
 
-  markPaymentFailed(orderId: number, paymentId: number, tx?: PaymentTx): Promise<void> {
+  markPaymentFailed(
+    orderId: number,
+    paymentId: number,
+    tx?: PaymentTx,
+  ): Promise<void> {
     return this.transition(orderId, OrderStatus.PAYMENT_FAILED, paymentId, tx);
   }
 
@@ -54,19 +68,41 @@ export class MockOrdersPaymentAdapter implements OrdersPaymentPort {
     paymentId?: number,
     tx?: PaymentTx,
   ): Promise<void> {
-    const order = tx
-      ? await tx.order.findUnique({ where: { id: orderId }, select: { status: true } })
-      : await this.prisma.order.findUnique({ where: { id: orderId }, select: { status: true } });
+    const client = tx ?? this.prisma;
+
+    const order = await client.order.findUnique({
+      where: { id: orderId },
+      select: { status: true },
+    });
+
     if (!order) {
-      throw new PaymentError(PaymentErrorCode.ORDER_NOT_FOUND, 'Không tìm thấy đơn hàng', 404);
+      throw new PaymentError(
+        PaymentErrorCode.ORDER_NOT_FOUND,
+        'Không tìm thấy đơn hàng',
+        404,
+      );
     }
+
     assertTransition(order.status, to);
-    if (tx) {
-      await tx.order.update({ where: { id: orderId }, data: { status: to } });
-    } else {
-      await this.prisma.order.update({ where: { id: orderId }, data: { status: to } });
+
+    const result = await client.order.updateMany({
+      where: {
+        id: orderId,
+        status: order.status,
+      },
+      data: { status: to },
+    });
+
+    if (result.count !== 1) {
+      throw new PaymentError(
+        PaymentErrorCode.ORDER_NOT_PAYABLE,
+        'Trạng thái đơn hàng đã thay đổi',
+        409,
+      );
     }
+
     const paymentLog = paymentId === undefined ? '' : ` paymentId=${paymentId}`;
+
     this.logger.log(`payment.order.${to} orderId=${orderId}${paymentLog}`);
   }
 }

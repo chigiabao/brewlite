@@ -23,10 +23,7 @@ export class StockService {
     const demand = new Map<number, number>();
 
     for (const item of items) {
-      demand.set(
-        item.productId,
-        (demand.get(item.productId) ?? 0) + item.qty,
-      );
+      demand.set(item.productId, (demand.get(item.productId) ?? 0) + item.qty);
     }
 
     // Luôn cập nhật theo thứ tự ID để giảm nguy cơ deadlock.
@@ -62,6 +59,37 @@ export class StockService {
 
       if (result.count !== 1) {
         throw new ConflictException('STOCK_VERSION_CONFLICT');
+      }
+    }
+  }
+  async release(
+    tx: Prisma.TransactionClient,
+    items: { productId: number; qty: number }[],
+  ): Promise<void> {
+    const quantities = new Map<number, number>();
+
+    for (const item of items) {
+      quantities.set(
+        item.productId,
+        (quantities.get(item.productId) ?? 0) + item.qty,
+      );
+    }
+
+    const productIds = [...quantities.keys()].sort((a, b) => a - b);
+
+    for (const productId of productIds) {
+      const qty = quantities.get(productId)!;
+
+      const result = await tx.product.updateMany({
+        where: { id: productId },
+        data: {
+          stock: { increment: qty },
+          version: { increment: 1 },
+        },
+      });
+
+      if (result.count !== 1) {
+        throw new NotFoundException('PRODUCT_NOT_FOUND');
       }
     }
   }

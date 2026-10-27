@@ -28,6 +28,7 @@ import type { Size } from '../common/pricing.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateOrderDto } from './orders.dto.js';
 import { StockService } from './stock.service.js';
+import { OrderStatus } from '../generated/prisma/enums.js';
 
 @Injectable()
 export class OrdersService {
@@ -186,7 +187,6 @@ export class OrdersService {
           },
         });
       });
-     
     } catch (error: unknown) {
       // Request đồng thời có thể thua unique constraint
       // hoặc gặp xung đột khi giữ tồn kho.
@@ -228,6 +228,61 @@ export class OrdersService {
         total: true,
         createdAt: true,
       },
+    });
+  }
+  async cancel(userId: number, orderId: number) {
+    return this.prisma.$transaction(async (tx) => {
+      // Kiểm tra đơn có thuộc user không
+      const order = await tx.order.findFirst({
+        where: { id: orderId, userId },
+        select: { id: true, status: true },
+      });
+
+      if (!order) {
+        throw new NotFoundException('ORDER_NOT_FOUND');
+      }
+
+      // Chỉ cho phép hủy đơn chưa thanh toán hoặc thanh toán thất bại
+      const allowedStatuses: OrderStatus[] = [
+        OrderStatus.PENDING,
+        OrderStatus.PAYMENT_FAILED,
+      ];
+
+      if (!allowedStatuses.includes(order.status)) {
+        throw new ConflictException('ORDER_CANNOT_BE_CANCELLED');
+      }
+
+      // CAS: chỉ một request được chuyển trạng thái thành công
+      const updated = await tx.order.updateMany({
+        where: {
+          id: orderId,
+          userId,
+          status: order.status,
+        },
+        data: {
+          status: OrderStatus.CANCELLED,
+        },
+      });
+
+      if (updated.count !== 1) {
+        throw new ConflictException('ORDER_STATUS_CHANGED');
+      }
+
+      // Lấy chi tiết để hoàn kho
+      const items = await tx.orderItem.findMany({
+        where: { orderId },
+        select: {
+          productId: true,
+          qty: true,
+        },
+      });
+
+      await this.stock.release(tx, items);
+
+      return {
+        id: orderId,
+        status: OrderStatus.CANCELLED,
+      };
     });
   }
 }
