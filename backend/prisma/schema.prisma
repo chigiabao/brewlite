@@ -65,13 +65,18 @@ model Order {
   discountTotal   Int            @default(0)
   pointsRedeemed  Int            @default(0)
   total           Int            // Số tiền thực phải thanh toán, VND
+
   couponCode      String?
   coupon          Coupon?        @relation(fields: [couponCode], references: [code])
   createdAt       DateTime       @default(now())
+idempotencyKey String?
+requestHash    String?
   items           OrderItem[]
   payments        Payment[]      // Cho phép thử lại sau PAYMENT_FAILED (mỗi attempt có key riêng)
   loyaltyEntries  LoyaltyEntry[]
 
+
+@@unique([userId, idempotencyKey])
   @@index([userId, createdAt])
 }
 
