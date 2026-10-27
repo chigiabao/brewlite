@@ -133,7 +133,28 @@ describe('Identity (e2e) — Sprint 2 & Sprint 3', () => {
         .expect(400);
     });
 
-    it('returns 201 Created and safe user info without exposing passwordHash', async () => {
+    it('returns 400 Bad Request when password exceeds 72 characters (bcrypt limitation guard)', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email: 'valid@example.com', password: 'a'.repeat(73) })
+        .expect(400);
+    });
+
+    it('returns 400 Bad Request when request contains unwhitelisted extra properties (DTO whitelist protection)', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          email: 'valid-unwhitelisted@example.com',
+          password: 'secret123',
+          role: 'ADMIN',
+          isAdmin: true,
+        })
+        .expect(400);
+
+      expect(res.body.message).toEqual(expect.arrayContaining([expect.stringContaining('should not exist')]));
+    });
+
+    it('returns 201 Created and safe user info without exposing passwordHash or secrets', async () => {
       const res = await request(app.getHttpServer())
         .post('/auth/register')
         .send({ email: 'user@example.com', password: 'secret123' })
@@ -142,6 +163,8 @@ describe('Identity (e2e) — Sprint 2 & Sprint 3', () => {
       expect(res.body).toEqual({ id: 1, email: 'user@example.com' });
       expect(users[0].passwordHash).not.toBe('secret123');
       expect((res.body as { passwordHash?: string }).passwordHash).toBeUndefined();
+      expect(JSON.stringify(res.body)).not.toContain('passwordHash');
+      expect(JSON.stringify(res.body)).not.toContain(process.env.JWT_SECRET ?? 'brewlite');
     });
 
     it('returns 409 Conflict when registering with an existing email (case-insensitive)', async () => {
@@ -184,7 +207,14 @@ describe('Identity (e2e) — Sprint 2 & Sprint 3', () => {
         .expect(400);
     });
 
-    it('returns 201/200 and a valid JWT accessToken for User A credentials', async () => {
+    it('returns 400 Bad Request when login payload contains unwhitelisted extra properties', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: 'user@example.com', password: 'secret123', extraField: 'injection' })
+        .expect(400);
+    });
+
+    it('returns 201/200 and a valid JWT accessToken without exposing passwordHash or secrets', async () => {
       const res = await request(app.getHttpServer())
         .post('/auth/login')
         .send({ email: 'user@example.com', password: 'secret123' })
@@ -192,25 +222,27 @@ describe('Identity (e2e) — Sprint 2 & Sprint 3', () => {
 
       expect(res.body.accessToken).toEqual(expect.any(String));
       expect(res.body.accessToken.split('.')).toHaveLength(3);
+      expect(JSON.stringify(res.body)).not.toContain('passwordHash');
+      expect(JSON.stringify(res.body)).not.toContain(process.env.JWT_SECRET ?? 'brewlite-test');
       tokenUserA = res.body.accessToken;
     });
 
-    it('returns 401 Unauthorized when password does not match', async () => {
+    it('returns 401 Unauthorized when password does not match (generic error message)', async () => {
       const res = await request(app.getHttpServer())
         .post('/auth/login')
         .send({ email: 'user@example.com', password: 'wrong-password' })
         .expect(401);
 
-      expect(res.body.message).toContain('Email hoặc mật khẩu không đúng');
+      expect(res.body.message).toBe('Email hoặc mật khẩu không đúng');
     });
 
-    it('returns 401 Unauthorized when email does not exist', async () => {
+    it('returns 401 Unauthorized when email does not exist (same generic error message to prevent enumeration)', async () => {
       const res = await request(app.getHttpServer())
         .post('/auth/login')
         .send({ email: 'unknown@example.com', password: 'secret123' })
         .expect(401);
 
-      expect(res.body.message).toContain('Email hoặc mật khẩu không đúng');
+      expect(res.body.message).toBe('Email hoặc mật khẩu không đúng');
     });
   });
 
