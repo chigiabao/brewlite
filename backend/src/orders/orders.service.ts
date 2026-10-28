@@ -22,13 +22,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '../generated/prisma/client.js';
 import { unitPrice } from '../common/pricing.js';
 import type { Size } from '../common/pricing.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateOrderDto } from './orders.dto.js';
 import { StockService } from './stock.service.js';
 import { OrderStatus } from '../generated/prisma/enums.js';
+import { assertTransition } from './order-state.js';
 
 @Injectable()
 export class OrdersService {
@@ -241,16 +241,16 @@ export class OrdersService {
       if (!order) {
         throw new NotFoundException('ORDER_NOT_FOUND');
       }
-
       // Chỉ cho phép hủy đơn chưa thanh toán hoặc thanh toán thất bại
-      const allowedStatuses: OrderStatus[] = [
-        OrderStatus.PENDING,
-        OrderStatus.PAYMENT_FAILED,
-      ];
-
-      if (!allowedStatuses.includes(order.status)) {
+      if (
+        order.status !== OrderStatus.PENDING &&
+        order.status !== OrderStatus.PAYMENT_FAILED
+      ) {
         throw new ConflictException('ORDER_CANNOT_BE_CANCELLED');
       }
+
+      // Kiểm tra state machine
+      assertTransition(order.status, OrderStatus.CANCELLED);
 
       // CAS: chỉ một request được chuyển trạng thái thành công
       const updated = await tx.order.updateMany({

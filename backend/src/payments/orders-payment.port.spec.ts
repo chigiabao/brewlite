@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { BadRequestException } from '@nestjs/common';
+import { ConflictException } from '@nestjs/common';
 import { OrderStatus } from '../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MockOrdersPaymentAdapter } from './orders-payment.port.js';
@@ -40,7 +40,7 @@ describe('MockOrdersPaymentAdapter', () => {
     const invalid = setup(OrderStatus.COMPLETED);
 
     await expect(invalid.adapter.markPaid(10, 1)).rejects.toBeInstanceOf(
-      BadRequestException,
+      ConflictException,
     );
 
     expect(invalid.prisma.order.updateMany).not.toHaveBeenCalled();

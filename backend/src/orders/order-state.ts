@@ -22,8 +22,9 @@
 //   void to;
 // }
 
-import { BadRequestException } from '@nestjs/common';
+// import { BadRequestException } from '@nestjs/common';
 import { OrderStatus } from '../generated/prisma/enums.js';
+import { ConflictException } from '@nestjs/common';
 // Người phụ trách: E (Task 10.1 – Order State Machine)
 // Mọi chỗ đổi order.status phải gọi assertTransition() trước.
 
@@ -41,9 +42,16 @@ export const ALLOWED: Record<OrderStatus, OrderStatus[]> = {
   CANCELLED: [],
 };
 
+// export function assertTransition(from: OrderStatus, to: OrderStatus): void {
+//   if (!ALLOWED[from].includes(to)) {
+//     throw new BadRequestException(
+//       `Invalid order status transition: ${from} -> ${to}`,
+//     );
+//   }
+// }
 export function assertTransition(from: OrderStatus, to: OrderStatus): void {
   if (!ALLOWED[from].includes(to)) {
-    throw new BadRequestException(
+    throw new ConflictException(
       `Invalid order status transition: ${from} -> ${to}`,
     );
   }

@@ -174,6 +174,36 @@ describe('POST /payments (e2e, fixture order)', () => {
     expect(res.body.code).toBe('IDEMPOTENCY_KEY_REUSED');
   });
 
+  it('đơn đã PAID thanh toán lại -> 409 ORDER_ALREADY_PAID', async () => {
+    const order = await seedOrder();
+
+    // Lượt thanh toán đầu tiên thành công.
+    const first = await request(app.getHttpServer())
+      .post('/payments')
+      .set('Idempotency-Key', 'e2e-paid-state-1')
+      .send({ orderId: order.id, method: 'WALLET' });
+
+    expect(first.status).toBe(200);
+    expect(first.body.orderStatus).toBe('PAID');
+
+    // Key mới để không rơi vào nhánh idempotency replay.
+    const second = await request(app.getHttpServer())
+      .post('/payments')
+      .set('Idempotency-Key', 'e2e-paid-state-2')
+      .send({ orderId: order.id, method: 'WALLET' });
+
+    expect(second.status).toBe(409);
+    expect(second.body).toMatchObject({
+      statusCode: 409,
+      code: 'ORDER_ALREADY_PAID',
+    });
+
+    // Không tạo thêm payment.
+    expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(
+      1,
+    );
+  });
+
   it('gateway decline -> 402 PAYMENT_DECLINED, order PAYMENT_FAILED', async () => {
     const order = await seedOrder();
     nextReference = 'MOCK-DECL0000';

@@ -148,7 +148,6 @@ describe('Orders rollback and stock concurrency (real PostgreSQL)', () => {
 
     expect(successes).toHaveLength(1);
     expect(failures).toHaveLength(1);
-   
 
     const after = await prisma.product.findUniqueOrThrow({
       where: { id: product.id },
@@ -164,45 +163,73 @@ describe('Orders rollback and stock concurrency (real PostgreSQL)', () => {
 
     expect(orderCount).toBe(1);
   });
-it('creates only one order when concurrent requests use the same idempotency key', async () => {
-  const user = await createTestUser();
-  const product = await createTestProduct(5);
-  const key = `same-key-${Date.now()}`;
+  it('creates only one order when concurrent requests use the same idempotency key', async () => {
+    const user = await createTestUser();
+    const product = await createTestProduct(5);
+    const key = `same-key-${Date.now()}`;
 
-  const results = await Promise.allSettled([
-    ordersService.create(user.id, orderDto(product.id), key),
-    ordersService.create(user.id, orderDto(product.id), key),
-  ]);
+    const results = await Promise.allSettled([
+      ordersService.create(user.id, orderDto(product.id), key),
+      ordersService.create(user.id, orderDto(product.id), key),
+    ]);
 
-  // Cả hai request đều thành công và trả về cùng một đơn hàng.
-  const successes = results.filter(
-    (result) => result.status === 'fulfilled',
-  );
-  const failures = results.filter(
-    (result) => result.status === 'rejected',
-  );
+    // Cả hai request đều thành công và trả về cùng một đơn hàng.
+    const successes = results.filter((result) => result.status === 'fulfilled');
+    const failures = results.filter((result) => result.status === 'rejected');
 
-expect(successes).toHaveLength(2);
-expect(failures).toHaveLength(0);
+    expect(successes).toHaveLength(2);
+    expect(failures).toHaveLength(0);
 
-  const orders = await prisma.order.findMany({
-    where: { userId: user.id },
-    select: {
-      id: true,
-      idempotencyKey: true,
-    },
+    const orders = await prisma.order.findMany({
+      where: { userId: user.id },
+      select: {
+        id: true,
+        idempotencyKey: true,
+      },
+    });
+
+    expect(orders).toHaveLength(1);
+    expect(orders[0].idempotencyKey).toBe(key);
+
+    const after = await prisma.product.findUniqueOrThrow({
+      where: { id: product.id },
+      select: { stock: true, version: true },
+    });
+
+    // Chỉ trừ một sản phẩm, version chỉ tăng một lần.
+    expect(after.stock).toBe(4);
+    expect(after.version).toBe(1);
   });
 
-  expect(orders).toHaveLength(1);
-  expect(orders[0].idempotencyKey).toBe(key);
+  it('keeps stock non-negative under 20 concurrent requests', async () => {
+    const user = await createTestUser();
+    const product = await createTestProduct(10);
 
-  const after = await prisma.product.findUniqueOrThrow({
-    where: { id: product.id },
-    select: { stock: true, version: true },
+    const results = await Promise.allSettled(
+      Array.from({ length: 20 }, (_, i) =>
+        ordersService.create(
+          user.id,
+          orderDto(product.id),
+          `stress-key-${Date.now()}-${i}`,
+        ),
+      ),
+    );
+
+    const after = await prisma.product.findUniqueOrThrow({
+      where: { id: product.id },
+      select: { stock: true, version: true },
+    });
+
+    const orderCount = await prisma.order.count({
+      where: { userId: user.id },
+    });
+
+    const successes = results.filter((result) => result.status === 'fulfilled');
+
+    expect(after.stock).toBeGreaterThanOrEqual(0);
+    expect(after.stock).toBe(10 - successes.length);
+    expect(after.version).toBe(successes.length);
+    expect(orderCount).toBe(successes.length);
+    expect(successes.length).toBeLessThanOrEqual(10);
   });
-
-  // Chỉ trừ một sản phẩm, version chỉ tăng một lần.
-  expect(after.stock).toBe(4);
-  expect(after.version).toBe(1);
-});
 });

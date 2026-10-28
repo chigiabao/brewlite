@@ -1,6 +1,5 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import type { Prisma, Product } from '../generated/prisma/client.js';
-import { OrderStatus } from '../generated/prisma/enums.js';
 import { StockService } from './stock.service.js';
 import type { OrderItemDto } from './orders.dto.js';
 
