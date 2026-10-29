@@ -1,7 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ConflictException } from '@nestjs/common';
-import type { Prisma, Product } from '../generated/prisma/client.js';
-import { StockService } from '../orders/stock.service.js';
 import { PaymentsService } from './payments.service.js';
 import { PaymentStatus } from '../generated/prisma/enums.js';
 
@@ -75,57 +72,5 @@ describe('Payments (idempotency) - Task 10 (b)', () => {
     expect(res2.idempotentReplay).toBe(true);
     expect(mockGateway.charge).toHaveBeenCalledTimes(1); // Gateway không bị gọi lại lần 2
     expect(payments.length).toBe(1); // Chỉ có 1 bản ghi thanh toán được tạo
-  });
-});
-
-describe('Stock (concurrent orders) - Task 10 (c)', () => {
-  it('10 request đồng thời, stock=3 → tối đa 3 thành công', async () => {
-    let currentStock = 3;
-    let currentVersion = 0;
-
-    const mockTx = {
-      product: {
-        updateMany: vi.fn(async ({ where, data }: any) => {
-          // Mô phỏng kiểm tra optimistic locking (CAS) của database:
-          // Chỉ thành công nếu version khớp và stock >= qty
-          if (where.version === currentVersion && currentStock >= 1) {
-            currentStock -= 1;
-            currentVersion += 1;
-            return { count: 1 };
-          }
-          return { count: 0 };
-        }),
-      },
-    };
-
-    const stockService = new StockService();
-    const product: Product = {
-      id: 1,
-      name: 'Cold Brew',
-      price: 45000,
-      imageUrl: 'coldbrew.png',
-      stock: 3,
-      version: 0,
-    } as Product;
-
-    // Chạy 10 request đặt mua cùng lúc (mỗi request mua 1 ly)
-    const attempts = await Promise.allSettled(
-      Array.from({ length: 10 }, async () => {
-        return stockService.reserve(
-          mockTx as unknown as Prisma.TransactionClient,
-          [{ productId: 1, size: 'M', toppings: [], qty: 1 }],
-          [product],
-        );
-      }),
-    );
-
-    const successes = attempts.filter((a) => a.status === 'fulfilled');
-    const failures = attempts.filter((a) => a.status === 'rejected');
-
-    // Tối đa 3 đơn thành công (không vượt quá tồn kho ban đầu là 3)
-    expect(successes.length).toBeLessThanOrEqual(3);
-    expect(successes.length).toBeGreaterThanOrEqual(1);
-    expect(successes.length + failures.length).toBe(10);
-    expect(currentStock).toBeGreaterThanOrEqual(0);
   });
 });

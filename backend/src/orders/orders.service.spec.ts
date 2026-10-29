@@ -389,4 +389,36 @@ describe('OrdersService', () => {
 
     expect(stock.release).toHaveBeenCalledWith(tx, [{ productId: 1, qty: 2 }]);
   });
+
+  describe('findOne', () => {
+    it('trả về chi tiết đơn hàng khi thuộc đúng user', async () => {
+      const mockOrder = {
+        id: 10,
+        userId: 7,
+        status: 'PAID',
+        total: 50000,
+        items: [],
+        payments: [],
+      };
+
+      prisma.order.findFirst.mockResolvedValue(mockOrder);
+
+      const result = await service.findOne(7, 10);
+      expect(result).toEqual(mockOrder);
+      expect(prisma.order.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 10, userId: 7 },
+        }),
+      );
+    });
+
+    it('báo lỗi NotFoundException khi không tìm thấy đơn hàng hoặc khác user', async () => {
+      prisma.order.findFirst.mockResolvedValue(null);
+
+      await expect(service.findOne(7, 999)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
 });
+

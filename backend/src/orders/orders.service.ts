@@ -260,6 +260,41 @@ export class OrdersService {
       },
     });
   }
+
+  async findOne(userId: number, orderId: number) {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, userId },
+      include: {
+        items: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                imageUrl: true,
+              },
+            },
+          },
+        },
+        payments: {
+          select: {
+            id: true,
+            method: true,
+            status: true,
+            transactionId: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Không tìm thấy đơn hàng của bạn');
+    }
+
+    return order;
+  }
+
   async cancel(userId: number, orderId: number) {
     return this.prisma.$transaction(async (tx) => {
       // Kiểm tra đơn có thuộc user không

@@ -153,6 +153,8 @@ export default function CheckoutPage() {
         setError('Thanh toán lỗi. Giỏ hàng vẫn được giữ nguyên. Vui lòng thử lại.');
       }
     } catch (e: unknown) {
+      // Kết quả lỗi đã rõ: lần thanh toán tiếp theo cần key mới, nhưng giữ nguyên orderId (Task 10).
+      idemKey.current = null;
       setError((e as Error).message ?? 'Đã xảy ra lỗi kết nối. Kiểm tra lịch sử đơn trước khi tạo lần khác.');
     } finally {
       setLoading(false);

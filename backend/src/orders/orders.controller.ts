@@ -28,6 +28,8 @@ import {
   Controller,
   Get,
   Headers,
+  Param,
+  ParseIntPipe,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -54,5 +56,14 @@ export class OrdersController {
   mine(@CurrentUser() user: AuthUser) {
     const userId = user?.userId ?? 1;
     return this.orders.findMine(userId);
+  }
+
+  @Get(':id')
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const userId = user?.userId ?? 1;
+    return this.orders.findOne(userId, id);
   }
 }
