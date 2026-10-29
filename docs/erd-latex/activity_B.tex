@@ -6,82 +6,110 @@
 \begin{document}
 \begin{tikzpicture}[
     >=stealth, thick,
-    startstop/.style={rectangle, rounded corners, draw=black, fill=red!20, minimum width=2.5cm, minimum height=0.8cm, text centered, font=\bfseries},
-    process/.style={rectangle, draw=black, fill=blue!10, minimum width=4cm, minimum height=0.8cm, text centered, text width=4cm},
-    decision/.style={diamond, aspect=1.6, draw=black, fill=yellow!20, minimum width=3.5cm, minimum height=0.8cm, text centered, text width=3cm}
+    startstop/.style={rectangle, rounded corners=12pt, draw=black!80, fill=red!15, minimum width=2.8cm, minimum height=0.9cm, text centered, font=\bfseries\small},
+    process/.style={rectangle, rounded corners=4pt, draw=black!80, fill=blue!10, minimum width=4.2cm, minimum height=0.9cm, text centered, text width=4cm, font=\small},
+    decision/.style={diamond, aspect=1.8, draw=black!80, fill=yellow!25, minimum width=3.8cm, minimum height=0.9cm, text centered, text width=3.2cm, font=\small\bfseries},
+    ready/.style={rectangle, rounded corners=6pt, draw=emerald!80!black, fill=emerald!15, minimum width=4.8cm, minimum height=0.9cm, text centered, text width=4.6cm, font=\small\bfseries},
+    flow/.style={->, draw=stone!80!black, thick}
 ]
 
-% --- CÁC NODE KHỐI ---
-\node[startstop] (start) at (-4, 0) {Bắt đầu};
+% ==========================================
+% 1. CÁC NODE KHỐI (NODES)
+% ==========================================
 
-\node[process] (menu) at (-4, -1.5) {Truy cập trang Menu};
-\node[process] (sys_fetch) at (4, -1.5) {Tải \& Hiển thị DS Sản phẩm};
+% --- Luồng mở đầu: Menu ---
+\node[startstop] (start) at (-4.5, 0) {Bắt đầu};
+\node[process] (menu) at (-4.5, -1.8) {Truy cập trang Menu};
+\node[process] (sys_fetch) at (4.5, -1.8) {Gọi \texttt{GET /products} \&\\Hiển thị danh sách món};
 
-\node[process] (click_prod) at (-4, -3) {Click chọn 1 sản phẩm};
-\node[process] (sys_detail) at (4, -3) {Tải chi tiết \& Tồn kho (Stock)};
+% --- Xem chi tiết & Tồn kho ---
+\node[process] (click_prod) at (-4.5, -3.8) {Click chọn 1 sản phẩm};
+\node[process] (sys_detail) at (4.5, -3.8) {Gọi \texttt{GET /products/:id} \&\\Tải chi tiết + Tồn kho (\texttt{stock})};
 
-\node[process] (sys_state) at (4, -4.5) {Khởi tạo State (Size S), Tính Giá ban đầu};
+\node[process] (sys_state) at (4.5, -5.6) {Khởi tạo State: Size S, 0 Topping,\\Tính giá ban đầu};
 
-\node[decision] (check_stock) at (4, -6.5) {Tồn kho (Stock) > 0?};
+% --- Rẽ nhánh kiểm tra tồn kho ---
+\node[decision] (check_stock) at (4.5, -7.8) {Tồn kho (\texttt{stock}) > 0?};
 
-\node[process] (ui_disable) at (0, -8.5) {Render UI: Nút Add bị KHÓA}; 
-\node[process] (ui_enable) at (8, -8.5) {Render UI: Nút Add MỞ};       
+\node[process, fill=red!10] (ui_disable) at (1.8, -9.8) {Khóa nút "Thêm vào giỏ"\\Hiển thị tag "Hết hàng"}; 
+\node[process, fill=emerald!10] (ui_enable) at (7.2, -9.8) {Mở nút "Thêm vào giỏ"\\Cho phép đặt món};       
 
-\node[process, fill=green!10, minimum width=5cm, text width=5cm] (ui_ready) at (4, -10.5) {Giao diện Chi tiết Sẵn sàng};
+\node[ready] (ui_ready) at (4.5, -11.8) {Giao diện Chi tiết món sẵn sàng};
 
-\node[decision] (cust_action) at (-4, -12.5) {Hành động tiếp theo?};
+% --- Khách hàng tương tác tại trang Chi tiết ---
+\node[decision] (cust_action) at (-4.5, -13.8) {Khách hàng chọn\\thao tác gì?};
 
-\node[process] (change_opt) at (-4, -15) {Đổi Size hoặc Chọn Topping};
-\node[process] (sys_recalc) at (4, -15) {Cập nhật State, Tính lại Giá mới};
+% Nhánh 1: Đổi tùy chọn Size / Topping
+\node[process] (change_opt) at (-4.5, -16.2) {Đổi Size (M/L) hoặc\\Chọn/Bỏ Topping};
+\node[process] (sys_recalc) at (4.5, -16.2) {Cập nhật State, Tính lại\\Giá mới theo công thức};
 
-\node[process] (click_add) at (-4, -17) {Bấm "Thêm vào giỏ"};
-\node[process] (sys_payload) at (4, -17) {Tạo Payload: id, size, price, qty...};
+% Nhánh 2: Thêm vào giỏ hàng
+\node[process] (click_add) at (-4.5, -18.8) {Bấm "Thêm vào giỏ hàng"\\(Khi món còn hàng)};
+\node[process] (sys_payload) at (4.5, -18.8) {Tạo CartItem (id, name, size,\\toppings, unitPrice, qty=1)};
 
-\node[process] (sys_dispatch) at (4, -18.5) {Gửi Payload qua Store (Cart Module)};
-\node[process] (sys_toast) at (4, -20) {Hiển thị thông báo Thành công};
+\node[process] (sys_dispatch) at (4.5, -20.6) {Lưu vào Store giỏ hàng\\(Zustand State \& LocalStorage)};
+\node[process] (sys_toast) at (4.5, -22.4) {Hiển thị Toast thành công \&\\Cập nhật Badge giỏ hàng};
 
-\node[startstop] (end) at (4, -21.5) {Kết thúc};
+\node[startstop] (end) at (4.5, -24.2) {Kết thúc};
 
-% --- VẼ ĐƯỜNG LIÊN KẾT (ARROWS) ---
+% Nhánh 3: Quay lại Menu
+\node[process, fill=gray!15, text width=2.6cm, minimum width=2.8cm] (back_menu) at (-4.5, -11.8) {Bấm "Quay lại Menu"};
+
+
+% ==========================================
+% 2. ĐƯỜNG NỐI LUỒNG TIẾN TRÌNH (ARROWS)
+% ==========================================
+
+% Bắt đầu -> Menu -> Fetch
 \draw[->] (start) -- (menu);
 \draw[->] (menu) -- (sys_fetch);
 
-% ĐƯỜNG ĐỎ CỦA USER: Từ trên (sys_fetch) vòng qua trái xuống dưới (click_prod)
-\draw[->, rounded corners] (sys_fetch.north) -- ++(0, 0.7) -| (-1.5, -3.8) -| (click_prod.south);
+% Fetch xong -> Khách click chọn món
+\draw[->] (sys_fetch) -- ++(0,-1) -| (click_prod.north);
 
+% Chọn món -> Tải chi tiết -> Init State -> Check stock
 \draw[->] (click_prod) -- (sys_detail);
 \draw[->] (sys_detail) -- (sys_state);
 \draw[->] (sys_state) -- (check_stock);
 
-\draw[->] (check_stock) -| node[above, pos=0.25] {Sai (Hết)} (ui_disable);
-\draw[->] (check_stock) -| node[above, pos=0.25] {Đúng (Còn)} (ui_enable);
+% Rẽ nhánh Stock
+\draw[->] (check_stock) -| node[above, font=\footnotesize\bfseries, pos=0.3] {[Sai: Hết]} (ui_disable);
+\draw[->] (check_stock) -| node[above, font=\footnotesize\bfseries, pos=0.3] {[Đúng: Còn]} (ui_enable);
 
 \draw[->] (ui_disable) |- (ui_ready);
 \draw[->] (ui_enable) |- (ui_ready);
 
-\draw[->] (ui_ready) -| (cust_action);
+% UI sẵn sàng -> Khách hàng quyết định
+\draw[->] (ui_ready) -- (cust_action);
 
-\draw[->] (cust_action) -- node[left] {Đổi tùy chọn} (change_opt);
+% Nhánh Đổi Size / Topping -> Tính lại giá -> Quay lại UI
+\draw[->] (cust_action) -- node[left, font=\footnotesize\bfseries] {Đổi tùy chọn} (change_opt);
 \draw[->] (change_opt) -- (sys_recalc);
+\draw[->] (sys_recalc.east) -- ++(1.8, 0) |- (ui_ready.east);
 
-% Vòng lặp cập nhật State và UI 
-\draw[->] (sys_recalc.east) -- +(2.5,0) |- node[right, pos=0.25] {Cập nhật lại giao diện} (sys_state.east);
+% Nhánh Quay lại Menu
+\draw[->] (cust_action) -- node[above, font=\footnotesize\bfseries] {Đổi ý / Hết hàng} (back_menu);
+\draw[->] (back_menu.north) -- ++(0, 7) -| (sys_fetch.south);
 
-% Luồng "Bấm Thêm" đi vòng ra ngoài để không đè lên node "Đổi tùy chọn"
-\draw[->] (cust_action.west) -- ++(-1.5,0) |- node[left, pos=0.25, text width=2cm, align=right] {Bấm Thêm\\(Nếu Mở)} (click_add.west);
-
+% Nhánh Bấm thêm vào giỏ
+\draw[->] (cust_action.west) -- ++(-1.2, 0) |- node[left, font=\footnotesize\bfseries, text width=2cm, align=right] {Bấm Thêm\\(Còn hàng)} (click_add.west);
 \draw[->] (click_add) -- (sys_payload);
 \draw[->] (sys_payload) -- (sys_dispatch);
 \draw[->] (sys_dispatch) -- (sys_toast);
 \draw[->] (sys_toast) -- (end);
 
-% --- VẼ MÀU 2 LÀN BƠI (SWIMLANES) ---
+
+% ==========================================
+% 3. LÀN BƠI PHÂN VAI (SWIMLANES)
+% ==========================================
 \begin{scope}[on background layer]
-    \filldraw[draw=black, fill=gray!5, dashed] (-9, 3) rectangle (-1, -22.5);
-    \node[font=\Large\bfseries] at (-5, 2) {KHÁCH HÀNG};
+    % Làn Khách hàng
+    \filldraw[draw=stone!60, fill=stone!5, dashed, rounded corners=6pt] (-8.8, 1.2) rectangle (-0.2, -25.2);
+    \node[font=\large\bfseries, text=stone!80!black] at (-4.5, 0.7) {👤 KHÁCH HÀNG (CUSTOMER)};
     
-    \filldraw[draw=black, fill=blue!5, dashed] (-1, 3) rectangle (12, -22.5);
-    \node[font=\Large\bfseries] at (5.5, 2) {HỆ THỐNG (MODULE CATALOG)};
+    % Làn Hệ thống Catalog
+    \filldraw[draw=blue!60!black, fill=blue!3, dashed, rounded corners=6pt] (0.2, 1.2) rectangle (9.8, -25.2);
+    \node[font=\large\bfseries, text=blue!80!black] at (5, 0.7) {💻 HỆ THỐNG (MODULE CATALOG \& STOCK)};
 \end{scope}
 
 \end{tikzpicture}
