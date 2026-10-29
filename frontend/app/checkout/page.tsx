@@ -138,13 +138,14 @@ export default function CheckoutPage() {
       }
 
       // F – Task 8: gọi POST /payments với Idempotency-Key
-      const res = await api<{ orderId: number; status: string }>('/payments', {
+      const res = await api<{ orderId: number; status: string; orderStatus?: string }>('/payments', {
         method: 'POST',
         headers: { 'Idempotency-Key': idemKey.current },
         body: JSON.stringify({ orderId, method }),
       });
 
-      if (res.status === 'PAID') {
+      const isPaid = res.orderStatus === 'PAID' || res.status === 'SUCCEEDED' || res.status === 'PAID';
+      if (isPaid) {
         clear();
         router.push(`/orders/${res.orderId}/confirmed`);
       } else {
@@ -153,9 +154,17 @@ export default function CheckoutPage() {
         setError('Thanh toán lỗi. Giỏ hàng vẫn được giữ nguyên. Vui lòng thử lại.');
       }
     } catch (e: unknown) {
+      const msg = (e as Error).message ?? '';
+      if (msg.includes('đã được thanh toán') || msg.includes('ORDER_ALREADY_PAID')) {
+        clear();
+        if (pendingOrder.current?.id) {
+          router.push(`/orders/${pendingOrder.current.id}/confirmed`);
+          return;
+        }
+      }
       // Kết quả lỗi đã rõ: lần thanh toán tiếp theo cần key mới, nhưng giữ nguyên orderId (Task 10).
       idemKey.current = null;
-      setError((e as Error).message ?? 'Đã xảy ra lỗi kết nối. Kiểm tra lịch sử đơn trước khi tạo lần khác.');
+      setError(msg || 'Đã xảy ra lỗi kết nối. Kiểm tra lịch sử đơn trước khi tạo lần khác.');
     } finally {
       setLoading(false);
     }
