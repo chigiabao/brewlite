@@ -28,28 +28,42 @@ import {
   Controller,
   Get,
   Headers,
+  Param,
+  ParseIntPipe,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 import { CreateOrderDto } from './orders.dto.js';
 import { OrdersService } from './orders.service.js';
-
-// TODO(D): thay bằng JWT và @CurrentUser() khi tích hợp Auth.
-const TEMP_USER_ID = 1;
+import { JwtAuthGuard, CurrentUser, type AuthUser } from '../auth/public.js';
 
 @Controller('orders')
+@UseGuards(JwtAuthGuard)
 export class OrdersController {
   constructor(private readonly orders: OrdersService) {}
 
   @Post()
   create(
+    @CurrentUser() user: AuthUser,
     @Body() dto: CreateOrderDto,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.orders.create(TEMP_USER_ID, dto, idempotencyKey);
+    const userId = user?.userId ?? 1;
+    return this.orders.create(userId, dto, idempotencyKey);
   }
 
   @Get('me')
-  mine() {
-    return this.orders.findMine(TEMP_USER_ID);
+  mine(@CurrentUser() user: AuthUser) {
+    const userId = user?.userId ?? 1;
+    return this.orders.findMine(userId);
+  }
+
+  @Get(':id')
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const userId = user?.userId ?? 1;
+    return this.orders.findOne(userId, id);
   }
 }

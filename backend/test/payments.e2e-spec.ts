@@ -22,7 +22,11 @@ describe('POST /payments (e2e, fixture order)', () => {
 
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(
-      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
     );
     await app.init();
     prisma = app.get(PrismaService);
@@ -34,10 +38,16 @@ describe('POST /payments (e2e, fixture order)', () => {
 
   beforeEach(async () => {
     nextReference = 'MOCK-OK1234';
-    const orders = await prisma.order.findMany({ where: { userId: 1 }, select: { id: true } });
+    const orders = await prisma.order.findMany({
+      where: { userId: 1 },
+      select: { id: true },
+    });
     const orderIds = orders.map((o) => o.id);
     if (orderIds.length > 0) {
       await prisma.payment.deleteMany({ where: { orderId: { in: orderIds } } });
+      await prisma.loyaltyEntry.deleteMany({
+        where: { orderId: { in: orderIds } },
+      });
       await prisma.order.deleteMany({ where: { id: { in: orderIds } } });
     } else {
       await prisma.order.deleteMany({ where: { userId: 1 } });
@@ -45,7 +55,11 @@ describe('POST /payments (e2e, fixture order)', () => {
     await prisma.user.upsert({
       where: { id: 1 },
       update: {},
-      create: { id: 1, email: 'fixture-e2e@brewlite.test', passwordHash: 'fixture' },
+      create: {
+        id: 1,
+        email: 'fixture-e2e@brewlite.test',
+        passwordHash: 'fixture',
+      },
     });
   });
 
@@ -62,7 +76,9 @@ describe('POST /payments (e2e, fixture order)', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.code).toBe('IDEMPOTENCY_KEY_REQUIRED');
-    expect(await prisma.payment.count({ where: { order: { userId: 1 } } })).toBe(0);
+    expect(
+      await prisma.payment.count({ where: { order: { userId: 1 } } }),
+    ).toBe(0);
   });
 
   it('không nhận amount từ client -> 400, không tạo payment', async () => {
@@ -74,7 +90,9 @@ describe('POST /payments (e2e, fixture order)', () => {
       .send({ orderId: order.id, method: 'WALLET', amount: 1 });
 
     expect(res.status).toBe(400);
-    expect(await prisma.payment.count({ where: { order: { userId: 1 } } })).toBe(0);
+    expect(
+      await prisma.payment.count({ where: { order: { userId: 1 } } }),
+    ).toBe(0);
   });
 
   it('WALLET success -> 200, order PAID, amount lấy từ Order', async () => {
@@ -98,7 +116,9 @@ describe('POST /payments (e2e, fixture order)', () => {
 
     const updated = await prisma.order.findUnique({ where: { id: order.id } });
     expect(updated?.status).toBe('PAID');
-    expect(await prisma.payment.count({ where: { idempotencyKey: 'e2e-wallet-1' } })).toBe(1);
+    expect(
+      await prisma.payment.count({ where: { idempotencyKey: 'e2e-wallet-1' } }),
+    ).toBe(1);
   });
 
   it('CARD success -> 200, method CARD', async () => {
@@ -132,7 +152,9 @@ describe('POST /payments (e2e, fixture order)', () => {
     expect(second.body.paymentId).toBe(first.body.paymentId);
     expect(second.body.transactionId).toBe(first.body.transactionId);
     expect(second.body.idempotentReplay).toBe(true);
-    expect(await prisma.payment.count({ where: { idempotencyKey: key } })).toBe(1);
+    expect(await prisma.payment.count({ where: { idempotencyKey: key } })).toBe(
+      1,
+    );
   });
 
   it('cùng key khác payload -> 409 IDEMPOTENCY_KEY_REUSED', async () => {
@@ -150,6 +172,36 @@ describe('POST /payments (e2e, fixture order)', () => {
 
     expect(res.status).toBe(409);
     expect(res.body.code).toBe('IDEMPOTENCY_KEY_REUSED');
+  });
+
+  it('đơn đã PAID thanh toán lại -> 409 ORDER_ALREADY_PAID', async () => {
+    const order = await seedOrder();
+
+    // Lượt thanh toán đầu tiên thành công.
+    const first = await request(app.getHttpServer())
+      .post('/payments')
+      .set('Idempotency-Key', 'e2e-paid-state-1')
+      .send({ orderId: order.id, method: 'WALLET' });
+
+    expect(first.status).toBe(200);
+    expect(first.body.orderStatus).toBe('PAID');
+
+    // Key mới để không rơi vào nhánh idempotency replay.
+    const second = await request(app.getHttpServer())
+      .post('/payments')
+      .set('Idempotency-Key', 'e2e-paid-state-2')
+      .send({ orderId: order.id, method: 'WALLET' });
+
+    expect(second.status).toBe(409);
+    expect(second.body).toMatchObject({
+      statusCode: 409,
+      code: 'ORDER_ALREADY_PAID',
+    });
+
+    // Không tạo thêm payment.
+    expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(
+      1,
+    );
   });
 
   it('gateway decline -> 402 PAYMENT_DECLINED, order PAYMENT_FAILED', async () => {
@@ -189,6 +241,8 @@ describe('POST /payments (e2e, fixture order)', () => {
 
     const updated = await prisma.order.findUnique({ where: { id: order.id } });
     expect(updated?.status).toBe('PAID');
-    expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(2);
+    expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(
+      2,
+    );
   });
 });

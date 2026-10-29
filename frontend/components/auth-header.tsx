@@ -56,7 +56,7 @@ export function AuthHeader() {
       <Link
         href="/login"
         id="header-login-link"
-        className="hover:underline flex items-center gap-1.5 text-sm font-medium"
+        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-amber-100 hover:text-white bg-amber-950/50 hover:bg-amber-900/60 rounded-full border border-amber-700/40 transition shadow-sm"
       >
         <span>👤 Đăng nhập</span>
       </Link>

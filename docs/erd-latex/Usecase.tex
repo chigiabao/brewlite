@@ -60,6 +60,8 @@
     % 3. NGOÀI MVP
     % ==========================================
     \node[uc] (UC19) at (6.2, -14.2) {Nhân viên cập nhật\\trạng thái chế biến};
+    \node[uc] (UC20) at (6.2, -15.8) {Thủ kho cập nhật\\tồn kho (nhập kho)};
+    \node[uc] (UC21) at (6.2, -17.4) {Nhận cảnh báo\\tồn kho thấp};
 
     % ==========================================
     % 4. ĐÓNG KHUNG PACKAGE & SYSTEM BOUNDARY
@@ -67,7 +69,7 @@
     \begin{scope}[on background layer]
         \node[pkg, fit=(UC01) (UC08), label={[anchor=south west, font=\bfseries\small]north west:MVP - Catalog / Cart / Identity}] (pkg1) {};
         \node[pkg, fit=(UC11) (UC17) (UC18), label={[anchor=south west, font=\bfseries\small]north west:MVP - Ordering / Payments / Rewards}] (pkg2) {};
-        \node[pkg, fit=(UC19), label={[anchor=south west, font=\bfseries\small]north west:NGOÀI MVP}] (pkg3) {};
+        \node[pkg, fit=(UC19) (UC20) (UC21), label={[anchor=south west, font=\bfseries\small]north west:NGOÀI MVP}] (pkg3) {};
         
         \node[sys, fit=(pkg1) (pkg2) (pkg3), label={[anchor=south, font=\bfseries\large]north:HỆ THỐNG BREWLITE}] (system) {};
     \end{scope}
@@ -79,6 +81,7 @@
     \drawactor{Customer}{-5.5, -9.5}{Khách đã đăng nhập}
     \drawactor{Gateway}{18.5, -10.1}{Cổng thanh toán\\giả lập}
     \drawactor{Staff}{18.5, -14.2}{Nhân viên quầy}
+    \drawactor{InventoryStaff}{18.5, -16.6}{Thủ kho /\\Quản lý kho}
 
     % Quan hệ kế thừa: Khách đã đăng nhập --|> Khách vãng lai
     \draw[inherit] (Customer.north) -- (Guest_lbl.south);
@@ -117,9 +120,11 @@
         \draw[assoc] (Customer.east) -- (\u.west);
     }
 
-    % Tương tác hệ thống ngoài & Nhân viên
+    % Tương tác hệ thống ngoài, Nhân viên & Thủ kho
     \draw[assoc] (UC10.east) -- (Gateway.west);
     \draw[assoc] (Staff.west) -- (UC19.east);
+    \draw[assoc] (InventoryStaff.west) -- (UC20.east);
+    \draw[assoc] (InventoryStaff.west) -- (UC21.east);
 
     % ==========================================
     % 8. QUAN HỆ INCLUDE & EXTEND

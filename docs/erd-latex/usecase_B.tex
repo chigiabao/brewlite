@@ -1,0 +1,73 @@
+\documentclass[tikz,border=15pt]{standalone}
+\usepackage[utf8]{inputenc}
+\usepackage[T5]{fontenc}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, backgrounds}
+
+\begin{document}
+\begin{tikzpicture}[
+    >=stealth, thick,
+    usecase/.style={ellipse, draw=black, fill=white, minimum width=3.5cm, minimum height=1.2cm, align=center, font=\small},
+    actor_node/.style={align=center, font=\small}
+]
+
+% --- USE CASES ---
+% Catalog Module
+\node[usecase] (uc_detail) at (2, 2.5) {Xem chi tiết sản phẩm};
+\node[usecase] (uc_menu) at (2, -3.5) {Xem danh sách\\sản phẩm (Menu)};
+
+\node[usecase] (uc_size) at (8, 5.5) {Chọn Size (S/M/L)};
+\node[usecase] (uc_topping) at (8, 2) {Chọn Topping};
+\node[usecase] (uc_add) at (8, -2) {Thêm vào giỏ hàng};
+\node[usecase] (uc_disable) at (8, -6) {Báo hết hàng\\(Disable Button)};
+
+\node[usecase] (uc_price) at (13.5, 4.5) {Xem giá tạm tính\\(Preview Price)};
+
+% Cart Module
+\node[usecase] (uc_store) at (20, 4.5) {Lưu món vào State\\(Zustand)};
+
+
+% --- SYSTEM BOUNDARIES ---
+% Catalog Module Boundary
+\draw[thick] (-0.5, 7.5) rectangle (15.5, -7.5);
+\draw[thick] (-0.5, 7.5) rectangle (4.5, 8);
+\node[anchor=center, font=\scriptsize\bfseries] at (2, 7.75) {BrewLite - Module Catalog (B)};
+
+% Cart Module Boundary
+\draw[thick] (17.5, 3) rectangle (22.5, 6);
+\draw[thick] (17.5, 6) rectangle (21.5, 6.5);
+\node[anchor=center, font=\scriptsize\bfseries] at (19.5, 6.25) {Module Cart (C) - Boundary};
+
+
+
+
+% --- ACTOR ---
+\coordinate (head) at (-3, 0);
+\draw[thick] (head) circle (3mm);
+\draw[thick] (head) ++(0,-0.3) -- ++(0,-1.2) coordinate (body);
+\draw[thick] (head) ++(0,-0.5) -- ++(-0.6,-0.4);
+\draw[thick] (head) ++(0,-0.5) -- ++(0.6,-0.4);
+\draw[thick] (body) -- ++(-0.5,-0.8);
+\draw[thick] (body) -- ++(0.5,-0.8);
+\node[actor_node] (actor) at (-3, -2.5) {Khách hàng\\(Customer)};
+
+% --- RELATIONSHIPS ---
+% Actor to Use Cases
+\draw[solid, thick] (-2.5, -0.3) -- (uc_detail.west);
+\draw[solid, thick] (-2.5, -0.8) -- (uc_menu.west);
+
+% Includes / Extends
+\draw[dashed, ->] (uc_detail) -- node[fill=white, font=\scriptsize, align=center] {$\ll$extend$\gg$\\ (Click xem chi tiết)} (uc_menu);
+
+\draw[dashed, ->] (uc_size) -- node[fill=white, font=\scriptsize, sloped, anchor=south] {$\ll$extend$\gg$} (uc_detail);
+\draw[dashed, ->] (uc_topping) -- node[fill=white, font=\scriptsize, sloped, anchor=south] {$\ll$extend$\gg$} (uc_detail);
+
+\draw[dashed, ->] (uc_add) -- node[fill=white, font=\scriptsize, align=center, sloped, pos=0.4] {$\ll$extend$\gg$\\[1mm] {[Condition: Stock > 0]}} (uc_detail);
+\draw[dashed, ->] (uc_disable) -- node[fill=white, font=\scriptsize, align=center, sloped, pos=0.4] {$\ll$extend$\gg$\\[1mm] {[Condition: Stock $\le$ 0]}} (uc_detail);
+
+\draw[dashed, ->] (uc_size) -- node[fill=white, font=\scriptsize] {$\ll$include$\gg$} (uc_price);
+\draw[dashed, ->] (uc_topping) -- node[fill=white, font=\scriptsize, sloped, anchor=north] {$\ll$include$\gg$} (uc_price);
+
+\draw[dashed, ->] (uc_add) -- node[fill=white, font=\scriptsize, align=center, sloped, pos=0.6] {$\ll$include$\gg$\\ (Truyền ProductId, Size,\\ Topping, Qty, UnitPrice)} (uc_store);
+
+\end{tikzpicture}
+\end{document}

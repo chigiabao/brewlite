@@ -1,10 +1,5 @@
-
-import {
-  ConflictException,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import type { Prisma, Product } from '../generated/prisma/client.js';
-import { OrderStatus } from '../generated/prisma/enums.js';
 import { StockService } from './stock.service.js';
 import type { OrderItemDto } from './orders.dto.js';
 
@@ -18,9 +13,7 @@ describe('StockService', () => {
     };
   };
 
-  const makeProduct = (
-    overrides: Partial<Product> = {},
-  ): Product =>
+  const makeProduct = (overrides: Partial<Product> = {}): Product =>
     ({
       id: 1,
       name: 'Trà sữa',
@@ -31,9 +24,7 @@ describe('StockService', () => {
       ...overrides,
     }) as Product;
 
-  const makeItem = (
-    overrides: Partial<OrderItemDto> = {},
-  ): OrderItemDto => ({
+  const makeItem = (overrides: Partial<OrderItemDto> = {}): OrderItemDto => ({
     productId: 1,
     size: 'M',
     toppings: [],
@@ -52,16 +43,11 @@ describe('StockService', () => {
   });
 
   it('gom số lượng của cùng sản phẩm trước khi trừ kho', async () => {
-    const items = [
-      makeItem({ qty: 2 }),
-      makeItem({ qty: 3 }),
-    ];
+    const items = [makeItem({ qty: 2 }), makeItem({ qty: 3 })];
 
-    await service.reserve(
-      tx as unknown as Prisma.TransactionClient,
-      items,
-      [makeProduct()],
-    );
+    await service.reserve(tx as unknown as Prisma.TransactionClient, items, [
+      makeProduct(),
+    ]);
 
     expect(tx.product.updateMany).toHaveBeenCalledTimes(1);
     expect(tx.product.updateMany).toHaveBeenCalledWith({
@@ -116,18 +102,80 @@ describe('StockService', () => {
   it('cập nhật sản phẩm theo thứ tự ID tăng dần', async () => {
     await service.reserve(
       tx as unknown as Prisma.TransactionClient,
-      [
-        makeItem({ productId: 2, qty: 1 }),
-        makeItem({ productId: 1, qty: 1 }),
-      ],
-      [
-        makeProduct({ id: 2, stock: 10 }),
-        makeProduct({ id: 1, stock: 10 }),
-      ],
+      [makeItem({ productId: 2, qty: 1 }), makeItem({ productId: 1, qty: 1 })],
+      [makeProduct({ id: 2, stock: 10 }), makeProduct({ id: 1, stock: 10 })],
     );
 
-    expect(tx.product.updateMany.mock.calls.map(
-      ([args]) => args.where.id,
-    )).toEqual([1, 2]);
+    expect(
+      tx.product.updateMany.mock.calls.map(([args]) => args.where.id),
+    ).toEqual([1, 2]);
+  });
+  it('hoàn kho đúng số lượng sản phẩm', async () => {
+    await service.release(tx as unknown as Prisma.TransactionClient, [
+      { productId: 1, qty: 2 },
+      { productId: 1, qty: 3 },
+    ]);
+
+    expect(tx.product.updateMany).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: {
+        stock: { increment: 5 },
+        version: { increment: 1 },
+      },
+    });
+  });
+
+  it('hoàn kho theo thứ tự ID tăng dần', async () => {
+    await service.release(tx as unknown as Prisma.TransactionClient, [
+      { productId: 3, qty: 1 },
+      { productId: 1, qty: 2 },
+    ]);
+
+    expect(
+      tx.product.updateMany.mock.calls.map(([arg]) => arg.where.id),
+    ).toEqual([1, 3]);
+  });
+
+  describe('Stock (concurrent orders) - Task 10 (c)', () => {
+    it('10 request đồng thời, stock=3 → tối đa 3 thành công', async () => {
+      let currentStock = 3;
+      let currentVersion = 0;
+
+      const mockTx = {
+        product: {
+          updateMany: vi.fn(async ({ where }: any) => {
+            if (where.version === currentVersion && currentStock >= 1) {
+              currentStock -= 1;
+              currentVersion += 1;
+              return { count: 1 };
+            }
+            return { count: 0 };
+          }),
+        },
+      };
+
+      const product = makeProduct({ stock: 3, version: 0 });
+
+      // Chạy 10 request đặt mua cùng lúc (mỗi request mua 1 ly)
+      const attempts = await Promise.allSettled(
+        Array.from({ length: 10 }, async () => {
+          return service.reserve(
+            mockTx as unknown as Prisma.TransactionClient,
+            [{ productId: 1, size: 'M', toppings: [], qty: 1 }],
+            [product],
+          );
+        }),
+      );
+
+      const successes = attempts.filter((a) => a.status === 'fulfilled');
+      const failures = attempts.filter((a) => a.status === 'rejected');
+
+      // Tối đa 3 đơn thành công (không vượt quá tồn kho ban đầu là 3)
+      expect(successes.length).toBeLessThanOrEqual(3);
+      expect(successes.length).toBeGreaterThanOrEqual(1);
+      expect(successes.length + failures.length).toBe(10);
+      expect(currentStock).toBeGreaterThanOrEqual(0);
+    });
   });
 });
+

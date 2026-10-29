@@ -19,21 +19,28 @@ import { createHash } from 'node:crypto';
 import {
   ConflictException,
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
-import { Prisma } from '../generated/prisma/client.js';
 import { unitPrice } from '../common/pricing.js';
 import type { Size } from '../common/pricing.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateOrderDto } from './orders.dto.js';
 import { StockService } from './stock.service.js';
+import { OrderStatus } from '../generated/prisma/enums.js';
+import { assertTransition } from './order-state.js';
+import { REWARDS_PORT, type RewardsPort } from '../rewards/public.js';
 
 @Injectable()
 export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly stock: StockService,
+    @Optional()
+    @Inject(REWARDS_PORT)
+    private readonly rewards?: RewardsPort,
   ) {}
 
   async create(userId: number, dto: CreateOrderDto, idempotencyKey?: string) {
@@ -154,14 +161,29 @@ export class OrdersService {
           0,
         );
 
-        // Chờ hợp đồng Rewards (G) để xử lý coupon và đổi điểm.
-        const discountTotal = 0;
-        const pointsRedeemed = 0;
-        const total = subtotal;
+        let discountTotal = 0;
+        let pointsRedeemed = dto.pointsToRedeem ?? 0;
+        let total = subtotal;
+        let couponCodeToSave: string | null = null;
+
+        if (this.rewards && (dto.couponCode || pointsRedeemed > 0)) {
+          const quote = await this.rewards.reserveCouponAndPoints(
+            {
+              userId,
+              subtotal,
+              couponCode: dto.couponCode,
+              pointsToRedeem: pointsRedeemed,
+            },
+            tx,
+          );
+          discountTotal = quote.totalDiscount;
+          total = quote.total;
+          couponCodeToSave = dto.couponCode ?? null;
+        }
 
         await this.stock.reserve(tx, dto.items, products);
 
-        return tx.order.create({
+        const createdOrder = await tx.order.create({
           data: {
             userId,
             idempotencyKey: key,
@@ -171,7 +193,7 @@ export class OrdersService {
             discountTotal,
             pointsRedeemed,
             total,
-            couponCode: null,
+            couponCode: couponCodeToSave,
             items: {
               create: pricedItems,
             },
@@ -185,8 +207,16 @@ export class OrdersService {
             total: true,
           },
         });
+
+        if (this.rewards && pointsRedeemed > 0 && 'createRedeemEntry' in this.rewards) {
+          await (this.rewards as any).createRedeemEntry(
+            { orderId: createdOrder.id, userId, points: pointsRedeemed },
+            tx,
+          );
+        }
+
+        return createdOrder;
       });
-     
     } catch (error: unknown) {
       // Request đồng thời có thể thua unique constraint
       // hoặc gặp xung đột khi giữ tồn kho.
@@ -228,6 +258,96 @@ export class OrdersService {
         total: true,
         createdAt: true,
       },
+    });
+  }
+
+  async findOne(userId: number, orderId: number) {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, userId },
+      include: {
+        items: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                imageUrl: true,
+              },
+            },
+          },
+        },
+        payments: {
+          select: {
+            id: true,
+            method: true,
+            status: true,
+            transactionId: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Không tìm thấy đơn hàng của bạn');
+    }
+
+    return order;
+  }
+
+  async cancel(userId: number, orderId: number) {
+    return this.prisma.$transaction(async (tx) => {
+      // Kiểm tra đơn có thuộc user không
+      const order = await tx.order.findFirst({
+        where: { id: orderId, userId },
+        select: { id: true, status: true },
+      });
+
+      if (!order) {
+        throw new NotFoundException('ORDER_NOT_FOUND');
+      }
+      // Chỉ cho phép hủy đơn chưa thanh toán hoặc thanh toán thất bại
+      if (
+        order.status !== OrderStatus.PENDING &&
+        order.status !== OrderStatus.PAYMENT_FAILED
+      ) {
+        throw new ConflictException('ORDER_CANNOT_BE_CANCELLED');
+      }
+
+      // Kiểm tra state machine
+      assertTransition(order.status, OrderStatus.CANCELLED);
+
+      // CAS: chỉ một request được chuyển trạng thái thành công
+      const updated = await tx.order.updateMany({
+        where: {
+          id: orderId,
+          userId,
+          status: order.status,
+        },
+        data: {
+          status: OrderStatus.CANCELLED,
+        },
+      });
+
+      if (updated.count !== 1) {
+        throw new ConflictException('ORDER_STATUS_CHANGED');
+      }
+
+      // Lấy chi tiết để hoàn kho
+      const items = await tx.orderItem.findMany({
+        where: { orderId },
+        select: {
+          productId: true,
+          qty: true,
+        },
+      });
+
+      await this.stock.release(tx, items);
+
+      return {
+        id: orderId,
+        status: OrderStatus.CANCELLED,
+      };
     });
   }
 }

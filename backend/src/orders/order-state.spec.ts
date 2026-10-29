@@ -5,7 +5,8 @@
 //   it.todo('trạng thái kết thúc (COMPLETED, CANCELLED) không chuyển tiếp được');
 // });
 
-import { BadRequestException } from '@nestjs/common';
+// import { BadRequestException } from '@nestjs/common';
+import { ConflictException } from '@nestjs/common';
 import { OrderStatus } from '../generated/prisma/enums.js';
 import { assertTransition } from './order-state.js';
 
@@ -13,7 +14,7 @@ describe('Order State Machine', () => {
   it('chặn PENDING → COMPLETED', () => {
     expect(() =>
       assertTransition(OrderStatus.PENDING, OrderStatus.COMPLETED),
-    ).toThrow(BadRequestException);
+    ).toThrow(ConflictException);
   });
 
   it('cho phép PENDING → PAID', () => {
@@ -25,11 +26,11 @@ describe('Order State Machine', () => {
   it('trạng thái kết thúc (COMPLETED, CANCELLED) không chuyển tiếp được', () => {
     expect(() =>
       assertTransition(OrderStatus.COMPLETED, OrderStatus.PENDING),
-    ).toThrow(BadRequestException);
+    ).toThrow(ConflictException);
 
     expect(() =>
       assertTransition(OrderStatus.CANCELLED, OrderStatus.PENDING),
-    ).toThrow(BadRequestException);
+    ).toThrow(ConflictException);
   });
 
   it('cho phép các chuyển tiếp hợp lệ theo luồng đặt hàng', () => {
@@ -63,14 +64,14 @@ describe('Order State Machine', () => {
   it('chặn các chuyển tiếp không hợp lệ', () => {
     expect(() =>
       assertTransition(OrderStatus.PENDING, OrderStatus.PREPARING),
-    ).toThrow(BadRequestException);
+    ).toThrow(ConflictException);
 
     expect(() =>
       assertTransition(OrderStatus.PAID, OrderStatus.COMPLETED),
-    ).toThrow(BadRequestException);
+    ).toThrow(ConflictException);
 
     expect(() =>
       assertTransition(OrderStatus.READY, OrderStatus.PREPARING),
-    ).toThrow(BadRequestException);
+    ).toThrow(ConflictException);
   });
 });
