@@ -19,8 +19,10 @@ import { createHash } from 'node:crypto';
 import {
   ConflictException,
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { unitPrice } from '../common/pricing.js';
 import type { Size } from '../common/pricing.js';
@@ -29,12 +31,16 @@ import { CreateOrderDto } from './orders.dto.js';
 import { StockService } from './stock.service.js';
 import { OrderStatus } from '../generated/prisma/enums.js';
 import { assertTransition } from './order-state.js';
+import { REWARDS_PORT, type RewardsPort } from '../rewards/public.js';
 
 @Injectable()
 export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly stock: StockService,
+    @Optional()
+    @Inject(REWARDS_PORT)
+    private readonly rewards?: RewardsPort,
   ) {}
 
   async create(userId: number, dto: CreateOrderDto, idempotencyKey?: string) {
@@ -155,14 +161,29 @@ export class OrdersService {
           0,
         );
 
-        // Chờ hợp đồng Rewards (G) để xử lý coupon và đổi điểm.
-        const discountTotal = 0;
-        const pointsRedeemed = 0;
-        const total = subtotal;
+        let discountTotal = 0;
+        let pointsRedeemed = dto.pointsToRedeem ?? 0;
+        let total = subtotal;
+        let couponCodeToSave: string | null = null;
+
+        if (this.rewards && (dto.couponCode || pointsRedeemed > 0)) {
+          const quote = await this.rewards.reserveCouponAndPoints(
+            {
+              userId,
+              subtotal,
+              couponCode: dto.couponCode,
+              pointsToRedeem: pointsRedeemed,
+            },
+            tx,
+          );
+          discountTotal = quote.totalDiscount;
+          total = quote.total;
+          couponCodeToSave = dto.couponCode ?? null;
+        }
 
         await this.stock.reserve(tx, dto.items, products);
 
-        return tx.order.create({
+        const createdOrder = await tx.order.create({
           data: {
             userId,
             idempotencyKey: key,
@@ -172,7 +193,7 @@ export class OrdersService {
             discountTotal,
             pointsRedeemed,
             total,
-            couponCode: null,
+            couponCode: couponCodeToSave,
             items: {
               create: pricedItems,
             },
@@ -186,6 +207,15 @@ export class OrdersService {
             total: true,
           },
         });
+
+        if (this.rewards && pointsRedeemed > 0 && 'createRedeemEntry' in this.rewards) {
+          await (this.rewards as any).createRedeemEntry(
+            { orderId: createdOrder.id, userId, points: pointsRedeemed },
+            tx,
+          );
+        }
+
+        return createdOrder;
       });
     } catch (error: unknown) {
       // Request đồng thời có thể thua unique constraint
