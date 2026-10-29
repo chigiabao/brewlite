@@ -7,11 +7,11 @@
 \begin{document}
 \begin{tikzpicture}[
     >=stealth, thick,
-    startstop/.style={rectangle, rounded corners=12pt, draw=black!80, fill=red!15, minimum width=2.8cm, minimum height=0.9cm, text centered, font=\bfseries\small},
+    startstop/.style={rectangle, rounded corners=12pt, draw=black!80, fill=red!20, minimum width=2.8cm, minimum height=0.9cm, text centered, font=\bfseries\small},
     process/.style={rectangle, rounded corners=4pt, draw=black!80, fill=blue!10, minimum width=4.2cm, minimum height=0.9cm, text centered, text width=4cm, font=\small},
     decision/.style={diamond, aspect=1.8, draw=black!80, fill=yellow!25, minimum width=3.8cm, minimum height=0.9cm, text centered, text width=3.2cm, font=\small\bfseries},
-    ready/.style={rectangle, rounded corners=6pt, draw=emerald!80!black, fill=emerald!15, minimum width=4.8cm, minimum height=0.9cm, text centered, text width=4.6cm, font=\small\bfseries},
-    flow/.style={->, draw=stone!80!black, thick}
+    ready/.style={rectangle, rounded corners=6pt, draw=green!60!black, fill=green!15, minimum width=4.8cm, minimum height=0.9cm, text centered, text width=4.6cm, font=\small\bfseries},
+    flow/.style={->, draw=black!80, thick}
 ]
 
 % ==========================================
@@ -32,8 +32,8 @@
 % --- Rẽ nhánh kiểm tra tồn kho ---
 \node[decision] (check_stock) at (4.5, -7.8) {Tồn kho (\texttt{stock}) > 0?};
 
-\node[process, fill=red!10] (ui_disable) at (1.8, -9.8) {Khóa nút "Thêm vào giỏ"\\Hiển thị tag "Hết hàng"}; 
-\node[process, fill=emerald!10] (ui_enable) at (7.2, -9.8) {Mở nút "Thêm vào giỏ"\\Cho phép đặt món};       
+\node[process, fill=red!15] (ui_disable) at (1.8, -9.8) {Khóa nút "Thêm vào giỏ"\\Hiển thị tag "Hết hàng"}; 
+\node[process, fill=green!15] (ui_enable) at (7.2, -9.8) {Mở nút "Thêm vào giỏ"\\Cho phép đặt món};       
 
 \node[ready] (ui_ready) at (4.5, -11.8) {Giao diện Chi tiết món sẵn sàng};
 
@@ -49,12 +49,12 @@
 \node[process] (sys_payload) at (4.5, -18.8) {Tạo CartItem (id, name, size,\\toppings, unitPrice, qty=1)};
 
 \node[process] (sys_dispatch) at (4.5, -20.6) {Lưu vào Store giỏ hàng\\(Zustand State \& LocalStorage)};
-\node[process] (sys_toast) at (4.5, -22.4) {Hiển thị Toast thành công \&\\Cập nhật Badge giỏ hàng};
+\node[process] (sys_toast) at (4.5, -22.4) {Hiển thị thông báo Thành công \&\\Cập nhật Badge giỏ hàng};
 
 \node[startstop] (end) at (4.5, -24.2) {Kết thúc};
 
 % Nhánh 3: Quay lại Menu
-\node[process, fill=gray!15, text width=2.6cm, minimum width=2.8cm] (back_menu) at (-4.5, -11.8) {Bấm "Quay lại Menu"};
+\node[process, fill=gray!20, text width=2.6cm, minimum width=2.8cm] (back_menu) at (-4.5, -11.8) {Bấm "Quay lại Menu"};
 
 
 % ==========================================
@@ -105,12 +105,12 @@
 % ==========================================
 \begin{scope}[on background layer]
     % Làn Khách hàng
-    \filldraw[draw=stone!60, fill=stone!5, dashed, rounded corners=6pt] (-8.8, 1.2) rectangle (-0.2, -25.2);
-    \node[font=\large\bfseries, text=stone!80!black] at (-4.5, 0.7) {👤 KHÁCH HÀNG (CUSTOMER)};
+    \filldraw[draw=gray!60, fill=gray!8, dashed, rounded corners=6pt] (-8.8, 1.2) rectangle (-0.2, -25.2);
+    \node[font=\large\bfseries, text=black!80] at (-4.5, 0.7) {KHACH HANG (CUSTOMER)};
     
     % Làn Hệ thống Catalog
-    \filldraw[draw=blue!60!black, fill=blue!3, dashed, rounded corners=6pt] (0.2, 1.2) rectangle (9.8, -25.2);
-    \node[font=\large\bfseries, text=blue!80!black] at (5, 0.7) {💻 HỆ THỐNG (MODULE CATALOG \& STOCK)};
+    \filldraw[draw=blue!60!black, fill=blue!5, dashed, rounded corners=6pt] (0.2, 1.2) rectangle (9.8, -25.2);
+    \node[font=\large\bfseries, text=blue!80!black] at (5, 0.7) {HE THONG (MODULE CATALOG \& STOCK)};
 \end{scope}
 
 \end{tikzpicture}
