@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useState, useMemo } from 'react';
-import { getProducts, Product } from '@/lib/products-api';
+import { getProducts } from '@/lib/products-api';
 
 const PLACEHOLDER_IMG =
   "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300' fill='%23F3F4F6'><rect width='400' height='300' fill='%23F3F4F6'/><path d='M160 110h80v70a40 40 0 0 1-40 40 40 40 0 0 1-40-40v-70Z' stroke='%239CA3AF' stroke-width='6' fill='%23E5E7EB'/><path d='M240 130h16a16 16 0 0 1 16 16v8a16 16 0 0 1-16 16h-16' stroke='%239CA3AF' stroke-width='6' fill='none'/><path d='M175 85c0-10 10-15 10-25M200 85c0-10 10-15 10-25M225 85c0-10 10-15 10-25' stroke='%23D1D5DB' stroke-width='4' stroke-linecap='round'/><text x='50%25' y='260' text-anchor='middle' font-family='sans-serif' font-size='14' fill='%239CA3AF' font-weight='600'>BrewLite Coffee</text></svg>";
@@ -147,12 +147,12 @@ export default function MenuPage() {
                 <p className="text-xs text-stone-400 line-clamp-2">
                   Lớp kem muối sánh mịn mặn mòi quyện cùng vị cà phê phin đậm đà thơm ngát.
                 </p>
-                <a
+                <Link
                   href="/products/2"
                   className="mt-3 block w-full py-2.5 rounded-lg text-center font-bold text-xs bg-amber-700/80 hover:bg-amber-600 text-white transition shadow"
                 >
                   Thử Ngay Món Này →
-                </a>
+                </Link>
               </div>
             </div>
           </div>
@@ -270,7 +270,7 @@ export default function MenuPage() {
             <span>Sắp xếp:</span>
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
+              onChange={(e) => setSortBy(e.target.value as 'popular' | 'price-asc' | 'price-desc')}
               className="bg-white border border-stone-300 rounded-lg px-2.5 py-1.5 text-xs text-stone-800 font-medium focus:outline-none focus:ring-1 focus:ring-amber-600"
             >
               <option value="popular">Được yêu thích nhất</option>
