@@ -90,100 +90,150 @@ export default function ProductDetailPage() {
   };
 
   return (
-    <div className="max-w-md mx-auto bg-white p-6 rounded-xl shadow-md border border-gray-100 my-8">
-      {/* Toast thông báo thành công */}
-      {showToast && (
-        <div className="fixed top-4 right-4 z-50 bg-emerald-600 text-white px-4 py-2.5 rounded-lg shadow-lg flex items-center gap-2 transition duration-300">
-          <span>✓</span>
-          <span>Đã thêm <strong>{product.name}</strong> vào giỏ hàng!</span>
-        </div>
-      )}
-
-      <div className="relative mb-4">
-        <img
-          src={product.imageUrl}
-          alt={product.name}
-          className="h-56 w-full object-cover rounded-lg bg-gray-200"
-          onError={(e) => {
-            e.currentTarget.onerror = null;
-            e.currentTarget.src = PLACEHOLDER_IMG;
-          }}
-        />
-        {product.stock <= 0 && (
-          <span className="absolute top-3 right-3 bg-red-600 text-white text-xs font-bold px-2.5 py-1 rounded">
-            Hết hàng
-          </span>
-        )}
-      </div>
-
-      <h1 className="text-2xl font-bold text-gray-900">{product.name}</h1>
-      <p className="text-2xl font-extrabold text-amber-700 mt-2">
-        {unitPrice.toLocaleString('vi-VN')}đ
-      </p>
-
-      {/* Chọn Size */}
-      <div className="mt-6">
-        <label className="block text-sm font-semibold text-gray-700 mb-2">Chọn Size</label>
-        <div className="flex gap-3">
-          {(['S', 'M', 'L'] as const).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setSize(s)}
-              className={`flex-1 py-2 text-sm font-semibold rounded-lg border transition ${
-                size === s
-                  ? 'border-amber-700 bg-amber-700 text-white shadow-sm'
-                  : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              {s} {s === 'M' ? '(+5k)' : s === 'L' ? '(+10k)' : '(+0k)'}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Chọn Topping */}
-      <div className="mt-6">
-        <label className="block text-sm font-semibold text-gray-700 mb-2">
-          Chọn Topping (+5.000đ/loại)
-        </label>
-        <div className="flex gap-2 flex-wrap">
-          {ALLOWED_TOPPINGS.map((topping) => (
-            <button
-              key={topping}
-              type="button"
-              onClick={() => toggleTopping(topping)}
-              className={`px-3 py-1.5 text-sm rounded-lg border transition ${
-                toppings.includes(topping)
-                  ? 'border-amber-700 bg-amber-50 text-amber-800 font-semibold'
-                  : 'border-gray-300 text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              {toppings.includes(topping) ? '✓ ' : '+ '}
-              {topping}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Nút Thêm vào giỏ */}
-      <button
-        type="button"
-        disabled={product.stock <= 0}
-        onClick={handleAddToCart}
-        className={`mt-8 w-full py-3 rounded-lg font-bold text-base transition shadow-sm ${
-          product.stock <= 0
-            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            : 'bg-amber-700 hover:bg-amber-800 text-white active:scale-[0.99]'
-        }`}
-      >
-        {product.stock <= 0 ? 'Hết hàng' : 'Thêm vào giỏ hàng'}
-      </button>
-
-      <div className="mt-4 text-center">
-        <Link href="/" className="text-sm text-gray-500 hover:text-amber-800 transition">
-          ← Tiếp tục chọn đồ uống
+    <div className="max-w-xl mx-auto px-4 py-8">
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-2 text-xs text-stone-500 mb-6 font-medium">
+        <Link href="/" className="hover:text-amber-800 transition">
+          Trang chủ
         </Link>
+        <span>/</span>
+        <Link href="/#menu" className="hover:text-amber-800 transition">
+          Thực đơn
+        </Link>
+        <span>/</span>
+        <span className="text-stone-900 font-bold truncate max-w-[180px]">{product.name}</span>
+      </nav>
+
+      {/* Main Product Card */}
+      <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-xl border border-stone-200/90">
+        {/* Toast thông báo thành công */}
+        {showToast && (
+          <div className="fixed top-6 right-6 z-50 bg-stone-900/95 backdrop-blur-md text-white px-5 py-3 rounded-2xl shadow-2xl border border-amber-500/40 flex items-center gap-3 transition duration-300">
+            <span className="w-6 h-6 rounded-full bg-emerald-500 text-stone-950 flex items-center justify-center text-xs font-black">
+              ✓
+            </span>
+            <span className="text-sm font-medium">
+              Đã thêm <strong>{product.name}</strong> vào giỏ hàng!
+            </span>
+          </div>
+        )}
+
+        <div className="relative mb-6 rounded-2xl overflow-hidden bg-stone-100 aspect-16/10 shadow-inner">
+          <img
+            src={product.imageUrl}
+            alt={product.name}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = PLACEHOLDER_IMG;
+            }}
+          />
+          {product.badge && (
+            <span className="absolute top-3 left-3 bg-amber-500 text-stone-950 text-xs font-black px-3 py-1 rounded-full shadow">
+              {product.badge}
+            </span>
+          )}
+          {product.stock <= 0 && (
+            <span className="absolute top-3 right-3 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow">
+              Hết hàng
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight">
+              {product.name}
+            </h1>
+            {product.description && (
+              <p className="text-sm text-stone-500 mt-2 leading-relaxed">
+                {product.description}
+              </p>
+            )}
+          </div>
+          <div className="text-right shrink-0">
+            <p className="text-2xl sm:text-3xl font-black text-amber-800">
+              {unitPrice.toLocaleString('vi-VN')}đ
+            </p>
+            <span className="text-xs text-stone-400 font-medium">Giá đã gồm thuế</span>
+          </div>
+        </div>
+
+        {/* Chọn Size */}
+        <div className="mt-8 pt-6 border-t border-stone-100">
+          <div className="flex items-center justify-between mb-3">
+            <label className="text-sm font-bold text-stone-800">Chọn Size ly</label>
+            <span className="text-xs text-stone-400">Đang chọn: Size {size}</span>
+          </div>
+          <div className="flex gap-3">
+            {(['S', 'M', 'L'] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setSize(s)}
+                className={`flex-1 py-3 text-sm font-bold rounded-xl border transition-all ${
+                  size === s
+                    ? 'border-amber-800 bg-amber-800 text-white shadow-md shadow-amber-900/20 scale-[1.02]'
+                    : 'border-stone-200 text-stone-700 hover:bg-stone-50'
+                }`}
+              >
+                {s} {s === 'M' ? '(+5k)' : s === 'L' ? '(+10k)' : '(+0k)'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Chọn Topping */}
+        <div className="mt-6 pt-6 border-t border-stone-100">
+          <div className="flex items-center justify-between mb-3">
+            <label className="text-sm font-bold text-stone-800">Thêm Topping</label>
+            <span className="text-xs text-amber-700 font-semibold">+5.000đ/loại</span>
+          </div>
+          <div className="flex gap-2.5 flex-wrap">
+            {ALLOWED_TOPPINGS.map((topping) => {
+              const selected = toppings.includes(topping);
+              return (
+                <button
+                  key={topping}
+                  type="button"
+                  onClick={() => toggleTopping(topping)}
+                  className={`px-4 py-2 text-sm rounded-xl border font-semibold transition-all ${
+                    selected
+                      ? 'border-amber-800 bg-amber-100/70 text-amber-900'
+                      : 'border-stone-200 text-stone-600 hover:bg-stone-50'
+                  }`}
+                >
+                  {selected ? '✓ ' : '+ '}
+                  {topping}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Nút Thêm vào giỏ */}
+        <button
+          type="button"
+          disabled={product.stock <= 0}
+          onClick={handleAddToCart}
+          className={`mt-8 w-full py-4 rounded-xl font-black text-base transition-all shadow-lg flex items-center justify-center gap-2 ${
+            product.stock <= 0
+              ? 'bg-stone-200 text-stone-400 cursor-not-allowed shadow-none'
+              : 'bg-gradient-to-r from-amber-700 to-amber-800 hover:from-amber-800 hover:to-amber-900 text-white shadow-amber-900/30 hover:scale-[1.01] active:scale-[0.99]'
+          }`}
+        >
+          <span>🛒</span>
+          <span>{product.stock <= 0 ? 'Món Này Tạm Hết Hàng' : 'Thêm Vào Giỏ Hàng'}</span>
+        </button>
+
+        <div className="mt-6 text-center">
+          <Link
+            href="/#menu"
+            className="text-xs font-bold text-stone-500 hover:text-amber-800 transition"
+          >
+            ← Tiếp tục chọn món khác
+          </Link>
+        </div>
       </div>
     </div>
   );
