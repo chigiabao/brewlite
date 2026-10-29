@@ -132,6 +132,34 @@ export const MOCK_PRODUCTS: Product[] = [
   },
 ];
 
+function enrichProduct(p: Product): Product {
+  const name = p.name.toLowerCase();
+  let category: Product['category'] = 'vietnamese';
+  let badge: string | undefined = undefined;
+  let rating = 4.9;
+
+  if (name.includes('americano') || name.includes('espresso') || name.includes('latte') || name.includes('cappuccino')) {
+    category = 'espresso';
+  } else if (name.includes('trà') || name.includes('tea')) {
+    category = 'tea';
+  } else if (name.includes('muối') || name.includes('cold brew') || name.includes('matcha')) {
+    category = 'specialty';
+  }
+
+  if (name.includes('sữa')) badge = 'Bán chạy nhất';
+  if (name.includes('americano')) badge = 'Không đường';
+  if (name.includes('cappuccino')) badge = 'Thượng hạng';
+  if (name.includes('trà đào')) badge = 'Giải nhiệt hè';
+  if (name.includes('matcha')) badge = 'Cao cấp';
+
+  return {
+    ...p,
+    category: p.category ?? category,
+    badge: p.badge ?? badge,
+    rating: p.rating ?? rating,
+  };
+}
+
 export async function getProducts(): Promise<Product[]> {
   try {
     const controller = new AbortController();
@@ -141,7 +169,7 @@ export async function getProducts(): Promise<Product[]> {
     if (response.ok) {
       const data = await response.json();
       if (Array.isArray(data) && data.length > 0) {
-        return data;
+        return data.map(enrichProduct);
       }
     }
   } catch (error) {
@@ -157,7 +185,8 @@ export async function getProduct(id: string): Promise<Product> {
     const response = await fetch(`${BASE_URL}/products/${id}`, { signal: controller.signal });
     clearTimeout(timeoutId);
     if (response.ok) {
-      return await response.json();
+      const data = await response.json();
+      return enrichProduct(data);
     }
   } catch (error) {
     console.warn(`Backend unavailable for product ${id}, using fallback mock:`, error);
