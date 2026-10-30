@@ -1,4 +1,5 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -15,6 +16,9 @@ describe('POST /payments (e2e, fixture order)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
   let fixtureToken: string;
+  let fixtureUserId: number;
+  const runId = randomUUID();
+  const testKey = (suffix: string) => `f04-e2e-${runId}-${suffix}`;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
@@ -32,49 +36,50 @@ describe('POST /payments (e2e, fixture order)', () => {
     );
     await app.init();
     prisma = app.get(PrismaService);
-    fixtureToken = app.get(JwtService).sign({ sub: 1, email: 'fixture-e2e@brewlite.test' });
+    const user = await prisma.user.create({
+      data: { email: `f04-pay-${runId}@example.test`, passwordHash: 'fixture-only' },
+    });
+    fixtureUserId = user.id;
+    fixtureToken = app.get(JwtService).sign({ sub: fixtureUserId, email: user.email });
   });
 
+  async function cleanFixtureOrders() {
+    // Never delete orders belonging to seeded/real users (especially id=1).
+    const orders = await prisma.order.findMany({
+      where: { userId: fixtureUserId }, select: { id: true },
+    });
+    const ids = orders.map((o) => o.id);
+    if (ids.length === 0) return;
+    await prisma.payment.deleteMany({ where: { orderId: { in: ids } } });
+    await prisma.loyaltyEntry.deleteMany({ where: { orderId: { in: ids } } });
+    await prisma.orderItem.deleteMany({ where: { orderId: { in: ids } } });
+    await prisma.order.deleteMany({ where: { id: { in: ids } } });
+  }
+
   afterAll(async () => {
-    await app.close();
+    try {
+      if (prisma && fixtureUserId) {
+        await cleanFixtureOrders();
+        await prisma.user.delete({ where: { id: fixtureUserId } });
+      }
+    } finally {
+      await app?.close();
+    }
   });
 
   beforeEach(async () => {
-    nextReference = 'MOCK-OK1234';
-    const orders = await prisma.order.findMany({
-      where: { userId: 1 },
-      select: { id: true },
-    });
-    const orderIds = orders.map((o) => o.id);
-    if (orderIds.length > 0) {
-      await prisma.payment.deleteMany({ where: { orderId: { in: orderIds } } });
-      await prisma.loyaltyEntry.deleteMany({
-        where: { orderId: { in: orderIds } },
-      });
-      await prisma.order.deleteMany({ where: { id: { in: orderIds } } });
-    } else {
-      await prisma.order.deleteMany({ where: { userId: 1 } });
-    }
-    await prisma.user.upsert({
-      where: { id: 1 },
-      update: {},
-      create: {
-        id: 1,
-        email: 'fixture-e2e@brewlite.test',
-        passwordHash: 'fixture',
-      },
-    });
+    await cleanFixtureOrders();
   });
 
   function seedOrder(total = 85_000) {
-    return prisma.order.create({ data: { userId: 1, total } });
+    return prisma.order.create({ data: { userId: fixtureUserId, total } });
   }
 
   it('không có JWT -> 401, không tạo payment hay đổi trạng thái order', async () => {
     const order = await seedOrder();
     await request(app.getHttpServer())
       .post('/payments')
-      .set('Idempotency-Key', 'e2e-no-jwt-1')
+      .set('Idempotency-Key', testKey('e2e-no-jwt-1'))
       .send({ orderId: order.id, method: 'WALLET' })
       .expect(401);
     expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(0);
@@ -84,13 +89,13 @@ describe('POST /payments (e2e, fixture order)', () => {
   it('JWT có payload đúng nhưng chữ ký sai -> 401', async () => {
     const order = await seedOrder();
     const forged = app.get(JwtService).sign(
-      { sub: 1, email: 'fixture-e2e@brewlite.test' },
+      { sub: fixtureUserId, email: 'fixture-e2e@brewlite.test' },
       { secret: 'fake-signing-key' },
     );
     await request(app.getHttpServer())
       .post('/payments')
       .set('Authorization', `Bearer ${forged}`)
-      .set('Idempotency-Key', 'e2e-forged-jwt-1')
+      .set('Idempotency-Key', testKey('e2e-forged-jwt-1'))
       .send({ orderId: order.id, method: 'WALLET' })
       .expect(401);
     expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(0);
@@ -105,7 +110,7 @@ describe('POST /payments (e2e, fixture order)', () => {
     const res = await request(app.getHttpServer())
       .post('/payments')
       .set('Authorization', `Bearer ${otherUserToken}`)
-      .set('Idempotency-Key', 'e2e-other-user-1')
+      .set('Idempotency-Key', testKey('e2e-other-user-1'))
       .send({ orderId: order.id, method: 'WALLET' });
     expect(res.status).toBe(404);
     expect(res.body.code).toBe('ORDER_NOT_FOUND');
@@ -123,7 +128,7 @@ describe('POST /payments (e2e, fixture order)', () => {
     expect(res.status).toBe(400);
     expect(res.body.code).toBe('IDEMPOTENCY_KEY_REQUIRED');
     expect(
-      await prisma.payment.count({ where: { order: { userId: 1 } } }),
+      await prisma.payment.count({ where: { order: { userId: fixtureUserId } } }),
     ).toBe(0);
   });
 
@@ -133,12 +138,12 @@ describe('POST /payments (e2e, fixture order)', () => {
     const res = await request(app.getHttpServer())
       .post('/payments')
       .set('Authorization', `Bearer ${fixtureToken}`)
-      .set('Idempotency-Key', 'e2e-amount-1')
+      .set('Idempotency-Key', testKey('e2e-amount-1'))
       .send({ orderId: order.id, method: 'WALLET', amount: 1 });
 
     expect(res.status).toBe(400);
     expect(
-      await prisma.payment.count({ where: { order: { userId: 1 } } }),
+      await prisma.payment.count({ where: { order: { userId: fixtureUserId } } }),
     ).toBe(0);
   });
 
@@ -148,7 +153,7 @@ describe('POST /payments (e2e, fixture order)', () => {
     const res = await request(app.getHttpServer())
       .post('/payments')
       .set('Authorization', `Bearer ${fixtureToken}`)
-      .set('Idempotency-Key', 'e2e-wallet-1')
+      .set('Idempotency-Key', testKey('e2e-wallet-1'))
       .send({ orderId: order.id, method: 'WALLET' });
 
     expect(res.status).toBe(200);
@@ -165,7 +170,7 @@ describe('POST /payments (e2e, fixture order)', () => {
     const updated = await prisma.order.findUnique({ where: { id: order.id } });
     expect(updated?.status).toBe('PAID');
     expect(
-      await prisma.payment.count({ where: { idempotencyKey: 'e2e-wallet-1' } }),
+      await prisma.payment.count({ where: { idempotencyKey: testKey('e2e-wallet-1') } }),
     ).toBe(1);
   });
 
@@ -175,7 +180,7 @@ describe('POST /payments (e2e, fixture order)', () => {
     const res = await request(app.getHttpServer())
       .post('/payments')
       .set('Authorization', `Bearer ${fixtureToken}`)
-      .set('Idempotency-Key', 'e2e-card-1')
+      .set('Idempotency-Key', testKey('e2e-card-1'))
       .send({ orderId: order.id, method: 'CARD' });
 
     expect(res.status).toBe(200);
@@ -185,7 +190,7 @@ describe('POST /payments (e2e, fixture order)', () => {
 
   it('gửi lặp cùng key -> cùng paymentId, idempotentReplay true, 1 payment', async () => {
     const order = await seedOrder();
-    const key = 'e2e-replay-1';
+    const key = testKey('e2e-replay-1');
 
     const first = await request(app.getHttpServer())
       .post('/payments')
@@ -210,7 +215,7 @@ describe('POST /payments (e2e, fixture order)', () => {
 
   it('cùng key khác payload -> 409 IDEMPOTENCY_KEY_REUSED', async () => {
     const order = await seedOrder();
-    const key = 'e2e-reuse-1';
+    const key = testKey('e2e-reuse-1');
 
     await request(app.getHttpServer())
       .post('/payments')
@@ -234,7 +239,7 @@ describe('POST /payments (e2e, fixture order)', () => {
     const first = await request(app.getHttpServer())
       .post('/payments')
       .set('Authorization', `Bearer ${fixtureToken}`)
-      .set('Idempotency-Key', 'e2e-paid-state-1')
+      .set('Idempotency-Key', testKey('e2e-paid-state-1'))
       .send({ orderId: order.id, method: 'WALLET' });
 
     expect(first.status).toBe(200);
@@ -244,7 +249,7 @@ describe('POST /payments (e2e, fixture order)', () => {
     const second = await request(app.getHttpServer())
       .post('/payments')
       .set('Authorization', `Bearer ${fixtureToken}`)
-      .set('Idempotency-Key', 'e2e-paid-state-2')
+      .set('Idempotency-Key', testKey('e2e-paid-state-2'))
       .send({ orderId: order.id, method: 'WALLET' });
 
     expect(second.status).toBe(409);
@@ -267,7 +272,7 @@ describe('POST /payments (e2e, fixture order)', () => {
       await request(app.getHttpServer())
         .post('/payments')
         .set('Authorization', `Bearer ${fixtureToken}`)
-        .set('Idempotency-Key', 'e2e-demo-disabled-1')
+        .set('Idempotency-Key', testKey('e2e-demo-disabled-1'))
         .send({ orderId: order.id, method: 'CARD', demoDecline: true })
         .expect(400);
       expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(0);
@@ -288,7 +293,7 @@ describe('POST /payments (e2e, fixture order)', () => {
       const declined = await request(app.getHttpServer())
         .post('/payments')
         .set('Authorization', `Bearer ${fixtureToken}`)
-        .set('Idempotency-Key', 'e2e-demo-declined-1')
+        .set('Idempotency-Key', testKey('e2e-demo-declined-1'))
         .send({ orderId: order.id, method: 'WALLET', demoDecline: true });
       expect(declined.status).toBe(402);
       expect(declined.body.code).toBe('PAYMENT_DECLINED');
@@ -296,7 +301,7 @@ describe('POST /payments (e2e, fixture order)', () => {
       const retry = await request(app.getHttpServer())
         .post('/payments')
         .set('Authorization', `Bearer ${fixtureToken}`)
-        .set('Idempotency-Key', 'e2e-demo-retry-2')
+        .set('Idempotency-Key', testKey('e2e-demo-retry-2'))
         .send({ orderId: order.id, method: 'WALLET' });
       expect(retry.status).toBe(200);
       expect(retry.body.orderStatus).toBe('PAID');
@@ -316,7 +321,7 @@ describe('POST /payments (e2e, fixture order)', () => {
     const res = await request(app.getHttpServer())
       .post('/payments')
       .set('Authorization', `Bearer ${fixtureToken}`)
-      .set('Idempotency-Key', 'e2e-decline-1')
+      .set('Idempotency-Key', testKey('e2e-decline-1'))
       .send({ orderId: order.id, method: 'CARD' });
 
     expect(res.status).toBe(402);
@@ -333,7 +338,7 @@ describe('POST /payments (e2e, fixture order)', () => {
     const declined = await request(app.getHttpServer())
       .post('/payments')
       .set('Authorization', `Bearer ${fixtureToken}`)
-      .set('Idempotency-Key', 'e2e-decline-retry-1')
+      .set('Idempotency-Key', testKey('e2e-decline-retry-1'))
       .send({ orderId: order.id, method: 'CARD' });
     expect(declined.status).toBe(402);
 
@@ -341,7 +346,7 @@ describe('POST /payments (e2e, fixture order)', () => {
     const retried = await request(app.getHttpServer())
       .post('/payments')
       .set('Authorization', `Bearer ${fixtureToken}`)
-      .set('Idempotency-Key', 'e2e-decline-retry-2')
+      .set('Idempotency-Key', testKey('e2e-decline-retry-2'))
       .send({ orderId: order.id, method: 'WALLET' });
 
     expect(retried.status).toBe(200);

@@ -3,7 +3,7 @@
  * E/F chỉ import từ file này (hoặc rewards/public.ts), không import internals.
  *
  * Quy tắc ranh giới module (FOUNDATION-V1 §2):
- *   - E gọi reserveCouponAndPoints trong cùng $transaction tạo Order.
+ *   - E gọi reserveCouponAndPoints khi tạo Order, releaseReservedOnCancel khi hủy.
  *   - F gọi finalizeRewardsOnPaid trong cùng $transaction markPaid.
  *   - G không tự sửa orders.service.ts hay payments.service.ts.
  */
@@ -47,11 +47,23 @@ export interface RewardsPort {
    */
   reserveCouponAndPoints(params: ReserveParams, tx: RewardsTx): Promise<ReserveResult>;
 
+  /** REDEEM ledger sau khi tạo Order (trong cùng transaction). */
+  createRedeemEntry(
+    params: { orderId: number; userId: number; points: number },
+    tx: RewardsTx,
+  ): Promise<void>;
+
+  /** Hoàn đúng số điểm/quota đã reserve nếu E hủy Order bằng CAS thành công. */
+  releaseReservedOnCancel(
+    params: { orderId: number; userId: number; couponCode: string | null; pointsRedeemed: number },
+    tx: RewardsTx,
+  ): Promise<void>;
+
   /**
    * Cộng điểm loyalty sau khi Order PAID — chính xác 1 lần nhờ unique constraint.
    * Phải được gọi trong cùng transaction markPaid (F sở hữu transaction).
    *
-   * Throws nếu LoyaltyEntry EARN cho orderId này đã tồn tại (idempotent guard).
+   * Nếu LoyaltyEntry EARN đã tồn tại, trả kết quả cũ, không cộng trùng.
    */
   finalizeRewardsOnPaid(
     params: { orderId: number; userId: number; totalPaid: number },

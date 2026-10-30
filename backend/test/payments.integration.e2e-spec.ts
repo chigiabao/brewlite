@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../src/app.module.js';
 import {
@@ -9,7 +10,9 @@ import { PaymentDeclinedError } from '../src/payments/payment.errors.js';
 import { PaymentsService } from '../src/payments/payments.service.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 
-const USER_ID = 2;
+let USER_ID: number;
+const runId = randomUUID();
+const testKey = (suffix: string) => `f04-int-${runId}-${suffix}`;
 
 describe('Payments idempotency (integration, real PostgreSQL)', () => {
   let moduleRef: TestingModule;
@@ -27,60 +30,39 @@ describe('Payments idempotency (integration, real PostgreSQL)', () => {
     service = moduleRef.get(PaymentsService);
     gateway = moduleRef.get(MockGatewayService);
     prisma = moduleRef.get(PrismaService);
+    const user = await prisma.user.create({
+      data: { email: `f04-pay-int-${runId}@example.test`, passwordHash: 'fixture-only' },
+    });
+    USER_ID = user.id;
   });
 
-  afterAll(async () => {
-    await moduleRef.close();
-  });
-
-  // beforeEach(async () => {
-  //   const orders = await prisma.order.findMany({ where: { userId: USER_ID }, select: { id: true } });
-  //   const orderIds = orders.map((o) => o.id);
-  //   if (orderIds.length > 0) {
-  //     await prisma.payment.deleteMany({ where: { orderId: { in: orderIds } } });
-  //     await prisma.order.deleteMany({ where: { id: { in: orderIds } } });
-  //   } else {
-  //     await prisma.order.deleteMany({ where: { userId: USER_ID } });
-  //   }
-  //   await prisma.user.upsert({
-  //     where: { id: USER_ID },
-  //     update: {},
-  //     create: { id: USER_ID, email: 'fixture-int@brewlite.test', passwordHash: 'fixture' },
-  //   });
-  // });
-beforeEach(async () => {
-  const orders = await prisma.order.findMany({
-    where: { userId: USER_ID },
-    select: { id: true },
-  });
-
-  const orderIds = orders.map((o) => o.id);
-
-  if (orderIds.length > 0) {
-    await prisma.payment.deleteMany({
-      where: { orderId: { in: orderIds } },
+  async function cleanFixtureOrders() {
+    // Isolate each test; never delete fixed IDs from the application database.
+    const orders = await prisma.order.findMany({
+      where: { userId: USER_ID }, select: { id: true },
     });
-
-    await prisma.loyaltyEntry.deleteMany({
-      where: { orderId: { in: orderIds } },
-    });
-
-    await prisma.order.deleteMany({
-      where: { id: { in: orderIds } },
-    });
+    const ids = orders.map((o) => o.id);
+    if (ids.length === 0) return;
+    await prisma.payment.deleteMany({ where: { orderId: { in: ids } } });
+    await prisma.loyaltyEntry.deleteMany({ where: { orderId: { in: ids } } });
+    await prisma.orderItem.deleteMany({ where: { orderId: { in: ids } } });
+    await prisma.order.deleteMany({ where: { id: { in: ids } } });
   }
 
-  await prisma.user.upsert({
-    where: { id: USER_ID },
-    update: {},
-    create: {
-      id: USER_ID,
-      email: 'fixture-int@brewlite.test',
-      passwordHash: 'fixture',
-    },
+  afterAll(async () => {
+    try {
+      if (prisma && USER_ID) {
+        await cleanFixtureOrders();
+        await prisma.user.delete({ where: { id: USER_ID } });
+      }
+    } finally {
+      await moduleRef?.close();
+    }
   });
-});
 
+  beforeEach(async () => {
+    await cleanFixtureOrders();
+  });
 
   function seedOrder(total = 50_000) {
     return prisma.order.create({ data: { userId: USER_ID, total } });
@@ -93,7 +75,7 @@ beforeEach(async () => {
       userId: USER_ID,
       orderId: order.id,
       method: 'WALLET' as const,
-      idempotencyKey: 'itest-sequential-1',
+      idempotencyKey: testKey('itest-sequential-1'),
     };
 
     const first = await service.pay(input);
@@ -114,7 +96,7 @@ beforeEach(async () => {
       userId: USER_ID,
       orderId: order.id,
       method: 'WALLET' as const,
-      idempotencyKey: 'itest-concurrent-1',
+      idempotencyKey: testKey('itest-concurrent-1'),
     };
 
     const results = await Promise.allSettled([service.pay(input), service.pay(input)]);
@@ -128,7 +110,7 @@ beforeEach(async () => {
 
   it('cùng key khác payload -> IDEMPOTENCY_KEY_REUSED', async () => {
     const order = await seedOrder();
-    const idempotencyKey = 'itest-reuse-1';
+    const idempotencyKey = testKey('itest-reuse-1');
 
     await service.pay({ userId: USER_ID, orderId: order.id, method: 'WALLET', idempotencyKey });
 
@@ -143,14 +125,14 @@ beforeEach(async () => {
       userId: USER_ID,
       orderId: order.id,
       method: 'WALLET',
-      idempotencyKey: 'itest-unique-1',
+      idempotencyKey: testKey('itest-unique-1'),
     });
 
     await expect(
       prisma.payment.create({
         data: {
           orderId: order.id,
-          idempotencyKey: 'itest-unique-1',
+          idempotencyKey: testKey('itest-unique-1'),
           requestHash: 'x',
           amount: 1,
           method: 'WALLET',
@@ -170,7 +152,7 @@ beforeEach(async () => {
         userId: USER_ID,
         orderId: order.id,
         method: 'WALLET',
-        idempotencyKey: 'itest-decline-key',
+        idempotencyKey: testKey('itest-decline-key'),
       }),
     ).rejects.toMatchObject({ code: 'PAYMENT_DECLINED' });
     decline.mockRestore();
@@ -179,7 +161,7 @@ beforeEach(async () => {
       userId: USER_ID,
       orderId: order.id,
       method: 'WALLET',
-      idempotencyKey: 'itest-retry-key',
+      idempotencyKey: testKey('itest-retry-key'),
     });
 
     expect(recovered.orderStatus).toBe('PAID');
@@ -193,7 +175,7 @@ beforeEach(async () => {
       .mockRejectedValueOnce(new PaymentDeclinedError('MOCK-DECL0000'))
       .mockRejectedValueOnce(new PaymentDeclinedError('MOCK-DECL0000'));
 
-    for (const idempotencyKey of ['itest-decline-2a', 'itest-decline-2b']) {
+    for (const idempotencyKey of [testKey('itest-decline-2a'), testKey('itest-decline-2b')]) {
       await expect(
         service.pay({ userId: USER_ID, orderId: order.id, method: 'WALLET', idempotencyKey }),
       ).rejects.toMatchObject({ code: 'PAYMENT_DECLINED' });
@@ -207,7 +189,7 @@ beforeEach(async () => {
       userId: USER_ID,
       orderId: order.id,
       method: 'WALLET',
-      idempotencyKey: 'itest-decline-2c',
+      idempotencyKey: testKey('itest-decline-2c'),
     });
 
     expect(recovered.orderStatus).toBe('PAID');

@@ -35,7 +35,7 @@ export class CreateOrderDto {
   @IsString()
   couponCode?: string;
 
-  // Đã thống nhất: điểm chỉ trừ khi order PAID, không trừ ở bước validate.
+  // Điểm được reserve atomically khi tạo Order; chỉ cộng điểm EARN sau PAID.
   @IsOptional()
   @IsInt()
   @Min(0)

@@ -319,3 +319,114 @@ describe('RewardsService.finalizeRewardsOnPaid', () => {
     expect(txMock.loyaltyEntry.create).not.toHaveBeenCalled();
   });
 });
+
+
+// ─── FIX 03: redeem đúng số điểm giảm và hoàn khi cancel ──────────────────
+
+describe('FIX03 Rewards: capped redeem và release reservation', () => {
+  const service = new RewardsService({} as PrismaService);
+
+  it('coupon giảm 30k từ 57k, yêu cầu 30k điểm: chỉ trừ và lưu 27k', async () => {
+    const txMock = makeBaseTx();
+    txMock.coupon.findUnique.mockResolvedValue(
+      makeCoupon({ discountPercent: null, discountAmount: 30_000 }),
+    );
+    txMock.coupon.updateMany.mockResolvedValue({ count: 1 });
+    txMock.user.updateMany.mockResolvedValue({ count: 1 });
+
+    const quote = await service.reserveCouponAndPoints(
+      { userId: 7, subtotal: 57_000, couponCode: 'GIAM10', pointsToRedeem: 30_000 },
+      txMock as never,
+    );
+    expect(quote).toEqual({
+      couponDiscount: 30_000, pointsDiscount: 27_000,
+      totalDiscount: 57_000, total: 0,
+    });
+    expect(txMock.user.updateMany).toHaveBeenCalledWith({
+      where: { id: 7, loyaltyPoints: { gte: 27_000 } },
+      data: { loyaltyPoints: { decrement: 27_000 } },
+    });
+  });
+
+  it('coupon giảm hết tiền: không trừ 1 điểm nào dù khách yêu cầu', async () => {
+    const txMock = makeBaseTx();
+    txMock.coupon.findUnique.mockResolvedValue(
+      makeCoupon({ discountPercent: null, discountAmount: 100_000 }),
+    );
+    txMock.coupon.updateMany.mockResolvedValue({ count: 1 });
+    const quote = await service.reserveCouponAndPoints(
+      { userId: 7, subtotal: 57_000, couponCode: 'GIAM10', pointsToRedeem: 30_000 },
+      txMock as never,
+    );
+    expect(quote.pointsDiscount).toBe(0);
+    expect(quote.total).toBe(0);
+    expect(txMock.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it.each([-1, 1.5, NaN, Infinity])('reject pointsToRedeem=%s trước mọi DB update', async (requested) => {
+    const txMock = makeBaseTx();
+    await expect(service.reserveCouponAndPoints(
+      { userId: 7, subtotal: 57_000, couponCode: 'GIAM10', pointsToRedeem: requested },
+      txMock as never,
+    )).rejects.toThrow('pointsToRedeem');
+    expect(txMock.coupon.updateMany).not.toHaveBeenCalled();
+    expect(txMock.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('cancel hoàn quota + điểm đúng giá trị đã dùng trong cùng transaction', async () => {
+    const txMock = makeBaseTx();
+    txMock.coupon.updateMany.mockResolvedValue({ count: 1 });
+    txMock.user.updateMany.mockResolvedValue({ count: 1 });
+    await service.releaseReservedOnCancel(
+      { orderId: 4, userId: 7, couponCode: ' giAm10 ', pointsRedeemed: 27_000 },
+      txMock as never,
+    );
+    expect(txMock.coupon.updateMany).toHaveBeenCalledWith({
+      where: { code: 'GIAM10', usedCount: { gt: 0 } },
+      data: { usedCount: { decrement: 1 } },
+    });
+    expect(txMock.user.updateMany).toHaveBeenCalledWith({
+      where: { id: 7 },
+      data: { loyaltyPoints: { increment: 27_000 } },
+    });
+  });
+
+  it('chỉ dùng points: không đụng coupon', async () => {
+    const txMock = makeBaseTx();
+    txMock.user.updateMany.mockResolvedValue({ count: 1 });
+    await service.releaseReservedOnCancel(
+      { orderId: 4, userId: 7, couponCode: null, pointsRedeemed: 5_000 },
+      txMock as never,
+    );
+    expect(txMock.coupon.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('quota đã bằng 0 => 409; không hoàn điểm một cách đơn lẻ', async () => {
+    const txMock = makeBaseTx();
+    txMock.coupon.updateMany.mockResolvedValue({ count: 0 });
+    await expect(service.releaseReservedOnCancel(
+      { orderId: 4, userId: 7, couponCode: 'GIAM10', pointsRedeemed: 5_000 },
+      txMock as never,
+    )).rejects.toBeInstanceOf(ConflictException);
+    expect(txMock.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('user bị xóa => 409 để transaction cancel rollback', async () => {
+    const txMock = makeBaseTx();
+    txMock.user.updateMany.mockResolvedValue({ count: 0 });
+    await expect(service.releaseReservedOnCancel(
+      { orderId: 4, userId: 7, couponCode: null, pointsRedeemed: 5_000 },
+      txMock as never,
+    )).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('cancel không có reservation: không thay đổi quota/balance', async () => {
+    const txMock = makeBaseTx();
+    await service.releaseReservedOnCancel(
+      { orderId: 4, userId: 7, couponCode: null, pointsRedeemed: 0 },
+      txMock as never,
+    );
+    expect(txMock.coupon.updateMany).not.toHaveBeenCalled();
+    expect(txMock.user.updateMany).not.toHaveBeenCalled();
+  });
+});

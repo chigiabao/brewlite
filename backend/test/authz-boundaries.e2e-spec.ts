@@ -16,12 +16,19 @@ import { PaymentsController } from '../src/payments/payments.controller.js';
 import { PaymentsService } from '../src/payments/payments.service.js';
 import { PrismaModule } from '../src/prisma/prisma.module.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
+import { RewardsController } from '../src/rewards/rewards.controller.js';
+import { RewardsService } from '../src/rewards/rewards.service.js';
 
 const paymentService = { pay: vi.fn(async (input: unknown) => input) };
 const ordersService = {
   create: vi.fn(async (userId: number) => ({ userId })),
   findMine: vi.fn(async (userId: number) => [{ userId }]),
   findOne: vi.fn(async (userId: number, orderId: number) => ({ userId, orderId })),
+};
+
+const rewardsService = {
+  getBalance: vi.fn(async (userId: number) => ({ userId, loyaltyPoints: 17 })),
+  validateCoupon: vi.fn(async () => ({ valid: true, discount: 1000 })),
 };
 
 const orderBody = { items: [{ productId: 3, size: 'M', toppings: [], qty: 1 }] };
@@ -37,10 +44,11 @@ describe('Actual Payments / Orders JWT authorization boundary (HTTP)', () => {
     process.env.JWT_SECRET = 'brewlite-authz-http-regression-secret-long-enough';
     const fixture = await Test.createTestingModule({
       imports: [PrismaModule, AuthModule],
-      controllers: [PaymentsController, OrdersController],
+      controllers: [PaymentsController, OrdersController, RewardsController],
       providers: [
         { provide: PaymentsService, useValue: paymentService },
         { provide: OrdersService, useValue: ordersService },
+        { provide: RewardsService, useValue: rewardsService },
       ],
     })
       .overrideProvider(PrismaService)
@@ -73,6 +81,7 @@ describe('Actual Payments / Orders JWT authorization boundary (HTTP)', () => {
     expect(ordersService.create).not.toHaveBeenCalled();
     expect(ordersService.findMine).not.toHaveBeenCalled();
     expect(ordersService.findOne).not.toHaveBeenCalled();
+    expect(rewardsService.getBalance).not.toHaveBeenCalled();
   }
 
   it('rejects unauthenticated POST /payments with 401 before calling service', async () => {
@@ -181,4 +190,34 @@ describe('Actual Payments / Orders JWT authorization boundary (HTTP)', () => {
       .expect(200);
     expect(ordersService.findOne).toHaveBeenCalledWith(51, 123);
   });
+  it('GET /rewards/me rejects missing, forged and expired tokens', async () => {
+    await request(app.getHttpServer()).get('/rewards/me').expect(401);
+    const forged = jwt.sign({ sub: 42, email: 'authorized@brewlite.test' }, { secret: 'not-our-key' });
+    await request(app.getHttpServer()).get('/rewards/me')
+      .set('Authorization', `Bearer ${forged}`).expect(401);
+    const expired = jwt.sign({ sub: 42, email: 'authorized@brewlite.test' }, { expiresIn: -1 });
+    await request(app.getHttpServer()).get('/rewards/me')
+      .set('Authorization', `Bearer ${expired}`).expect(401);
+    expect(rewardsService.getBalance).not.toHaveBeenCalled();
+  });
+
+  it('GET /rewards/me ignores caller-supplied userId and uses the signed identity', async () => {
+    await request(app.getHttpServer()).get('/rewards/me?userId=1')
+      .set('Authorization', `Bearer ${token(51)}`).expect(200);
+    expect(rewardsService.getBalance).toHaveBeenCalledTimes(1);
+    expect(rewardsService.getBalance).toHaveBeenCalledWith(51);
+  });
+
+  it('rejects forged JWT on actual order APIs without invoking OrdersService', async () => {
+    const forged = jwt.sign({ sub: 1, email: 'fake@brewlite.test' }, { secret: 'forged-secret' });
+    await request(app.getHttpServer()).post('/orders')
+      .set('Authorization', `Bearer ${forged}`).set('Idempotency-Key', 'forged-order')
+      .send(orderBody).expect(401);
+    await request(app.getHttpServer()).get('/orders/me')
+      .set('Authorization', `Bearer ${forged}`).expect(401);
+    await request(app.getHttpServer()).get('/orders/123')
+      .set('Authorization', `Bearer ${forged}`).expect(401);
+    expectNoBusinessCalls();
+  });
+
 });

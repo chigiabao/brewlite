@@ -1,0 +1,36 @@
+{
+  "stage": "FIX04",
+  "base": "FIX01 + FIX02 + FIX03",
+  "contents": [
+    {
+      "path": "backend/src/orders/orders.rollback.e2e-spec.ts",
+      "bytes": 7372,
+      "sha256": "0e9ddf55fd2addc68bd36f546d5ae03dc0faa358a247dc9c4a448074df8a5c69"
+    },
+    {
+      "path": "backend/test/authz-boundaries.e2e-spec.ts",
+      "bytes": 8955,
+      "sha256": "3804a331121ab9e763d2889ad78662797ab47d9815ff44efe067250cca3c98d7"
+    },
+    {
+      "path": "backend/test/payments.e2e-spec.ts",
+      "bytes": 13687,
+      "sha256": "846fa2f5a34affe22e900f92b5c6603abcb68185d30ebfe460b84eb84e573906"
+    },
+    {
+      "path": "backend/test/payments.integration.e2e-spec.ts",
+      "bytes": 6808,
+      "sha256": "3069b84b4495676ce531f54a599a22c3fa21cf0cf8b078fcb4fb134aca34b99c"
+    },
+    {
+      "path": "backend/test/order-checkout-flow.e2e-spec.ts",
+      "bytes": 11450,
+      "sha256": "dbb740a560576b7c1f9fad783205bd4837793c9dc42d98743f3b3e66ec4a4ce6"
+    },
+    {
+      "path": "docs/FIX04-TEST-HARDENING.md",
+      "bytes": 3541,
+      "sha256": "b63b5f05b7ed05699097ac1ce278dd23baa0a268f49c59979bba2180facd6a70"
+    }
+  ]
+}

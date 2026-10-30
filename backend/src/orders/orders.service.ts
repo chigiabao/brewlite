@@ -31,7 +31,7 @@ import { CreateOrderDto } from './orders.dto.js';
 import { StockService } from './stock.service.js';
 import { OrderStatus } from '../generated/prisma/enums.js';
 import { assertTransition } from './order-state.js';
-import { REWARDS_PORT, type RewardsPort } from '../rewards/public.js';
+import { REWARDS_PORT, type RewardsPort, normalizeCouponCode } from '../rewards/public.js';
 
 @Injectable()
 export class OrdersService {
@@ -62,7 +62,7 @@ export class OrdersService {
         toppings: [...item.toppings].sort(),
         qty: item.qty,
       })),
-      couponCode: dto.couponCode ?? null,
+      couponCode: dto.couponCode?.trim() ? normalizeCouponCode(dto.couponCode) : null,
       pointsToRedeem: dto.pointsToRedeem ?? 0,
     };
 
@@ -162,23 +162,31 @@ export class OrdersService {
         );
 
         let discountTotal = 0;
-        let pointsRedeemed = dto.pointsToRedeem ?? 0;
+        let pointsRedeemed = 0;
         let total = subtotal;
         let couponCodeToSave: string | null = null;
+        const requestedPoints = dto.pointsToRedeem ?? 0;
+        const normalizedCoupon = dto.couponCode?.trim()
+          ? normalizeCouponCode(dto.couponCode)
+          : null;
+        if ((normalizedCoupon || requestedPoints > 0) && !this.rewards) {
+          throw new ConflictException('REWARDS_SERVICE_UNAVAILABLE');
+        }
 
-        if (this.rewards && (dto.couponCode || pointsRedeemed > 0)) {
+        if (this.rewards && (normalizedCoupon || requestedPoints > 0)) {
           const quote = await this.rewards.reserveCouponAndPoints(
             {
               userId,
               subtotal,
-              couponCode: dto.couponCode,
-              pointsToRedeem: pointsRedeemed,
+              couponCode: normalizedCoupon ?? undefined,
+              pointsToRedeem: requestedPoints,
             },
             tx,
           );
           discountTotal = quote.totalDiscount;
+          pointsRedeemed = quote.pointsDiscount;
           total = quote.total;
-          couponCodeToSave = dto.couponCode ?? null;
+          couponCodeToSave = normalizedCoupon;
         }
 
         await this.stock.reserve(tx, dto.items, products);
@@ -208,8 +216,8 @@ export class OrdersService {
           },
         });
 
-        if (this.rewards && pointsRedeemed > 0 && 'createRedeemEntry' in this.rewards) {
-          await (this.rewards as any).createRedeemEntry(
+        if (this.rewards && pointsRedeemed > 0) {
+          await this.rewards.createRedeemEntry(
             { orderId: createdOrder.id, userId, points: pointsRedeemed },
             tx,
           );
@@ -300,7 +308,7 @@ export class OrdersService {
       // Kiểm tra đơn có thuộc user không
       const order = await tx.order.findFirst({
         where: { id: orderId, userId },
-        select: { id: true, status: true },
+        select: { id: true, status: true, couponCode: true, pointsRedeemed: true },
       });
 
       if (!order) {
@@ -312,6 +320,12 @@ export class OrdersService {
         order.status !== OrderStatus.PAYMENT_FAILED
       ) {
         throw new ConflictException('ORDER_CANNOT_BE_CANCELLED');
+      }
+
+      // Không cho hủy nếu không thể hoàn đầy đủ coupon/points.
+      // Tránh trạng thái CANCELLED nhưng giữ lại tài nguyên đã reserve.
+      if ((order.couponCode || order.pointsRedeemed > 0) && !this.rewards) {
+        throw new ConflictException('REWARDS_SERVICE_UNAVAILABLE');
       }
 
       // Kiểm tra state machine
@@ -343,6 +357,17 @@ export class OrdersService {
       });
 
       await this.stock.release(tx, items);
+      if (this.rewards && (order.couponCode || order.pointsRedeemed > 0)) {
+        await this.rewards.releaseReservedOnCancel(
+          {
+            orderId,
+            userId,
+            couponCode: order.couponCode ?? null,
+            pointsRedeemed: order.pointsRedeemed ?? 0,
+          },
+          tx,
+        );
+      }
 
       return {
         id: orderId,
