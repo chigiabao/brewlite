@@ -5,7 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { LoyaltyKind } from '../generated/prisma/enums.js';
+import { LoyaltyKind, OrderStatus } from '../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
   calculateCouponDiscount,
@@ -202,7 +202,19 @@ export class RewardsService {
     tx: RewardsTx,
   ): Promise<{ pointsEarned: number }> {
     const { orderId, userId, totalPaid } = params;
-    const pointsEarned = calculateEarnedPoints(totalPaid);
+    // Caller must transition to PAID in this same transaction. Verify the stored
+    // snapshot so a stale callback cannot earn for another user or amount.
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      select: { userId: true, status: true, total: true },
+    });
+    if (!order || order.userId !== userId) {
+      throw new NotFoundException('Không tìm thấy đơn hàng của bạn');
+    }
+    if (order.status !== OrderStatus.PAID || order.total !== totalPaid) {
+      throw new ConflictException('Rewards chỉ được finalize theo tổng tiền của đơn đã PAID');
+    }
+    const pointsEarned = calculateEarnedPoints(order.total);
 
     if (pointsEarned <= 0) {
       return { pointsEarned: 0 };

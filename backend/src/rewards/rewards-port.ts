@@ -58,6 +58,7 @@ export interface RewardsPort {
    * Phải được gọi trong cùng transaction markPaid (F sở hữu transaction).
    *
    * Gọi lại an toàn; unique constraint + skipDuplicates ngăn cộng điểm lần hai.
+   * Xác minh user, trạng thái PAID và totalPaid khớp snapshot trong Order.
    */
   finalizeRewardsOnPaid(
     params: { orderId: number; userId: number; totalPaid: number },

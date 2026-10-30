@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import type { Payment } from '../generated/prisma/client.js';
 import { OrderStatus, PaymentStatus } from '../generated/prisma/enums.js';
@@ -66,7 +66,7 @@ export class PaymentsService {
     private readonly prisma: PrismaService,
     private readonly gateway: MockGatewayService,
     @Inject(ORDERS_PAYMENT_PORT) private readonly orders: OrdersPaymentPort,
-    @Optional() @Inject(REWARDS_PORT) private readonly rewards?: RewardsPort,
+    @Inject(REWARDS_PORT) private readonly rewards: RewardsPort,
   ) {}
 
   async pay(input: PayInput): Promise<PaymentResult> {
@@ -135,18 +135,14 @@ export class PaymentsService {
       });
       await this.orders.markPaid(payment.orderId, payment.id, tx);
 
-      // Dùng snapshot đã được owner Orders xác minh trước khi charge; không đọc
-      // lại qua implementation nội bộ của Orders trong transaction Payments.
-      if (this.rewards) {
-        await this.rewards.finalizeRewardsOnPaid(
-          {
-            orderId: payment.orderId,
-            userId: orderSnapshot.userId,
-            totalPaid: orderSnapshot.total,
-          },
-          tx,
-        );
-      }
+      await this.rewards.finalizeRewardsOnPaid(
+        {
+          orderId: payment.orderId,
+          userId: orderSnapshot.userId,
+          totalPaid: orderSnapshot.total,
+        },
+        tx,
+      );
     });
 
     this.logger.log(

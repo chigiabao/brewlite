@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Test } from '@nestjs/testing';
 import type { Payment } from '../generated/prisma/client.js';
 import { OrderStatus, PaymentStatus } from '../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import type { RewardsPort } from '../rewards/public.js';
 import { MockGatewayService } from './mock-gateway.service.js';
-import type { OrdersPaymentPort, PayableOrder } from './orders-payment.port.js';
+import { ORDERS_PAYMENT_PORT, type OrdersPaymentPort, type PayableOrder } from './orders-payment.port.js';
 import {
   PaymentDeclinedError,
   PaymentErrorCode,
@@ -66,8 +68,8 @@ function createGateway(charge?: () => Promise<{ reference: string; status: 'SUCC
 function createOrders(order: PayableOrder | null) {
   return {
     findOrderForUser: vi.fn(async () => order),
-    markPaid: vi.fn(async () => undefined),
-    markPaymentFailed: vi.fn(async () => undefined),
+    markPaid: vi.fn<OrdersPaymentPort['markPaid']>().mockResolvedValue(undefined),
+    markPaymentFailed: vi.fn<OrdersPaymentPort['markPaymentFailed']>().mockResolvedValue(undefined),
   };
 }
 
@@ -86,12 +88,19 @@ function setup(overrides: { order?: PayableOrder | null; gateway?: ReturnType<ty
       : overrides.order;
   const gateway = overrides.gateway ?? createGateway();
   const orders = createOrders(order);
+  const rewards = {
+    reserveCouponAndPoints: vi.fn(),
+    createRedeemEntry: vi.fn(),
+    finalizeRewardsOnPaid: vi.fn<RewardsPort['finalizeRewardsOnPaid']>()
+      .mockResolvedValue({ pointsEarned: 850 }),
+  };
   const service = new PaymentsService(
     prisma as unknown as PrismaService,
     gateway as unknown as MockGatewayService,
     orders as unknown as OrdersPaymentPort,
+    rewards,
   );
-  return { service, prisma, gateway, orders, order };
+  return { service, prisma, gateway, orders, order, rewards };
 }
 
 async function expectPaymentError(promise: Promise<unknown>, code: PaymentErrorCode) {
@@ -103,8 +112,19 @@ describe('PaymentsService', () => {
     vi.clearAllMocks();
   });
 
+  it('thiếu Rewards provider phải lỗi wiring thay vì bỏ qua loyalty', async () => {
+    await expect(Test.createTestingModule({
+      providers: [
+        PaymentsService,
+        { provide: PrismaService, useValue: {} },
+        { provide: MockGatewayService, useValue: {} },
+        { provide: ORDERS_PAYMENT_PORT, useValue: {} },
+      ],
+    }).compile()).rejects.toThrow('REWARDS_PORT');
+  });
+
   it('thanh toán mới success -> gateway gọi đúng 1 lần, Payment SUCCEEDED, Order PAID', async () => {
-    const { service, prisma, gateway, orders } = setup();
+    const { service, prisma, gateway, orders, rewards } = setup();
 
     const result = await service.pay(baseInput);
 
@@ -119,6 +139,12 @@ describe('PaymentsService', () => {
     expect(orders.markPaid).toHaveBeenCalledTimes(1);
     expect(prisma.__payments).toHaveLength(1);
     expect(prisma.__payments[0].status).toBe(PaymentStatus.SUCCEEDED);
+    expect(rewards.finalizeRewardsOnPaid).toHaveBeenCalledExactlyOnceWith(
+      { orderId: 10, userId: 1, totalPaid: 85_000 },
+      expect.any(Object),
+    );
+    expect(rewards.finalizeRewardsOnPaid.mock.calls[0][1])
+      .toBe(orders.markPaid.mock.calls[0][2]);
   });
 
   it('amount luôn lấy từ Order.total, không nhận từ client', async () => {
@@ -133,7 +159,7 @@ describe('PaymentsService', () => {
   });
 
   it('cùng key + cùng request -> gateway không gọi lần 2, trả lại kết quả đầu', async () => {
-    const { service, gateway } = setup();
+    const { service, gateway, rewards } = setup();
 
     const first = await service.pay(baseInput);
     const second = await service.pay(baseInput);
@@ -142,6 +168,7 @@ describe('PaymentsService', () => {
     expect(second.paymentId).toBe(first.paymentId);
     expect(second.transactionId).toBe(first.transactionId);
     expect(second.idempotentReplay).toBe(true);
+    expect(rewards.finalizeRewardsOnPaid).toHaveBeenCalledTimes(1);
   });
 
   it('cùng key + khác orderId -> 409 IDEMPOTENCY_KEY_REUSED', async () => {
@@ -168,23 +195,25 @@ describe('PaymentsService', () => {
     const gateway = createGateway(async () => {
       throw new PaymentDeclinedError('MOCK-ABC0000');
     });
-    const { service, prisma, orders } = setup({ gateway });
+    const { service, prisma, orders, rewards } = setup({ gateway });
 
     await expectPaymentError(service.pay(baseInput), PaymentErrorCode.PAYMENT_DECLINED);
 
     expect(orders.markPaymentFailed).toHaveBeenCalledTimes(1);
     expect(prisma.__payments[0].status).toBe(PaymentStatus.FAILED);
+    expect(rewards.finalizeRewardsOnPaid).not.toHaveBeenCalled();
   });
 
   it('gateway timeout -> 504 GATEWAY_TIMEOUT', async () => {
     const gateway = createGateway(async () => {
       throw new GatewayTimeoutError();
     });
-    const { service, prisma } = setup({ gateway });
+    const { service, prisma, rewards } = setup({ gateway });
 
     await expectPaymentError(service.pay(baseInput), PaymentErrorCode.GATEWAY_TIMEOUT);
 
     expect(prisma.__payments[0].status).toBe(PaymentStatus.FAILED);
+    expect(rewards.finalizeRewardsOnPaid).not.toHaveBeenCalled();
   });
 
   it('order đã PAID -> gateway không được gọi', async () => {

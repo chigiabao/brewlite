@@ -1,0 +1,48 @@
+name: Rewards quota and replay regression
+
+on:
+  push:
+    paths: ['backend/**', 'scripts/verify-foundation.mjs', '.github/workflows/rewards-regression.yml']
+  pull_request:
+    paths: ['backend/**', 'scripts/verify-foundation.mjs', '.github/workflows/rewards-regression.yml']
+
+jobs:
+  rewards:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: brew
+          POSTGRES_PASSWORD: brew
+          POSTGRES_DB: brewlite_rewards_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U brew -d brewlite_rewards_test"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql://brew:brew@127.0.0.1:5432/brewlite_rewards_test
+      REWARDS_TEST_DATABASE_URL: postgresql://brew:brew@127.0.0.1:5432/brewlite_rewards_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run build
+      - run: npx tsc --noEmit --incremental false
+      - run: node ../scripts/verify-foundation.mjs
+      - run: npm run test:rewards:regression -- --reporter=default --reporter=junit --outputFile.junit=reports/rewards-regression.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rewards-regression
+          path: backend/reports/rewards-regression.xml
+          if-no-files-found: warn
