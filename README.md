@@ -162,16 +162,6 @@ docker compose logs -f
 
 Yêu cầu: **Node.js 24 LTS** và dịch vụ **PostgreSQL 16** đang chạy ở cổng `5432`.
 
-| Vai trò / Mục đích | Email | Mật khẩu | Điểm tích lũy (`loyaltyPoints`) |
-|---|---|---|---|
-| **Khách hàng thân thiết** | `customer@gmail.com` | `password123` | `50` |
-| **Quản trị viên / Demo** | `admin@gmail.com` | `password123` | `100` |
-| **Tài khoản mới** | `demo@gmail.com` | `password123` | `0` |
-
-> [!TIP]
-> - Định dạng Email: Toàn bộ địa chỉ email và đuôi tên miền `@gmail.com` luôn được viết và chuẩn hóa bằng chữ thường (lowercase).
-> - Mật khẩu mẫu tuân thủ quy chuẩn bảo mật độ dài từ 6 đến 72 ký tự (chuẩn an toàn thuật toán Bcrypt 12 rounds).
-> - Bạn có thể đăng nhập trực tiếp trên giao diện: [http://localhost:3000/login](http://localhost:3000/login) hoặc qua REST API `POST http://localhost:3001/auth/login`.
 #### 1. Cấu hình biến môi trường
 Tạo file `.env` ở thư mục gốc và `backend/.env`:
 ```env
@@ -214,11 +204,15 @@ Hệ thống đã chuẩn bị sẵn các tài khoản mẫu trong cơ sở dữ
 
 | Phân loại | Email | Mật khẩu | Điểm tích lũy (`loyaltyPoints`) | Mục đích kiểm thử |
 | :--- | :--- | :--- | :---: | :--- |
-| **Khách hàng thân thiết** | `customer@brewlite.vn` | `password123` | **50** | Đặt món, áp dụng đổi điểm loyalty |
-| **Quản trị viên (Admin)** | `admin@brewlite.vn` | `password123` | **100** | Kiểm tra quyền quản trị & điểm cao |
-| **Tài khoản mới** | `demo@brewlite.vn` | `password123` | **0** | Kiểm thử đăng ký & đơn hàng đầu tiên |
+| **Khách hàng thân thiết** | `customer@gmail.com` | `password123` | **50** | Đặt món, áp dụng đổi điểm loyalty |
+| **Quản trị viên (Admin)** | `admin@gmail.com` | `password123` | **100** | Kiểm tra quyền quản trị & điểm cao |
+| **Tài khoản mới** | `demo@gmail.com` | `password123` | **0** | Kiểm thử đăng ký & đơn hàng đầu tiên |
 
-> **Voucher mẫu:** Nhập mã `GIAM10` tại trang thanh toán để được giảm 10% giá trị đơn hàng.
+> [!TIP]
+> - **Định dạng Email:** Toàn bộ địa chỉ email và đuôi tên miền `@gmail.com` luôn được viết và chuẩn hóa bằng chữ thường (lowercase).
+> - **Mật khẩu mẫu:** Tuân thủ quy chuẩn bảo mật độ dài từ 6 đến 72 ký tự (chuẩn an toàn thuật toán Bcrypt 12 rounds).
+> - **Đăng nhập:** Bạn có thể đăng nhập trực tiếp trên giao diện [http://localhost:3000/login](http://localhost:3000/login) hoặc qua REST API `POST http://localhost:3001/auth/login`.
+> - **Voucher mẫu:** Nhập mã `GIAM10` tại trang thanh toán để được giảm 10% giá trị đơn hàng.
 
 ---
 
