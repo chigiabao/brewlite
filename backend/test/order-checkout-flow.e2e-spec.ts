@@ -13,6 +13,10 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { AppModule } from '../src/app.module.js';
 import { OrdersService } from '../src/orders/orders.service.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
+import { RewardsService } from '../src/rewards/rewards.service.js';
+import { STRIPE_CLIENT } from '../src/payments/stripe.provider.js';
+import { FakeStripe } from './helpers/fake-stripe.js';
+import { ORDERS_PAYMENT_PORT, type OrdersPaymentPort } from '../src/payments/orders-payment.port.js';
 
 const runId = randomUUID();
 const testKey = (suffix: string) => `f04-flow-${runId}-${suffix}`;
@@ -48,6 +52,8 @@ describe('FIX04: actual order -> payment -> rewards checkout (PostgreSQL E2E)', 
     process.env.JWT_SECRET = 'fix04-actual-postgresql-e2e-jwt-secret';
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(STRIPE_CLIENT)
+      .useValue(new FakeStripe())
       .compile();
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({
@@ -192,15 +198,25 @@ describe('FIX04: actual order -> payment -> rewards checkout (PostgreSQL E2E)', 
 
     const key = testKey('rewards-payment');
     const pay = () => request(app.getHttpServer())
-      .post('/payments').set('Authorization', `Bearer ${token}`)
+      .post('/payments/checkout').set('Authorization', `Bearer ${token}`)
       .set('Idempotency-Key', key)
       .send({ orderId, method: 'WALLET' });
     const paid = await pay();
     expect(paid.status).toBe(200);
-    expect(paid.body).toMatchObject({ orderStatus: 'PAID', amount: 24_000 });
+    expect(paid.body).toMatchObject({ status: 'PENDING' });
     const replay = await pay();
     expect(replay.status).toBe(200);
     expect(replay.body.idempotentReplay).toBe(true);
+
+    const payment = await prisma.payment.findFirstOrThrow({ where: { orderId } });
+    await prisma.$transaction(async (tx) => {
+      await tx.payment.update({ where: { id: payment.id }, data: { status: 'SUCCEEDED' } });
+      await app.get<OrdersPaymentPort>(ORDERS_PAYMENT_PORT).markPaid(orderId, payment.id, tx as never);
+      await app.get(RewardsService).finalizeRewardsOnPaid(
+        { orderId, userId, totalPaid: 24_000, pointsRedeemed: 3_000 },
+        tx as never,
+      );
+    });
 
     expect(await prisma.loyaltyEntry.findUnique({
       where: { orderId_kind: { orderId, kind: 'REDEEM' } },

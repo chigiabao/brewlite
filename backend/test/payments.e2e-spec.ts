@@ -361,7 +361,7 @@ describe('Payments HTTP (e2e, fixture order, fake Stripe)', () => {
         livemode: false,
         pending_webhooks: 1,
         request: { id: null, idempotency_key: null },
-        type: 'charge.refunded',
+        type: 'customer.created',
         data: { object: {} },
       }),
       header: stripe.webhooks.generateTestHeaderString({
@@ -373,7 +373,7 @@ describe('Payments HTTP (e2e, fixture order, fake Stripe)', () => {
           livemode: false,
           pending_webhooks: 1,
           request: { id: null, idempotency_key: null },
-          type: 'charge.refunded',
+          type: 'customer.created',
           data: { object: {} },
         }),
         secret: WEBHOOK_SECRET,

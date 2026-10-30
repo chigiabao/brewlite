@@ -881,7 +881,12 @@ export class PaymentsService {
 
       if (becamePaid) {
         await this.rewards.finalizeRewardsOnPaid(
-          { orderId: order.id, userId: order.userId, totalPaid: order.total },
+          {
+            orderId: order.id,
+            userId: order.userId,
+            totalPaid: order.total,
+            pointsRedeemed: order.pointsRedeemed ?? 0,
+          },
           tx,
         );
       }

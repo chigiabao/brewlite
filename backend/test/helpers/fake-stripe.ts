@@ -37,18 +37,20 @@ export class FakeStripe {
     params: CreateParams,
     options?: RequestOptions,
   ): Promise<Stripe.Checkout.Session> {
+    // Check idempotency cache BEFORE recording the call — a cache-hit is a
+    // replay, not a new Stripe session creation (matches real Stripe behaviour).
+    const idempotencyKey = options?.idempotencyKey;
+    if (idempotencyKey) {
+      const cached = this.idempotency.get(idempotencyKey);
+      if (cached) return cached;
+    }
+
     this.createCalls.push({ params, options });
 
     if (this.failNextCreate) {
       const error = this.failNextCreate;
       this.failNextCreate = null;
       throw error;
-    }
-
-    const idempotencyKey = options?.idempotencyKey;
-    if (idempotencyKey) {
-      const cached = this.idempotency.get(idempotencyKey);
-      if (cached) return cached;
     }
 
     sessionSequence += 1;
