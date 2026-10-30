@@ -13,6 +13,7 @@ import {
   calculateRewardsQuote,
   checkCouponEligibility,
   normalizeCouponCode,
+  assertNonNegativeInteger,
   type CouponInvalidReason,
 } from './reward-rules.js';
 import type { ValidateCouponDto } from './rewards.dto.js';
@@ -88,6 +89,9 @@ export class RewardsService {
   ): Promise<ReserveResult> {
     const { userId, subtotal, couponCode, pointsToRedeem = 0 } = params;
 
+    assertNonNegativeInteger(subtotal, 'subtotal');
+    assertNonNegativeInteger(pointsToRedeem, 'pointsToRedeem');
+
     // --- Coupon ---
     let couponDiscount = 0;
     if (couponCode && couponCode.trim() !== '') {
@@ -111,6 +115,8 @@ export class RewardsService {
       const updated = await tx.coupon.updateMany({
         where: {
           code,
+          active: true,
+          expiresAt: { gt: new Date() },
           ...(coupon.maxUses !== null ? { usedCount: { lt: coupon.maxUses } } : {}),
         },
         data: { usedCount: { increment: 1 } },
@@ -125,23 +131,35 @@ export class RewardsService {
     }
 
     // --- Points redeem ---
-    let pointsDiscount = 0;
-    if (pointsToRedeem > 0) {
+    // Coupon được trừ trước; điểm yêu cầu vượt phần còn lại chỉ reserve phần có thể dùng.
+    // Không được trừ balance nhiều hơn pointsRedeemed snapshot.
+    const pointsDiscount = calculateRewardsQuote(
+      subtotal,
+      couponDiscount,
+      pointsToRedeem,
+    ).pointsDiscount;
+    if (pointsDiscount > 0) {
       // Đọc số điểm hiện tại; dùng updateMany để atomically kiểm tra và trừ.
       const updated = await tx.user.updateMany({
-        where: { id: userId, loyaltyPoints: { gte: pointsToRedeem } },
-        data: { loyaltyPoints: { decrement: pointsToRedeem } },
+        where: { id: userId, loyaltyPoints: { gte: pointsDiscount } },
+        data: { loyaltyPoints: { decrement: pointsDiscount } },
       });
 
       if (updated.count === 0) {
+        const current = await tx.user.findUnique({
+          where: { id: userId },
+          select: { loyaltyPoints: true },
+        });
+        if (current && current.loyaltyPoints >= pointsDiscount) {
+          throw new ConflictException('Điểm vừa được sử dụng. Vui lòng thử lại.');
+        }
         throw new BadRequestException('Không đủ điểm loyalty để đổi');
       }
 
       // Tạo LoyaltyEntry REDEEM; unique([orderId, kind]) sẽ được enforce sau khi Order được tạo.
       // Tại bước reserve, chưa có orderId nên entry này được tạo sau khi Order insert bởi E.
       // G chỉ trừ điểm user ở đây; E sẽ tạo LoyaltyEntry REDEEM sau khi có orderId.
-      pointsDiscount = pointsToRedeem;
-      this.logger.log(`points.reserved userId=${userId} points=${pointsToRedeem}`);
+      this.logger.log(`points.reserved userId=${userId} points=${pointsDiscount}`);
     }
 
     const quote = calculateRewardsQuote(subtotal, couponDiscount, pointsDiscount);
@@ -158,13 +176,14 @@ export class RewardsService {
     tx: RewardsTx,
   ): Promise<void> {
     if (params.points <= 0) return;
-    await tx.loyaltyEntry.create({
-      data: {
+    await tx.loyaltyEntry.createMany({
+      data: [{
         userId: params.userId,
         orderId: params.orderId,
         kind: LoyaltyKind.REDEEM,
         points: params.points,
-      },
+      }],
+      skipDuplicates: true,
     });
     this.logger.log(
       `loyalty.redeem.entry orderId=${params.orderId} userId=${params.userId} points=${params.points}`,
@@ -189,23 +208,25 @@ export class RewardsService {
       return { pointsEarned: 0 };
     }
 
-    // Kiểm tra đã EARN chưa (idempotency guard thủ công để tránh throw P2002 ra ngoài).
-    const existing = await tx.loyaltyEntry.findUnique({
-      where: { orderId_kind: { orderId, kind: LoyaltyKind.EARN } },
-    });
-    if (existing) {
-      this.logger.warn(`loyalty.earn.duplicate orderId=${orderId} — skipped`);
-      return { pointsEarned: existing.points };
-    }
-
-    await tx.loyaltyEntry.create({
-      data: {
+    // skipDuplicates biến unique(orderId, kind) thành exactly-once guard ngay
+    // cả khi hai payment callbacks chạy đồng thời trong cùng database.
+    const inserted = await tx.loyaltyEntry.createMany({
+      data: [{
         userId,
         orderId,
         kind: LoyaltyKind.EARN,
         points: pointsEarned,
-      },
+      }],
+      skipDuplicates: true,
     });
+
+    if (inserted.count === 0) {
+      const existing = await tx.loyaltyEntry.findUnique({
+        where: { orderId_kind: { orderId, kind: LoyaltyKind.EARN } },
+      });
+      this.logger.warn(`loyalty.earn.duplicate orderId=${orderId} — skipped`);
+      return { pointsEarned: existing?.points ?? pointsEarned };
+    }
 
     await tx.user.update({
       where: { id: userId },

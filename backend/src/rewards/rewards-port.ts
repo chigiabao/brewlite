@@ -47,11 +47,17 @@ export interface RewardsPort {
    */
   reserveCouponAndPoints(params: ReserveParams, tx: RewardsTx): Promise<ReserveResult>;
 
+  /** Ghi audit REDEEM sau khi Order đã có id, trong cùng transaction tạo Order. */
+  createRedeemEntry(
+    params: { orderId: number; userId: number; points: number },
+    tx: RewardsTx,
+  ): Promise<void>;
+
   /**
    * Cộng điểm loyalty sau khi Order PAID — chính xác 1 lần nhờ unique constraint.
    * Phải được gọi trong cùng transaction markPaid (F sở hữu transaction).
    *
-   * Throws nếu LoyaltyEntry EARN cho orderId này đã tồn tại (idempotent guard).
+   * Gọi lại an toàn; unique constraint + skipDuplicates ngăn cộng điểm lần hai.
    */
   finalizeRewardsOnPaid(
     params: { orderId: number; userId: number; totalPaid: number },

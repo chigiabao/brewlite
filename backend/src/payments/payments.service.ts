@@ -1,9 +1,9 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import type { Payment } from '../generated/prisma/client.js';
 import { OrderStatus, PaymentStatus } from '../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { REWARDS_PORT, type RewardsPort } from '../rewards/rewards-port.js';
+import { REWARDS_PORT, type RewardsPort } from '../rewards/public.js';
 import { MockGatewayService } from './mock-gateway.service.js';
 import {
   ORDERS_PAYMENT_PORT,
@@ -66,7 +66,7 @@ export class PaymentsService {
     private readonly prisma: PrismaService,
     private readonly gateway: MockGatewayService,
     @Inject(ORDERS_PAYMENT_PORT) private readonly orders: OrdersPaymentPort,
-    @Inject(REWARDS_PORT) private readonly rewards: RewardsPort,
+    @Optional() @Inject(REWARDS_PORT) private readonly rewards?: RewardsPort,
   ) {}
 
   async pay(input: PayInput): Promise<PaymentResult> {
@@ -107,10 +107,13 @@ export class PaymentsService {
       throw error;
     }
 
-    return this.chargeAndSettle(payment);
+    return this.chargeAndSettle(payment, order);
   }
 
-  private async chargeAndSettle(payment: Payment): Promise<PaymentResult> {
+  private async chargeAndSettle(
+    payment: Payment,
+    orderSnapshot: PayableOrder,
+  ): Promise<PaymentResult> {
     let reference: string;
     try {
       const result = await this.gateway.charge({
@@ -132,14 +135,15 @@ export class PaymentsService {
       });
       await this.orders.markPaid(payment.orderId, payment.id, tx);
 
-      // Lấy thông tin userId và total để cộng điểm; idempotent (unique LoyaltyEntry guard).
-      const order = await tx.order.findUnique({
-        where: { id: payment.orderId },
-        select: { userId: true, total: true },
-      });
-      if (order) {
+      // Dùng snapshot đã được owner Orders xác minh trước khi charge; không đọc
+      // lại qua implementation nội bộ của Orders trong transaction Payments.
+      if (this.rewards) {
         await this.rewards.finalizeRewardsOnPaid(
-          { orderId: payment.orderId, userId: order.userId, totalPaid: order.total },
+          {
+            orderId: payment.orderId,
+            userId: orderSnapshot.userId,
+            totalPaid: orderSnapshot.total,
+          },
           tx,
         );
       }

@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { RewardsModule } from '../rewards/rewards.module.js';
+import { RewardsModule } from '../rewards/public.js';
 import {
   GATEWAY_REFERENCE_GENERATOR,
   MockGatewayService,

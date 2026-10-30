@@ -41,6 +41,7 @@ function makeBaseTx() {
     loyaltyEntry: {
       findUnique: vi.fn(),
       create: vi.fn(),
+      createMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
   };
 }
@@ -223,6 +224,25 @@ describe('RewardsService.reserveCouponAndPoints', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('points yêu cầu vượt phần tiền còn lại → chỉ reserve phần được cap', async () => {
+    const tx = makeTx() as unknown as Parameters<typeof service.reserveCouponAndPoints>[1];
+    const txMock = tx as unknown as ReturnType<typeof makeBaseTx>;
+    txMock.coupon.findUnique.mockResolvedValue(makeCoupon());
+    txMock.coupon.updateMany.mockResolvedValue({ count: 1 });
+    txMock.user.updateMany.mockResolvedValue({ count: 1 });
+
+    const result = await service.reserveCouponAndPoints(
+      { userId: 1, subtotal: 100_000, couponCode: 'GIAM10', pointsToRedeem: 100_000 },
+      tx,
+    );
+
+    expect(result.pointsDiscount).toBe(90_000);
+    expect(txMock.user.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 1, loyaltyPoints: { gte: 90_000 } },
+      data: { loyaltyPoints: { decrement: 90_000 } },
+    }));
+  });
+
   it('coupon + points cùng lúc → tính đúng thứ tự subtotal → coupon → points', async () => {
     const tx = makeTx() as unknown as Parameters<typeof service.reserveCouponAndPoints>[1];
     const txMock = tx as unknown as ReturnType<typeof makeBaseTx>;
@@ -264,13 +284,14 @@ describe('RewardsService.finalizeRewardsOnPaid', () => {
     );
     expect(result).toEqual({ pointsEarned: 850 });
 
-    expect(txMock.loyaltyEntry.create).toHaveBeenCalledWith({
-      data: {
+    expect(txMock.loyaltyEntry.createMany).toHaveBeenCalledWith({
+      data: [{
         userId: 1,
         orderId: 10,
         kind: LoyaltyKind.EARN,
         points: 850,
-      },
+      }],
+      skipDuplicates: true,
     });
     expect(txMock.user.update).toHaveBeenCalledWith({
       where: { id: 1 },
@@ -283,13 +304,16 @@ describe('RewardsService.finalizeRewardsOnPaid', () => {
     const txMock = tx as unknown as ReturnType<typeof makeBaseTx>;
     // Simula idempotency replay: entry đã có
     txMock.loyaltyEntry.findUnique.mockResolvedValue({ id: 5, points: 850 });
+    txMock.loyaltyEntry.createMany.mockResolvedValue({ count: 0 });
 
     const result = await service.finalizeRewardsOnPaid(
       { orderId: 10, userId: 1, totalPaid: 85_000 },
       tx,
     );
     expect(result).toEqual({ pointsEarned: 850 });
-    expect(txMock.loyaltyEntry.create).not.toHaveBeenCalled();
+    expect(txMock.loyaltyEntry.createMany).toHaveBeenCalledWith(expect.objectContaining({
+      skipDuplicates: true,
+    }));
     expect(txMock.user.update).not.toHaveBeenCalled();
   });
 
