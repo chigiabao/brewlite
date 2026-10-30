@@ -242,4 +242,63 @@ export class RewardsService {
     this.logger.log(`loyalty.earn orderId=${orderId} points=${pointsEarned}`);
     return { pointsEarned };
   }
+
+  /**
+   * Full-refund reversal. The unique (orderId, kind=REFUND) ledger row is the
+   * idempotency barrier, so replaying Stripe webhooks cannot move points twice.
+   */
+  async refundRewardsOnRefund(
+    params: {
+      orderId: number;
+      userId: number;
+      pointsRedeemed: number;
+      restoreRedeemedPoints: boolean;
+    },
+    tx: RewardsTx,
+  ): Promise<{ pointsDelta: number; alreadyProcessed: boolean }> {
+    const { orderId, userId, pointsRedeemed, restoreRedeemedPoints } = params;
+    assertNonNegativeInteger(pointsRedeemed, 'pointsRedeemed');
+
+    const existingRefund = await tx.loyaltyEntry.findUnique({
+      where: { orderId_kind: { orderId, kind: LoyaltyKind.REFUND } },
+    });
+    if (existingRefund) {
+      this.logger.warn(`loyalty.refund.duplicate orderId=${orderId} — skipped`);
+      return { pointsDelta: existingRefund.points, alreadyProcessed: true };
+    }
+
+    const earnEntry = await tx.loyaltyEntry.findUnique({
+      where: { orderId_kind: { orderId, kind: LoyaltyKind.EARN } },
+    });
+    const earnedPoints = earnEntry?.points ?? 0;
+    const restoredPoints = restoreRedeemedPoints ? pointsRedeemed : 0;
+    const pointsDelta = restoredPoints - earnedPoints;
+
+    await tx.loyaltyEntry.create({
+      data: {
+        userId,
+        orderId,
+        kind: LoyaltyKind.REFUND,
+        points: pointsDelta,
+      },
+    });
+
+    if (pointsDelta !== 0) {
+      const user = await tx.user.update({
+        where: { id: userId },
+        data: { loyaltyPoints: { increment: pointsDelta } },
+        select: { loyaltyPoints: true },
+      });
+      if (user.loyaltyPoints < 0) {
+        this.logger.warn(
+          `loyalty.refund.negative_balance orderId=${orderId} userId=${userId} balance=${user.loyaltyPoints}`,
+        );
+      }
+    }
+
+    this.logger.log(
+      `loyalty.refund orderId=${orderId} userId=${userId} delta=${pointsDelta} restored=${restoredPoints} reversed=${earnedPoints}`,
+    );
+    return { pointsDelta, alreadyProcessed: false };
+  }
 }

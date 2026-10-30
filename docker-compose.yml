@@ -22,8 +22,8 @@ services:
       JWT_SECRET: ${JWT_SECRET:-local-only-change-me-before-deploy}
       FRONTEND_URL: http://localhost:3000
       PORT: 3001
-      # Bật bằng MOCK_GATEWAY_TEST_MODE=true trong .env chỉ khi demo local.
-      MOCK_GATEWAY_TEST_MODE: ${MOCK_GATEWAY_TEST_MODE:-false}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
     depends_on:
       db:
         condition: service_healthy

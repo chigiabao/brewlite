@@ -105,8 +105,14 @@
     },
     {
       "method": "POST",
-      "path": "/payments",
+      "path": "/payments/checkout",
       "owner": "F"
+    },
+    {
+      "method": "POST",
+      "path": "/payments/webhook/stripe",
+      "owner": "F",
+      "extension": true
     },
     {
       "method": "POST",
@@ -120,7 +126,7 @@
     "completedStatus": "COMPLETED, not PICKED_UP",
     "coupon": "percentage OR fixed amount; final discount capped at subtotal",
     "money": "all money represented by nonnegative integer VND",
-    "mockPayment": "no real money is debited",
+    "mockPayment": "Stripe Checkout test mode: backend creates a hosted Checkout Session and webhook settles the order",
     "loyalty": "earn/redeem finalized atomically once per PAID order (never on failed payment)",
     "stock": "optimistic locking using version inside transaction",
     "orderSnapshot": "server calculates amounts and captures price/toppings at order time",
