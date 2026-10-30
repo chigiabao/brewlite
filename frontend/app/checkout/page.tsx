@@ -1,10 +1,31 @@
 // Trang thanh toán hoàn chỉnh. Người phụ trách: F (Task 8 UI) & E (Tạo đơn) & G (Khuyến mãi).
 'use client';
-import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useCart } from '@/store/cart';
+import {
+  CheckoutApiError,
+  createCheckout,
+  createOrder,
+} from './checkout-api';
+import {
+  cartKeyFor,
+  clearAttempt,
+  loadAttempt,
+  newAttempt,
+  rotatePaymentAttempt,
+  saveAttempt,
+  startPaymentAttempt,
+} from './checkout-recovery';
+
+const FAILED_ATTEMPT_CODES = new Set([
+  'PAYMENT_DECLINED',
+  'PAYMENT_INTERNAL_ERROR',
+  'STRIPE_SESSION_EXPIRED',
+  'GATEWAY_TIMEOUT',
+]);
 
 function subscribe(callback: () => void) {
   window.addEventListener('storage', callback);
@@ -19,8 +40,10 @@ function getServerSnapshot(): null {
   return null;
 }
 
-export default function CheckoutPage() {
+function CheckoutContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const cancelled = searchParams.get('status') === 'cancelled';
   const items = useCart((s) => s.items);
   const total = useCart((s) => s.total());
   const clear = useCart((s) => s.clear);
@@ -40,13 +63,9 @@ export default function CheckoutPage() {
   const [validatedCartSignature, setValidatedCartSignature] = useState<string | null>(null);
   const couponRequestId = useRef(0);
 
-  // Demo simulator for US-05 failure test
-  const [simulateFailure, setSimulateFailure] = useState(false);
-
-  // Một khóa cho một lần thanh toán; bấm thử lại giữ nguyên khóa (Task 10 – F).
-  const idemKey = useRef<string | null>(null);
   // Giữ orderId trong cùng phiên trang checkout. Retry không được POST /orders lần nữa.
-  const pendingOrder = useRef<{ id: number; cartKey: string; total: number } | null>(null);
+  const [pendingOrder, setPendingOrder] = useState<{ id: number; cartKey: string; total: number } | null>(null);
+  const [paymentLocked, setPaymentLocked] = useState(false);
 
   useEffect(() => {
     if (!items.length) router.replace('/cart');
@@ -56,16 +75,20 @@ export default function CheckoutPage() {
   const cartSignature = JSON.stringify(items.map(({ productId, size, toppings, qty, unitPrice }) => ({
     productId, size, toppings: [...toppings].sort(), qty, unitPrice,
   })));
+  const cartKey = cartKeyFor(items);
+
+  const selectedMethod = method;
+  const isPaymentLocked = paymentLocked;
   const activeCouponCode = validatedCartSignature === cartSignature ? couponCode : null;
   const activeCouponDiscount = activeCouponCode ? couponDiscount : 0;
-  const finalTotal = pendingOrder.current?.cartKey === cartSignature
-    ? pendingOrder.current.total
+  const finalTotal = pendingOrder?.cartKey === cartSignature
+    ? pendingOrder.total
     : Math.max(0, total - activeCouponDiscount);
 
   if (!items.length) return null;
 
   const handleApplyCoupon = async () => {
-    if (pendingOrder.current) {
+    if (pendingOrder) {
       setCouponMessage('Đơn đã được tạo. Không thể đổi coupon trên đơn này; hãy hoàn tất thanh toán.');
       return;
     }
@@ -114,67 +137,81 @@ export default function CheckoutPage() {
       return;
     }
 
-    const cartKey = cartSignature;
-
-    // Không dùng nhầm đơn cũ nếu giỏ đã thay đổi trong khi checkout.
-    if (pendingOrder.current && pendingOrder.current.cartKey !== cartKey) {
-      pendingOrder.current = null;
-      idemKey.current = null;
+    let attempt = loadAttempt(cartKey) ?? newAttempt(cartKey);
+    if (pendingOrder && pendingOrder.cartKey !== cartKey) {
+      setPendingOrder(null);
+      clearAttempt();
+      attempt = newAttempt(cartKey);
     }
-    idemKey.current ??= crypto.randomUUID();
+
     setLoading(true);
     setError('');
 
     try {
-      // E: chỉ tạo đơn 1 lần cho một giỏ. Truyền Idempotency-Key để backend không bị 400 IDEMPOTENCY_KEY_REQUIRED.
-      if (!pendingOrder.current) {
-        const order = await api<{ id: number; total: number }>('/orders', {
-          method: 'POST',
-          headers: { 'Idempotency-Key': idemKey.current },
-          body: JSON.stringify({
+      saveAttempt(attempt);
+
+      if (!attempt.orderId) {
+        const order = await createOrder(
+          {
             items: items.map(({ productId, size, toppings, qty }) => ({
-              productId, size, toppings, qty,
+              productId,
+              size,
+              toppings,
+              qty,
             })),
             couponCode: activeCouponCode ?? undefined,
-          }),
-        });
+          },
+          attempt.orderKey,
+        );
         if (!Number.isSafeInteger(order.id) || !Number.isSafeInteger(order.total) || order.total < 0) {
           throw new Error('Backend trả dữ liệu đơn hàng không hợp lệ. Kiểm tra lịch sử đơn trước khi thử lại.');
         }
-        pendingOrder.current = { id: order.id, cartKey, total: order.total };
+        attempt = { ...attempt, orderId: order.id };
+        saveAttempt(attempt);
+        setPendingOrder({ id: order.id, cartKey, total: order.total });
       }
 
-      const orderId = pendingOrder.current?.id;
-      if (!orderId) throw new Error('Không tạo được đơn hàng. Vui lòng kiểm tra lại lịch sử đơn.');
+      attempt = startPaymentAttempt(attempt, method);
+      saveAttempt(attempt);
+      setPaymentLocked(true);
 
-      // F – Task 8: gọi POST /payments với Idempotency-Key
-      const res = await api<{ orderId: number; status: string; orderStatus?: string }>('/payments', {
-        method: 'POST',
-        headers: { 'Idempotency-Key': idemKey.current },
-        body: JSON.stringify({ orderId, method, ...(simulateFailure ? { demoDecline: true } : {}) }),
-      });
-
-      const isPaid = res.orderStatus === 'PAID' || res.status === 'SUCCEEDED' || res.status === 'PAID';
-      if (isPaid) {
-        clear();
-        router.push(`/orders/${res.orderId}/confirmed`);
-      } else {
-        // Kết quả lỗi đã rõ: lần thanh toán tiếp theo cần key mới, nhưng giữ orderId.
-        idemKey.current = null;
-        setError('Thanh toán lỗi. Giỏ hàng vẫn được giữ nguyên. Vui lòng thử lại.');
+      if (!attempt.orderId || !attempt.paymentKey || !attempt.method) {
+        throw new Error('Không thể khôi phục lượt thanh toán. Vui lòng thử lại.');
       }
+
+      const result = await createCheckout(
+        attempt.orderId,
+        attempt.method,
+        attempt.paymentKey,
+      );
+
+      window.location.assign(result.checkoutUrl);
     } catch (e: unknown) {
-      const msg = (e as Error).message ?? '';
-      if (msg.includes('đã được thanh toán') || msg.includes('ORDER_ALREADY_PAID')) {
+      const apiError = e instanceof CheckoutApiError ? e : null;
+
+      if (apiError?.code === 'ORDER_ALREADY_PAID') {
+        clearAttempt();
         clear();
-        if (pendingOrder.current?.id) {
-          router.push(`/orders/${pendingOrder.current.id}/confirmed`);
+        if (attempt.orderId) {
+          router.replace(`/orders/${attempt.orderId}/confirmed`);
           return;
         }
       }
-      // Kết quả lỗi đã rõ: lần thanh toán tiếp theo cần key mới, nhưng giữ nguyên orderId (Task 10).
-      idemKey.current = null;
-      setError(msg || 'Đã xảy ra lỗi kết nối. Kiểm tra lịch sử đơn trước khi tạo lần khác.');
+
+      if (apiError?.code === 'IDEMPOTENCY_KEY_REUSED') {
+        saveAttempt(rotatePaymentAttempt(attempt));
+      } else if (apiError?.code === 'STRIPE_SESSION_FAILED' && apiError.retryable) {
+        // Server kept payment PENDING; retrying the same key recreates the session.
+      } else if (apiError && FAILED_ATTEMPT_CODES.has(apiError.code ?? '')) {
+        saveAttempt(rotatePaymentAttempt(attempt));
+      }
+
+      setPaymentLocked(false);
+      setError(
+        e instanceof Error
+          ? e.message
+          : 'Đã xảy ra lỗi kết nối. Kiểm tra lịch sử đơn trước khi tạo lần khác.',
+      );
     } finally {
       setLoading(false);
     }
@@ -242,7 +279,7 @@ export default function CheckoutPage() {
               type="text"
               placeholder="Nhập mã (vd: GIAM10, GIAM15K)"
               value={couponInput}
-              disabled={loading || Boolean(pendingOrder.current)}
+              disabled={loading || Boolean(pendingOrder)}
               onChange={(e) => {
                 couponRequestId.current += 1;
                 setValidatingCoupon(false);
@@ -257,7 +294,7 @@ export default function CheckoutPage() {
             <button
               type="button"
               onClick={handleApplyCoupon}
-              disabled={validatingCoupon || loading || Boolean(pendingOrder.current)}
+              disabled={validatingCoupon || loading || Boolean(pendingOrder)}
               className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-amber-400 rounded-xl text-xs font-semibold border border-stone-700 transition"
             >
               {validatingCoupon ? 'Đang kiểm tra…' : 'Áp dụng'}
@@ -281,7 +318,7 @@ export default function CheckoutPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label
               className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition ${
-                method === 'WALLET'
+                selectedMethod === 'WALLET'
                   ? 'bg-amber-500/10 border-amber-500/50 text-stone-100'
                   : 'bg-stone-950 border-stone-800/80 text-stone-400 hover:border-stone-700'
               }`}
@@ -289,7 +326,8 @@ export default function CheckoutPage() {
               <input
                 type="radio"
                 name="paymentMethod"
-                checked={method === 'WALLET'}
+                checked={selectedMethod === 'WALLET'}
+                disabled={isPaymentLocked}
                 onChange={() => setMethod('WALLET')}
                 className="accent-amber-500"
               />
@@ -303,7 +341,7 @@ export default function CheckoutPage() {
 
             <label
               className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition ${
-                method === 'CARD'
+                selectedMethod === 'CARD'
                   ? 'bg-amber-500/10 border-amber-500/50 text-stone-100'
                   : 'bg-stone-950 border-stone-800/80 text-stone-400 hover:border-stone-700'
               }`}
@@ -311,7 +349,8 @@ export default function CheckoutPage() {
               <input
                 type="radio"
                 name="paymentMethod"
-                checked={method === 'CARD'}
+                checked={selectedMethod === 'CARD'}
+                disabled={isPaymentLocked}
                 onChange={() => setMethod('CARD')}
                 className="accent-amber-500"
               />
@@ -323,21 +362,6 @@ export default function CheckoutPage() {
               </div>
             </label>
           </div>
-        </div>
-
-        {/* Công cụ demo cho giảng viên (US-05 Acceptance Criteria) */}
-        <div className="py-3 px-3.5 my-4 bg-stone-950/70 border border-stone-800 rounded-xl">
-          <label className="flex items-center gap-2.5 cursor-pointer text-xs text-stone-400 hover:text-stone-300">
-            <input
-              type="checkbox"
-              checked={simulateFailure}
-              onChange={(e) => setSimulateFailure(e.target.checked)}
-              className="accent-red-500 w-4 h-4 rounded"
-            />
-            <span>
-              <strong className="text-amber-400">[Demo cho GV]:</strong> Gửi yêu cầu mô phỏng ngân hàng từ chối <em>qua backend thật</em> (đơn chuyển <code className="text-red-400">PAYMENT_FAILED</code>). Cần bật <code>MOCK_GATEWAY_TEST_MODE=true</code> trên backend local.
-            </span>
-          </label>
         </div>
 
         {/* Tổng kết tiền */}
@@ -352,7 +376,7 @@ export default function CheckoutPage() {
               <span className="font-mono">-{activeCouponDiscount.toLocaleString('vi-VN')}đ</span>
             </div>
           )}
-          {pendingOrder.current?.cartKey === cartSignature && (
+          {pendingOrder?.cartKey === cartSignature && (
             <p className="text-xs text-stone-400">Số tiền chính thức đã được backend tính lại khi tạo đơn.</p>
           )}
           <div className="flex justify-between text-base font-bold text-stone-100 pt-2 border-t border-stone-800">
@@ -364,9 +388,9 @@ export default function CheckoutPage() {
         </div>
 
         {/* Thông báo lỗi */}
-        {error && (
+        {(error || cancelled) && (
           <div className="mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs leading-relaxed">
-            {error}
+            {error || 'Bạn đã huỷ thanh toán. Có thể bấm thanh toán lại.'}
           </div>
         )}
 
@@ -380,7 +404,7 @@ export default function CheckoutPage() {
           </Link>
           <button
             onClick={handlePay}
-            disabled={loading || validatingCoupon}
+            disabled={loading || validatingCoupon || !isLoggedIn}
             className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-stone-950 font-bold text-center text-sm shadow-lg shadow-amber-500/20 disabled:opacity-50 transition"
           >
             {loading ? 'Đang xử lý giao dịch…' : 'Xác nhận thanh toán'}
@@ -388,5 +412,13 @@ export default function CheckoutPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={null}>
+      <CheckoutContent />
+    </Suspense>
   );
 }

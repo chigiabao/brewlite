@@ -106,7 +106,16 @@ model Payment {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
+  // Stripe fields
+  stripeSessionId        String?  @unique   // Checkout Session id (cs_...)
+  stripePaymentIntentId  String?            // PaymentIntent id (pi_...), dùng cho refund
+  stripeCheckoutUrl      String?            // cache session.url để replay nhanh
+  stripeSessionExpiresAt DateTime?          // = session.expires_at, để biết còn open không
+  paidAt                 DateTime?
+
   @@index([orderId])
+  // NOTE: migration 20261030120000 adds a partial unique index:
+  // one PENDING payment per order (Payment_orderId_pending_key).
 }
 
 model Coupon {

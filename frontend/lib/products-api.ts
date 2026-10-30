@@ -136,7 +136,7 @@ function enrichProduct(p: Product): Product {
   const name = p.name.toLowerCase();
   let category: Product['category'] = 'vietnamese';
   let badge: string | undefined = undefined;
-  let rating = 4.9;
+  const rating = 4.9;
 
   if (name.includes('americano') || name.includes('espresso') || name.includes('latte') || name.includes('cappuccino')) {
     category = 'espresso';

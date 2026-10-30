@@ -12,7 +12,6 @@ import type { App } from 'supertest/types.js';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module.js';
 import { OrdersService } from '../src/orders/orders.service.js';
-import { GATEWAY_REFERENCE_GENERATOR } from '../src/payments/mock-gateway.service.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 
 const runId = randomUUID();
@@ -33,7 +32,6 @@ describe('FIX04: actual order -> payment -> rewards checkout (PostgreSQL E2E)', 
   let productId: number;
   let couponCode: string | null = null;
   let previousJwtSecret: string | undefined;
-  let previousLatency: string | undefined;
 
   async function cleanupOrders() {
     const rows = await prisma.order.findMany({ where: { userId }, select: { id: true } });
@@ -47,13 +45,9 @@ describe('FIX04: actual order -> payment -> rewards checkout (PostgreSQL E2E)', 
 
   beforeAll(async () => {
     previousJwtSecret = process.env.JWT_SECRET;
-    previousLatency = process.env.MOCK_GATEWAY_LATENCY_MS;
     process.env.JWT_SECRET = 'fix04-actual-postgresql-e2e-jwt-secret';
-    process.env.MOCK_GATEWAY_LATENCY_MS = '0';
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
-      .overrideProvider(GATEWAY_REFERENCE_GENERATOR)
-      .useValue({ next: () => 'MOCK-FIX04-OK1234' })
       .compile();
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({
@@ -105,12 +99,10 @@ describe('FIX04: actual order -> payment -> rewards checkout (PostgreSQL E2E)', 
       await app?.close();
       if (previousJwtSecret === undefined) delete process.env.JWT_SECRET;
       else process.env.JWT_SECRET = previousJwtSecret;
-      if (previousLatency === undefined) delete process.env.MOCK_GATEWAY_LATENCY_MS;
-      else process.env.MOCK_GATEWAY_LATENCY_MS = previousLatency;
     }
   });
 
-  it('creates a priced order, pays once, replays payment without double stock or EARN', async () => {
+  it('creates a priced order and replays the order key without double stock', async () => {
     const placed = await request(app.getHttpServer())
       .post('/orders').set('Authorization', `Bearer ${token}`)
       .set('Idempotency-Key', testKey('order-happy'))
@@ -124,22 +116,11 @@ describe('FIX04: actual order -> payment -> rewards checkout (PostgreSQL E2E)', 
     expect(await prisma.product.findUniqueOrThrow({ where: { id: productId } }))
       .toMatchObject({ stock: 8, version: 1 });
 
-    const key = testKey('payment-happy');
-    const pay = () => request(app.getHttpServer())
-      .post('/payments').set('Authorization', `Bearer ${token}`)
-      .set('Idempotency-Key', key)
-      .send({ orderId, method: 'WALLET' });
-    const first = await pay();
-    expect(first.status).toBe(200);
-    expect(first.body).toMatchObject({ orderId, amount: 80_000, orderStatus: 'PAID', idempotentReplay: false });
-    const replay = await pay();
-    expect(replay.status).toBe(200);
-    expect(replay.body).toMatchObject({ paymentId: first.body.paymentId, idempotentReplay: true });
-
-    expect(await prisma.payment.count({ where: { orderId } })).toBe(1);
-    expect(await prisma.loyaltyEntry.count({ where: { orderId, kind: 'EARN' } })).toBe(1);
-    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } }))
-      .toMatchObject({ loyaltyPoints: 5_800 });
+    const replay = await request(app.getHttpServer())
+      .post('/orders').set('Authorization', `Bearer ${token}`)
+      .set('Idempotency-Key', testKey('order-happy'))
+      .send(checkoutBody(productId, 2)).expect(201);
+    expect(replay.body.id).toBe(orderId);
     expect(await prisma.product.findUniqueOrThrow({ where: { id: productId } }))
       .toMatchObject({ stock: 8, version: 1 });
   });
@@ -174,7 +155,7 @@ describe('FIX04: actual order -> payment -> rewards checkout (PostgreSQL E2E)', 
       .toMatchObject({ stock: 9, version: 1 });
   });
 
-  it('other JWT cannot read or pay another user order (404, no payment)', async () => {
+  it('other JWT cannot read another user order', async () => {
     const placed = await request(app.getHttpServer()).post('/orders')
       .set('Authorization', `Bearer ${token}`).set('Idempotency-Key', testKey('scope'))
       .send(checkoutBody(productId)).expect(201);
@@ -182,11 +163,6 @@ describe('FIX04: actual order -> payment -> rewards checkout (PostgreSQL E2E)', 
 
     await request(app.getHttpServer()).get(`/orders/${orderId}`)
       .set('Authorization', `Bearer ${otherToken}`).expect(404);
-    await request(app.getHttpServer()).post('/payments')
-      .set('Authorization', `Bearer ${otherToken}`)
-      .set('Idempotency-Key', testKey('other-user'))
-      .send({ orderId, method: 'WALLET' }).expect(404);
-    expect(await prisma.payment.count({ where: { orderId } })).toBe(0);
     expect((await prisma.order.findUniqueOrThrow({ where: { id: orderId } })).status).toBe('PENDING');
   });
 

@@ -11,6 +11,9 @@ export const PaymentErrorCode = {
   PAYMENT_DECLINED: 'PAYMENT_DECLINED',
   GATEWAY_TIMEOUT: 'GATEWAY_TIMEOUT',
   PAYMENT_INTERNAL_ERROR: 'PAYMENT_INTERNAL_ERROR',
+  STRIPE_SESSION_FAILED: 'STRIPE_SESSION_FAILED',           // tạo session fail
+  STRIPE_WEBHOOK_INVALID: 'STRIPE_WEBHOOK_INVALID',         // signature sai / payload hỏng
+  STRIPE_SESSION_EXPIRED: 'STRIPE_SESSION_EXPIRED',         // webhook expired
 } as const;
 
 export type PaymentErrorCode = (typeof PaymentErrorCode)[keyof typeof PaymentErrorCode];

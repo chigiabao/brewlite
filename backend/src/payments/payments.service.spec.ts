@@ -1,78 +1,174 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Payment } from '../generated/prisma/client.js';
 import { OrderStatus, PaymentStatus } from '../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { MockGatewayService, type MockChargeInput } from './mock-gateway.service.js';
 import type { OrdersPaymentPort, PayableOrder } from './orders-payment.port.js';
-import {
-  PaymentDeclinedError,
-  PaymentErrorCode,
-  GatewayTimeoutError,
-} from './payment.errors.js';
+import { PaymentError, PaymentErrorCode } from './payment.errors.js';
 import type { PayInput } from './payment.types.js';
 import { paymentRequestHash, PaymentsService } from './payments.service.js';
+import { FakeStripe, stripeError } from '../../test/helpers/fake-stripe.js';
 
-type PaymentCreateData = Omit<Payment, 'id' | 'transactionId' | 'createdAt' | 'updatedAt'>;
+const WEBHOOK_SECRET = 'whsec_unit_test';
+process.env.STRIPE_WEBHOOK_SECRET = WEBHOOK_SECRET;
 
-function createPrismaMock() {
+type OrderRow = PayableOrder;
+
+type PaymentCreateData = {
+  orderId: number;
+  idempotencyKey: string;
+  requestHash: string;
+  amount: number;
+  method: 'WALLET' | 'CARD';
+  status: PaymentStatus;
+};
+
+type PaymentWhere = {
+  id?: number;
+  idempotencyKey?: string;
+  orderId?: number;
+  status?: PaymentStatus | { not: PaymentStatus };
+};
+
+function matches(payment: Payment, where: PaymentWhere): boolean {
+  if (where.id !== undefined && payment.id !== where.id) return false;
+  if (where.idempotencyKey !== undefined && payment.idempotencyKey !== where.idempotencyKey) {
+    return false;
+  }
+  if (where.orderId !== undefined && payment.orderId !== where.orderId) return false;
+  if (where.status !== undefined) {
+    if (typeof where.status === 'string') {
+      if (payment.status !== where.status) return false;
+    } else if (payment.status === where.status.not) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function createPrismaMock(initialOrder: OrderRow) {
+  const order: OrderRow = initialOrder;
   const payments: Payment[] = [];
-  let nextId = 1;
+  let nextPaymentId = 1;
+
+  const paymentApi = {
+    findUnique: vi.fn(async ({ where }: { where: PaymentWhere }) => {
+      return (
+        payments.find((payment) =>
+          where.id !== undefined
+            ? payment.id === where.id
+            : payment.idempotencyKey === where.idempotencyKey,
+        ) ?? null
+      );
+    }),
+    findFirst: vi.fn(async ({ where }: { where: PaymentWhere }) => {
+      return payments.find((payment) => matches(payment, where)) ?? null;
+    }),
+    create: vi.fn(async ({ data }: { data: PaymentCreateData }): Promise<Payment> => {
+      if (payments.some((payment) => payment.idempotencyKey === data.idempotencyKey)) {
+        throw Object.assign(new Error('unique idempotency key'), { code: 'P2002' });
+      }
+      if (
+        data.status === PaymentStatus.PENDING &&
+        payments.some(
+          (payment) =>
+            payment.orderId === data.orderId && payment.status === PaymentStatus.PENDING,
+        )
+      ) {
+        throw Object.assign(new Error('unique pending payment'), { code: 'P2002' });
+      }
+      const now = new Date();
+      const payment: Payment = {
+        id: nextPaymentId++,
+        transactionId: null,
+        createdAt: now,
+        updatedAt: now,
+        stripeSessionId: null,
+        stripePaymentIntentId: null,
+        stripeCheckoutUrl: null,
+        stripeSessionExpiresAt: null,
+        paidAt: null,
+        ...data,
+      };
+      payments.push(payment);
+      return payment;
+    }),
+    update: vi.fn(
+      async ({ where, data }: { where: { id: number }; data: Partial<Payment> }) => {
+        const payment = payments.find((item) => item.id === where.id);
+        if (!payment) throw new Error('payment not found');
+        Object.assign(payment, data, { updatedAt: new Date() });
+        return payment;
+      },
+    ),
+    updateMany: vi.fn(
+      async ({ where, data }: { where: PaymentWhere; data: Partial<Payment> }) => {
+        const matched = payments.filter((payment) => matches(payment, where));
+        for (const payment of matched) {
+          Object.assign(payment, data, { updatedAt: new Date() });
+        }
+        return { count: matched.length };
+      },
+    ),
+  };
+
+  const orderApi = {
+    findFirst: vi.fn(async () => order),
+    findUnique: vi.fn(async () => order),
+  };
 
   const tx = {
-    payment: {
-      update: vi.fn(
-        async ({ where, data }: { where: { id: number }; data: Partial<Payment> }) => {
-          const payment = payments.find((item) => item.id === where.id);
-          if (!payment) throw new Error('payment not found');
-          Object.assign(payment, data, { updatedAt: new Date() });
-          return payment;
-        },
-      ),
-    },
-    order: {
-      findUnique: vi.fn(async () => ({ userId: 1, total: 85_000 })),
-    },
+    $queryRaw: vi.fn(async () => [{ id: order.id }]),
+    payment: paymentApi,
+    order: orderApi,
   };
 
-  return {
-    payment: {
-      findUnique: vi.fn(
-        async ({ where }: { where: { idempotencyKey: string } }): Promise<Payment | null> =>
-          payments.find((item) => item.idempotencyKey === where.idempotencyKey) ?? null,
-      ),
-      create: vi.fn(async ({ data }: { data: PaymentCreateData }): Promise<Payment> => {
-        if (payments.some((item) => item.idempotencyKey === data.idempotencyKey)) {
-          throw Object.assign(new Error('unique constraint'), { code: 'P2002' });
-        }
-        const payment: Payment = {
-          id: nextId++,
-          transactionId: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          ...data,
-        };
-        payments.push(payment);
-        return payment;
-      }),
-    },
-    $transaction: vi.fn(async (callback: (client: typeof tx) => Promise<unknown>) => callback(tx)),
+  const prisma = {
+    payment: paymentApi,
+    order: orderApi,
+    $transaction: vi.fn(
+      async (callback: (client: typeof tx) => Promise<unknown>) => callback(tx),
+    ),
     __payments: payments,
+    __order: order,
   };
+
+  return { prisma, order, payments, tx };
 }
 
-function createGateway(charge?: (input: MockChargeInput) => Promise<{ reference: string; status: 'SUCCEEDED' }>) {
-  return {
-    charge: vi.fn(charge ?? (async () => ({ reference: 'MOCK-ABC123', status: 'SUCCEEDED' as const }))),
-  };
-}
-
-function createOrders(order: PayableOrder | null) {
+function createOrdersPort(order: OrderRow): OrdersPaymentPort {
   return {
     findOrderForUser: vi.fn(async () => order),
-    markPending: vi.fn(async () => undefined),
-    markPaid: vi.fn(async () => undefined),
-    markPaymentFailed: vi.fn(async () => undefined),
+    markPending: vi.fn(async () => {
+      order.status = OrderStatus.PENDING;
+    }),
+    markPaid: vi.fn(async () => {
+      order.status = OrderStatus.PAID;
+    }),
+    markPaymentFailed: vi.fn(async () => {
+      order.status = OrderStatus.PAYMENT_FAILED;
+    }),
   };
+}
+
+function setup() {
+  const order: OrderRow = {
+    id: 10,
+    userId: 1,
+    status: OrderStatus.PENDING,
+    total: 85_000,
+  };
+  const { prisma, payments } = createPrismaMock(order);
+  const orders = createOrdersPort(order);
+  const rewards = { finalizeRewardsOnPaid: vi.fn(async () => undefined) };
+  const stripe = new FakeStripe();
+  const service = new PaymentsService(
+    prisma as unknown as PrismaService,
+    stripe as never,
+    orders,
+    rewards as never,
+  );
+
+  return { service, stripe, prisma, orders, rewards, order, payments };
 }
 
 const baseInput: PayInput = {
@@ -82,247 +178,315 @@ const baseInput: PayInput = {
   idempotencyKey: 'idem-abc-123',
 };
 
-function setup(overrides: { order?: PayableOrder | null; gateway?: ReturnType<typeof createGateway> } = {}) {
-  const prisma = createPrismaMock();
-  const order: PayableOrder | null =
-    overrides.order === undefined
-      ? { id: 10, userId: 1, status: OrderStatus.PENDING, total: 85_000 }
-      : overrides.order;
-  const gateway = overrides.gateway ?? createGateway();
-  const orders = createOrders(order);
-  const rewards = {
-    finalizeRewardsOnPaid: vi.fn(async () => undefined),
-  };
-  const service = new PaymentsService(
-    prisma as unknown as PrismaService,
-    gateway as unknown as MockGatewayService,
-    orders as unknown as OrdersPaymentPort,
-    rewards as any,
-  );
-  return { service, prisma, gateway, orders, order, rewards };
+async function capture(promise: Promise<unknown>): Promise<PaymentError> {
+  try {
+    await promise;
+  } catch (error) {
+    return error as PaymentError;
+  }
+  throw new Error('Expected promise to reject');
 }
 
-async function expectPaymentError(promise: Promise<unknown>, code: PaymentErrorCode) {
-  await expect(promise).rejects.toMatchObject({ code });
+function response(error: PaymentError): Record<string, unknown> {
+  return error.getResponse() as Record<string, unknown>;
 }
 
-describe('PaymentsService', () => {
+describe('PaymentsService createCheckout', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-  afterEach(() => {
-    vi.unstubAllEnvs();
+    process.env.STRIPE_WEBHOOK_SECRET = WEBHOOK_SECRET;
   });
 
-  it('thanh toán mới success -> gateway gọi đúng 1 lần, Payment SUCCEEDED, Order PAID', async () => {
-    const { service, prisma, gateway, orders } = setup();
+  it('tạo Stripe Checkout Session, lưu session và trả checkoutUrl', async () => {
+    const { service, stripe, payments } = setup();
 
-    const result = await service.pay(baseInput);
+    const result = await service.createCheckout(baseInput);
 
-    expect(gateway.charge).toHaveBeenCalledTimes(1);
     expect(result).toMatchObject({
       orderId: 10,
-      status: PaymentStatus.SUCCEEDED,
-      orderStatus: OrderStatus.PAID,
-      method: 'WALLET',
+      status: PaymentStatus.PENDING,
       idempotentReplay: false,
     });
-    expect(orders.markPaid).toHaveBeenCalledTimes(1);
-    expect(prisma.__payments).toHaveLength(1);
-    expect(prisma.__payments[0].status).toBe(PaymentStatus.SUCCEEDED);
+    expect(result.checkoutUrl).toContain('https://checkout.stripe.com');
+    expect(payments).toHaveLength(1);
+    expect(payments[0].stripeSessionId).toMatch(/^cs_test_/);
+    expect(payments[0].stripeCheckoutUrl).toBe(result.checkoutUrl);
+
+    expect(stripe.createCalls).toHaveLength(1);
+    const params = stripe.createCalls[0].params;
+    expect(params.mode).toBe('payment');
+    expect(params.success_url).toContain('/orders/10/confirmed');
+    expect(params.cancel_url).toContain('/checkout?status=cancelled');
+    expect(params.metadata).toMatchObject({ orderId: '10', paymentId: '1', userId: '1' });
+    expect(params.expires_at).toBeGreaterThan(Math.floor(Date.now() / 1000) + 30 * 60 - 5);
   });
 
-  it('order PAYMENT_FAILED -> reset PENDING trước khi gọi gateway', async () => {
-    const { service, gateway, orders } = setup({
-      order: { id: 10, userId: 1, status: OrderStatus.PAYMENT_FAILED, total: 85_000 },
-    });
+  it('cùng Idempotency-Key -> replay cùng session, Stripe chỉ gọi 1 lần', async () => {
+    const { service, stripe, payments } = setup();
 
-    const result = await service.pay(baseInput);
+    const first = await service.createCheckout(baseInput);
+    const second = await service.createCheckout(baseInput);
 
-    expect(orders.markPending).toHaveBeenCalledWith(10);
-    expect(orders.markPending.mock.invocationCallOrder[0]).toBeLessThan(
-      gateway.charge.mock.invocationCallOrder[0],
-    );
-    expect(gateway.charge).toHaveBeenCalledTimes(1);
-    expect(result.orderStatus).toBe(OrderStatus.PAID);
-  });
-
-  it('amount luôn lấy từ Order.total, không nhận từ client', async () => {
-    const { service, prisma } = setup({
-      order: { id: 10, userId: 1, status: OrderStatus.PENDING, total: 12_345 },
-    });
-
-    const result = await service.pay(baseInput);
-
-    expect(result.amount).toBe(12_345);
-    expect(prisma.__payments[0].amount).toBe(12_345);
-  });
-
-  it('cùng key + cùng request -> gateway không gọi lần 2, trả lại kết quả đầu', async () => {
-    const { service, gateway } = setup();
-
-    const first = await service.pay(baseInput);
-    const second = await service.pay(baseInput);
-
-    expect(gateway.charge).toHaveBeenCalledTimes(1);
     expect(second.paymentId).toBe(first.paymentId);
-    expect(second.transactionId).toBe(first.transactionId);
+    expect(second.checkoutUrl).toBe(first.checkoutUrl);
     expect(second.idempotentReplay).toBe(true);
+    expect(stripe.createCalls).toHaveLength(1);
+    expect(payments).toHaveLength(1);
   });
 
-  it('cùng key + khác orderId -> 409 IDEMPOTENCY_KEY_REUSED', async () => {
+  it('key khác cho cùng order -> reuse active payment, không tạo session thứ 2', async () => {
+    const { service, stripe, payments } = setup();
+
+    const first = await service.createCheckout(baseInput);
+    const second = await service.createCheckout({
+      ...baseInput,
+      idempotencyKey: 'idem-other-key',
+    });
+
+    expect(second.paymentId).toBe(first.paymentId);
+    expect(second.checkoutUrl).toBe(first.checkoutUrl);
+    expect(second.idempotentReplay).toBe(true);
+    expect(stripe.createCalls).toHaveLength(1);
+    expect(payments).toHaveLength(1);
+  });
+
+  it('cùng key khác payload -> IDEMPOTENCY_KEY_REUSED', async () => {
     const { service } = setup();
 
-    await service.pay(baseInput);
-    await expectPaymentError(
-      service.pay({ ...baseInput, orderId: 11 }),
-      PaymentErrorCode.IDEMPOTENCY_KEY_REUSED,
+    await service.createCheckout(baseInput);
+    const error = await capture(
+      service.createCheckout({ ...baseInput, method: 'CARD' }),
+    );
+
+    expect(error.code).toBe(PaymentErrorCode.IDEMPOTENCY_KEY_REUSED);
+  });
+
+  it('order đã PAID -> ORDER_ALREADY_PAID, không gọi Stripe', async () => {
+    const { service, stripe, order } = setup();
+    order.status = OrderStatus.PAID;
+
+    const error = await capture(service.createCheckout(baseInput));
+
+    expect(error.code).toBe(PaymentErrorCode.ORDER_ALREADY_PAID);
+    expect(stripe.createCalls).toHaveLength(0);
+  });
+
+  it('order PAYMENT_FAILED -> reset PENDING trước khi tạo session', async () => {
+    const { service, orders, order } = setup();
+    order.status = OrderStatus.PAYMENT_FAILED;
+
+    await service.createCheckout(baseInput);
+
+    expect(orders.markPending).toHaveBeenCalledWith(10, expect.anything());
+    expect(order.status).toBe(OrderStatus.PENDING);
+  });
+
+  it('lỗi Stripe permanent -> payment FAILED, retryable=false', async () => {
+    const { service, stripe, payments } = setup();
+    stripe.failNextCreate = stripeError('StripeInvalidRequestError');
+
+    const error = await capture(service.createCheckout(baseInput));
+
+    expect(error.code).toBe(PaymentErrorCode.STRIPE_SESSION_FAILED);
+    expect(response(error).retryable).toBe(false);
+    expect(payments[0].status).toBe(PaymentStatus.FAILED);
+  });
+
+  it('lỗi Stripe transient -> giữ PENDING, retry cùng key thành công', async () => {
+    const { service, stripe, payments } = setup();
+    stripe.failNextCreate = stripeError('StripeAPIError');
+
+    const firstError = await capture(service.createCheckout(baseInput));
+    expect(firstError.code).toBe(PaymentErrorCode.STRIPE_SESSION_FAILED);
+    expect(response(firstError).retryable).toBe(true);
+    expect(payments[0].status).toBe(PaymentStatus.PENDING);
+
+    const retried = await service.createCheckout(baseInput);
+
+    expect(retried.checkoutUrl).toContain('https://checkout.stripe.com');
+    expect(payments[0].status).toBe(PaymentStatus.PENDING);
+    expect(payments[0].stripeSessionId).toBeTruthy();
+    expect(stripe.createCalls).toHaveLength(2);
+    expect(stripe.createCalls[0].options?.idempotencyKey).toBe(
+      stripe.createCalls[1].options?.idempotencyKey,
     );
   });
 
-  it('cùng key + khác method -> 409 IDEMPOTENCY_KEY_REUSED', async () => {
-    const { service } = setup();
+  it('payment PENDING có session hết hạn -> STRIPE_SESSION_EXPIRED và mark FAILED', async () => {
+    const { service, stripe, payments } = setup();
+    const first = await service.createCheckout(baseInput);
+    const sessionId = payments[0].stripeSessionId!;
+    payments[0].stripeSessionExpiresAt = new Date(Date.now() - 1000);
+    stripe.markExpired(sessionId);
 
-    await service.pay(baseInput);
-    await expectPaymentError(
-      service.pay({ ...baseInput, method: 'CARD' }),
-      PaymentErrorCode.IDEMPOTENCY_KEY_REUSED,
+    const error = await capture(service.createCheckout(baseInput));
+
+    expect(error.code).toBe(PaymentErrorCode.STRIPE_SESSION_EXPIRED);
+    expect(payments[0].status).toBe(PaymentStatus.FAILED);
+    expect(first.checkoutUrl).toContain('https://checkout.stripe.com');
+  });
+});
+
+describe('PaymentsService stripe webhook', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.STRIPE_WEBHOOK_SECRET = WEBHOOK_SECRET;
+  });
+
+  async function createSession() {
+    const context = setup();
+    const result = await context.service.createCheckout(baseInput);
+    const sessionId = context.payments[0].stripeSessionId!;
+    return { ...context, result, sessionId };
+  }
+
+  it('completed + paid -> payment SUCCEEDED, order PAID, rewards 1 lần', async () => {
+    const { service, stripe, payments, order, rewards, sessionId } = await createSession();
+    const session = stripe.markPaid(sessionId);
+    const { payload, header } = stripe.signedEvent(
+      session,
+      'checkout.session.completed',
+      WEBHOOK_SECRET,
     );
+
+    const result = await service.handleStripeWebhook(Buffer.from(payload), header);
+
+    expect(result).toMatchObject({ received: true, orderId: 10, replay: false });
+    expect(payments[0].status).toBe(PaymentStatus.SUCCEEDED);
+    expect(payments[0].paidAt).toBeInstanceOf(Date);
+    expect(payments[0].stripePaymentIntentId).toMatch(/^pi_test_/);
+    expect(order.status).toBe(OrderStatus.PAID);
+    expect(rewards.finalizeRewardsOnPaid).toHaveBeenCalledTimes(1);
   });
 
-  it('demo decline không bật -> 400 trước khi tạo payment và không gọi gateway', async () => {
-    vi.stubEnv('MOCK_GATEWAY_TEST_MODE', 'false');
-    const { service, prisma, gateway } = setup();
-    await expect(service.pay({ ...baseInput, demoDecline: true }))
-      .rejects.toMatchObject({ status: 400 });
-    expect(prisma.__payments).toHaveLength(0);
-    expect(gateway.charge).not.toHaveBeenCalled();
+  it('webhook lặp lại -> replay, không cộng điểm lần 2', async () => {
+    const { service, stripe, rewards, sessionId } = await createSession();
+    const session = stripe.markPaid(sessionId);
+    const { payload, header } = stripe.signedEvent(
+      session,
+      'checkout.session.completed',
+      WEBHOOK_SECRET,
+    );
+
+    await service.handleStripeWebhook(Buffer.from(payload), header);
+    const replay = await service.handleStripeWebhook(Buffer.from(payload), header);
+
+    expect(replay).toMatchObject({ received: true, orderId: 10, replay: true });
+    expect(rewards.finalizeRewardsOnPaid).toHaveBeenCalledTimes(1);
   });
 
-  it('demo decline bị khóa khi NODE_ENV=production ngay cả nếu bật test mode', async () => {
-    vi.stubEnv('MOCK_GATEWAY_TEST_MODE', 'true');
-    vi.stubEnv('NODE_ENV', 'production');
-    const { service, prisma } = setup();
-    await expect(service.pay({ ...baseInput, demoDecline: true }))
-      .rejects.toMatchObject({ status: 400 });
-    expect(prisma.__payments).toHaveLength(0);
+  it('completed nhưng unpaid -> ignored, chưa chốt đơn', async () => {
+    const { service, stripe, payments, order, sessionId } = await createSession();
+    const session = stripe.getSession(sessionId);
+    const { payload, header } = stripe.signedEvent(
+      session,
+      'checkout.session.completed',
+      WEBHOOK_SECRET,
+    );
+
+    const result = await service.handleStripeWebhook(Buffer.from(payload), header);
+
+    expect(result).toMatchObject({ ignored: 'awaiting-async-payment' });
+    expect(payments[0].status).toBe(PaymentStatus.PENDING);
+    expect(order.status).toBe(OrderStatus.PENDING);
   });
 
-  it('demo mode gọi gateway có reference DECLINE thật; transaction đánh dấu FAILED', async () => {
-    vi.stubEnv('MOCK_GATEWAY_TEST_MODE', 'true');
-    vi.stubEnv('NODE_ENV', 'test');
-    const gateway = createGateway(async (input) => {
-      if (input.ref?.endsWith('0000')) throw new PaymentDeclinedError(input.ref);
-      return { reference: 'MOCK-OK1234', status: 'SUCCEEDED' };
+  it('async_payment_succeeded -> chốt đơn PAID', async () => {
+    const { service, stripe, order, sessionId } = await createSession();
+    const session = stripe.markPaid(sessionId);
+    const { payload, header } = stripe.signedEvent(
+      session,
+      'checkout.session.async_payment_succeeded',
+      WEBHOOK_SECRET,
+    );
+
+    await service.handleStripeWebhook(Buffer.from(payload), header);
+
+    expect(order.status).toBe(OrderStatus.PAID);
+  });
+
+  it('expired -> payment FAILED, order PAYMENT_FAILED', async () => {
+    const { service, stripe, payments, order, sessionId } = await createSession();
+    const session = stripe.markExpired(sessionId);
+    const { payload, header } = stripe.signedEvent(
+      session,
+      'checkout.session.expired',
+      WEBHOOK_SECRET,
+    );
+
+    await service.handleStripeWebhook(Buffer.from(payload), header);
+
+    expect(payments[0].status).toBe(PaymentStatus.FAILED);
+    expect(order.status).toBe(OrderStatus.PAYMENT_FAILED);
+  });
+
+  it('async_payment_failed -> payment FAILED', async () => {
+    const { service, stripe, payments, sessionId } = await createSession();
+    const session = stripe.updateSession(sessionId, {
+      status: 'complete',
+      payment_status: 'unpaid',
     });
-    const { service, prisma, orders } = setup({ gateway });
-    await expectPaymentError(
-      service.pay({ ...baseInput, demoDecline: true }),
-      PaymentErrorCode.PAYMENT_DECLINED,
-    );
-    expect(gateway.charge).toHaveBeenCalledWith(expect.objectContaining({ ref: 'MOCK-DEMO-0000' }));
-    expect(orders.markPaymentFailed).toHaveBeenCalledTimes(1);
-    expect(prisma.__payments[0].status).toBe(PaymentStatus.FAILED);
-  });
-
-  it('hash của thanh toán demo và bình thường khác nhau; normal hash giữ tương thích', () => {
-    const input = { userId: 1, orderId: 10, method: 'WALLET' };
-    expect(paymentRequestHash({ ...input, demoDecline: false })).toBe(paymentRequestHash(input));
-    expect(paymentRequestHash({ ...input, demoDecline: true })).not.toBe(paymentRequestHash(input));
-  });
-
-  it('gateway decline -> Payment FAILED, Order PAYMENT_FAILED, 402', async () => {
-    const gateway = createGateway(async () => {
-      throw new PaymentDeclinedError('MOCK-ABC0000');
-    });
-    const { service, prisma, orders } = setup({ gateway });
-
-    await expectPaymentError(service.pay(baseInput), PaymentErrorCode.PAYMENT_DECLINED);
-
-    expect(orders.markPaymentFailed).toHaveBeenCalledTimes(1);
-    expect(prisma.__payments[0].status).toBe(PaymentStatus.FAILED);
-  });
-
-  it('gateway timeout -> 504 GATEWAY_TIMEOUT', async () => {
-    const gateway = createGateway(async () => {
-      throw new GatewayTimeoutError();
-    });
-    const { service, prisma } = setup({ gateway });
-
-    await expectPaymentError(service.pay(baseInput), PaymentErrorCode.GATEWAY_TIMEOUT);
-
-    expect(prisma.__payments[0].status).toBe(PaymentStatus.FAILED);
-  });
-
-  it('order đã PAID -> gateway không được gọi', async () => {
-    const { service, gateway } = setup({
-      order: { id: 10, userId: 1, status: OrderStatus.PAID, total: 85_000 },
-    });
-
-    await expectPaymentError(service.pay(baseInput), PaymentErrorCode.ORDER_ALREADY_PAID);
-
-    expect(gateway.charge).not.toHaveBeenCalled();
-  });
-
-  it('order không thuộc user -> ORDER_NOT_FOUND', async () => {
-    const { service, gateway } = setup({ order: null });
-
-    await expectPaymentError(service.pay(baseInput), PaymentErrorCode.ORDER_NOT_FOUND);
-
-    expect(gateway.charge).not.toHaveBeenCalled();
-  });
-
-  it('thiếu Idempotency-Key -> 400 IDEMPOTENCY_KEY_REQUIRED', async () => {
-    const { service, gateway } = setup();
-
-    await expectPaymentError(
-      service.pay({ ...baseInput, idempotencyKey: undefined }),
-      PaymentErrorCode.IDEMPOTENCY_KEY_REQUIRED,
+    const { payload, header } = stripe.signedEvent(
+      session,
+      'checkout.session.async_payment_failed',
+      WEBHOOK_SECRET,
     );
 
-    expect(gateway.charge).not.toHaveBeenCalled();
+    await service.handleStripeWebhook(Buffer.from(payload), header);
+
+    expect(payments[0].status).toBe(PaymentStatus.FAILED);
   });
 
-  it('Idempotency-Key sai định dạng -> 400 INVALID_IDEMPOTENCY_KEY', async () => {
-    const { service } = setup();
-
-    await expectPaymentError(
-      service.pay({ ...baseInput, idempotencyKey: 'key with space' }),
-      PaymentErrorCode.INVALID_IDEMPOTENCY_KEY,
+  it('chữ ký sai -> STRIPE_WEBHOOK_INVALID', async () => {
+    const { service, stripe, sessionId } = await createSession();
+    const session = stripe.markPaid(sessionId);
+    const { payload } = stripe.signedEvent(
+      session,
+      'checkout.session.completed',
+      WEBHOOK_SECRET,
     );
+
+    const error = await capture(service.handleStripeWebhook(Buffer.from(payload), 'bad'));
+
+    expect(error.code).toBe(PaymentErrorCode.STRIPE_WEBHOOK_INVALID);
   });
 
-  it('thua race unique constraint -> replay record thắng, gateway không gọi lần 2', async () => {
-    const { service, prisma, gateway } = setup();
-    const requestHash = paymentRequestHash({
-      userId: baseInput.userId,
-      orderId: baseInput.orderId,
-      method: baseInput.method,
-    });
-    const winner: Payment = {
-      id: 99,
-      orderId: baseInput.orderId,
-      idempotencyKey: baseInput.idempotencyKey as string,
-      requestHash,
-      amount: 85_000,
-      method: 'WALLET',
-      status: PaymentStatus.SUCCEEDED,
-      transactionId: 'MOCK-WINNER',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    prisma.payment.findUnique
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(winner);
-    prisma.payment.create.mockRejectedValueOnce(
-      Object.assign(new Error('unique constraint'), { code: 'P2002' }),
+  it('session id không khớp payment -> webhook invalid', async () => {
+    const { service, stripe, sessionId } = await createSession();
+    const session = stripe.markPaid(sessionId);
+    const forged = { ...session, id: 'cs_test_other' } as typeof session;
+    const { payload, header } = stripe.signedEvent(
+      forged,
+      'checkout.session.completed',
+      WEBHOOK_SECRET,
     );
 
-    const result = await service.pay(baseInput);
+    const error = await capture(service.handleStripeWebhook(Buffer.from(payload), header));
 
-    expect(gateway.charge).not.toHaveBeenCalled();
-    expect(result.paymentId).toBe(99);
-    expect(result.idempotentReplay).toBe(true);
+    expect(error.code).toBe(PaymentErrorCode.STRIPE_WEBHOOK_INVALID);
+  });
+
+  it('sai amount_total -> webhook invalid', async () => {
+    const { service, stripe, sessionId } = await createSession();
+    const session = stripe.markPaid(sessionId);
+    const forged = { ...session, amount_total: 1 } as typeof session;
+    const { payload, header } = stripe.signedEvent(
+      forged,
+      'checkout.session.completed',
+      WEBHOOK_SECRET,
+    );
+
+    const error = await capture(service.handleStripeWebhook(Buffer.from(payload), header));
+
+    expect(error.code).toBe(PaymentErrorCode.STRIPE_WEBHOOK_INVALID);
+  });
+});
+
+describe('paymentRequestHash', () => {
+  it('thay đổi khi user/order/method thay đổi', () => {
+    const base = paymentRequestHash({ userId: 1, orderId: 2, method: 'WALLET' });
+    expect(paymentRequestHash({ userId: 2, orderId: 2, method: 'WALLET' })).not.toBe(base);
+    expect(paymentRequestHash({ userId: 1, orderId: 3, method: 'WALLET' })).not.toBe(base);
+    expect(paymentRequestHash({ userId: 1, orderId: 2, method: 'CARD' })).not.toBe(base);
   });
 });
