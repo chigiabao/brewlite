@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
-import { CHECKOUT_SESSION_KEY, clearCheckoutSession, isDefinitivePaymentFailure, isPaidOrderStatus, jwtSubject, loadCheckoutSession, saveCheckoutSession, type CheckoutSession, type CheckoutAttempt } from '@/lib/checkout-session';
+import { CHECKOUT_SESSION_KEY, clearCheckoutSession, isDefinitivePaymentFailure, isPaidOrderStatus, jwtSubject, loadCheckoutSession, saveCheckoutSession, type CheckoutSession } from '@/lib/checkout-session';
 import { useCart } from '@/store/cart';
 
 function subscribe(callback: () => void) {
@@ -251,18 +251,16 @@ export default function CheckoutPage() {
       const orderId = current.orderId;
       if (orderId === null) throw new Error('Chưa nhận được mã đơn.');
       // Khi thanh toán đang không rõ kết quả, tuyệt đối giữ nguyên method/demoDecline + payment key.
-      const attempt: CheckoutAttempt = current.attempt ?? {
-        key: crypto.randomUUID(),
-        method,
-        demoDecline: simulateFailure,
-      };
       if (!current.attempt) {
         current = {
           ...current,
-          attempt,
+          attempt: { key: crypto.randomUUID(), method, demoDecline: simulateFailure },
         };
         saveCheckoutSession(current);
       }
+      const attempt = current.attempt;
+      // Kiểm tra rõ ràng để TypeScript và runtime không dùng một lượt thanh toán rỗng.
+      if (!attempt) throw new Error('Chưa tạo được khóa thanh toán, vui lòng thử lại.');
       const res = await api<{ orderId: number; status: string; orderStatus: string }>('/payments', {
         method: 'POST',
         headers: { 'Idempotency-Key': attempt.key },
