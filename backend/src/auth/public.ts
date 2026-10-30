@@ -2,3 +2,6 @@
 export { JwtAuthGuard } from './jwt-auth.guard.js';
 export { CurrentUser } from './current-user.decorator.js';
 export type { AuthUser } from './current-user.decorator.js';
+
+// Module export for consumers that need to register the Passport JWT strategy.
+export { AuthModule } from './auth.module.js';

@@ -1,38 +1,24 @@
-import { Body, Controller, Headers, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { Body, Controller, Headers, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import { CurrentUser, JwtAuthGuard, type AuthUser } from '../auth/public.js';
 import { PayDto } from './payments.dto.js';
 import { PaymentsService } from './payments.service.js';
 import type { PaymentResult } from './payment.types.js';
 
-const TEMP_USER_ID = 1;
-
 @Controller('payments')
+@UseGuards(JwtAuthGuard)
 export class PaymentsController {
   constructor(private readonly payments: PaymentsService) {}
 
   @Post()
   @HttpCode(HttpStatus.OK)
   pay(
-    @Headers('authorization') authHeader: string | undefined,
+    @CurrentUser() user: AuthUser,
     @Headers('idempotency-key') key: string | undefined,
     @Body() dto: PayDto,
   ): Promise<PaymentResult> {
-    let userId = TEMP_USER_ID;
-    if (authHeader?.startsWith('Bearer ')) {
-      try {
-        const token = authHeader.slice(7).trim();
-        const payload = JSON.parse(
-          Buffer.from(token.split('.')[1], 'base64url').toString('utf8'),
-        );
-        if (payload && typeof payload.sub === 'number') {
-          userId = payload.sub;
-        }
-      } catch {
-        // Fallback to default user if token parsing fails
-      }
-    }
-
+    // Passport verifies JWT signature/expiry; userId must come from its validated principal.
     return this.payments.pay({
-      userId,
+      userId: user.userId,
       orderId: dto.orderId,
       method: dto.method,
       idempotencyKey: key,

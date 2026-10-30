@@ -10,13 +10,14 @@
 // export class OrdersModule {}
 
 import { Module } from '@nestjs/common';
+import { AuthModule } from '../auth/public.js';
 import { RewardsModule } from '../rewards/public.js';
 import { OrdersController } from './orders.controller.js';
 import { OrdersService } from './orders.service.js';
 import { StockService } from './stock.service.js';
 
 @Module({
-  imports: [RewardsModule],
+  imports: [AuthModule, RewardsModule],
   controllers: [OrdersController],
   providers: [OrdersService, StockService],
   exports: [OrdersService, StockService],

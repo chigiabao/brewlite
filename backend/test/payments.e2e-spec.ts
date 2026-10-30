@@ -1,4 +1,5 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import type { App } from 'supertest/types.js';
@@ -13,6 +14,7 @@ const generator = { next: () => nextReference };
 describe('POST /payments (e2e, fixture order)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
+  let fixtureToken: string;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
@@ -30,6 +32,7 @@ describe('POST /payments (e2e, fixture order)', () => {
     );
     await app.init();
     prisma = app.get(PrismaService);
+    fixtureToken = app.get(JwtService).sign({ sub: 1, email: 'fixture-e2e@brewlite.test' });
   });
 
   afterAll(async () => {
@@ -67,11 +70,54 @@ describe('POST /payments (e2e, fixture order)', () => {
     return prisma.order.create({ data: { userId: 1, total } });
   }
 
+  it('không có JWT -> 401, không tạo payment hay đổi trạng thái order', async () => {
+    const order = await seedOrder();
+    await request(app.getHttpServer())
+      .post('/payments')
+      .set('Idempotency-Key', 'e2e-no-jwt-1')
+      .send({ orderId: order.id, method: 'WALLET' })
+      .expect(401);
+    expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(0);
+    expect((await prisma.order.findUnique({ where: { id: order.id } }))?.status).toBe('PENDING');
+  });
+
+  it('JWT có payload đúng nhưng chữ ký sai -> 401', async () => {
+    const order = await seedOrder();
+    const forged = app.get(JwtService).sign(
+      { sub: 1, email: 'fixture-e2e@brewlite.test' },
+      { secret: 'fake-signing-key' },
+    );
+    await request(app.getHttpServer())
+      .post('/payments')
+      .set('Authorization', `Bearer ${forged}`)
+      .set('Idempotency-Key', 'e2e-forged-jwt-1')
+      .send({ orderId: order.id, method: 'WALLET' })
+      .expect(401);
+    expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(0);
+  });
+
+  it('JWT user khác không được thanh toán đơn của fixture -> 404', async () => {
+    const order = await seedOrder();
+    const otherUserToken = app.get(JwtService).sign({
+      sub: 999_999_999,
+      email: 'other-e2e@brewlite.test',
+    });
+    const res = await request(app.getHttpServer())
+      .post('/payments')
+      .set('Authorization', `Bearer ${otherUserToken}`)
+      .set('Idempotency-Key', 'e2e-other-user-1')
+      .send({ orderId: order.id, method: 'WALLET' });
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe('ORDER_NOT_FOUND');
+    expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(0);
+  });
+
   it('thiếu Idempotency-Key -> 400 IDEMPOTENCY_KEY_REQUIRED', async () => {
     const order = await seedOrder();
 
     const res = await request(app.getHttpServer())
       .post('/payments')
+      .set('Authorization', `Bearer ${fixtureToken}`)
       .send({ orderId: order.id, method: 'WALLET' });
 
     expect(res.status).toBe(400);
@@ -86,6 +132,7 @@ describe('POST /payments (e2e, fixture order)', () => {
 
     const res = await request(app.getHttpServer())
       .post('/payments')
+      .set('Authorization', `Bearer ${fixtureToken}`)
       .set('Idempotency-Key', 'e2e-amount-1')
       .send({ orderId: order.id, method: 'WALLET', amount: 1 });
 
@@ -100,6 +147,7 @@ describe('POST /payments (e2e, fixture order)', () => {
 
     const res = await request(app.getHttpServer())
       .post('/payments')
+      .set('Authorization', `Bearer ${fixtureToken}`)
       .set('Idempotency-Key', 'e2e-wallet-1')
       .send({ orderId: order.id, method: 'WALLET' });
 
@@ -126,6 +174,7 @@ describe('POST /payments (e2e, fixture order)', () => {
 
     const res = await request(app.getHttpServer())
       .post('/payments')
+      .set('Authorization', `Bearer ${fixtureToken}`)
       .set('Idempotency-Key', 'e2e-card-1')
       .send({ orderId: order.id, method: 'CARD' });
 
@@ -140,10 +189,12 @@ describe('POST /payments (e2e, fixture order)', () => {
 
     const first = await request(app.getHttpServer())
       .post('/payments')
+      .set('Authorization', `Bearer ${fixtureToken}`)
       .set('Idempotency-Key', key)
       .send({ orderId: order.id, method: 'WALLET' });
     const second = await request(app.getHttpServer())
       .post('/payments')
+      .set('Authorization', `Bearer ${fixtureToken}`)
       .set('Idempotency-Key', key)
       .send({ orderId: order.id, method: 'WALLET' });
 
@@ -163,10 +214,12 @@ describe('POST /payments (e2e, fixture order)', () => {
 
     await request(app.getHttpServer())
       .post('/payments')
+      .set('Authorization', `Bearer ${fixtureToken}`)
       .set('Idempotency-Key', key)
       .send({ orderId: order.id, method: 'WALLET' });
     const res = await request(app.getHttpServer())
       .post('/payments')
+      .set('Authorization', `Bearer ${fixtureToken}`)
       .set('Idempotency-Key', key)
       .send({ orderId: order.id, method: 'CARD' });
 
@@ -180,6 +233,7 @@ describe('POST /payments (e2e, fixture order)', () => {
     // Lượt thanh toán đầu tiên thành công.
     const first = await request(app.getHttpServer())
       .post('/payments')
+      .set('Authorization', `Bearer ${fixtureToken}`)
       .set('Idempotency-Key', 'e2e-paid-state-1')
       .send({ orderId: order.id, method: 'WALLET' });
 
@@ -189,6 +243,7 @@ describe('POST /payments (e2e, fixture order)', () => {
     // Key mới để không rơi vào nhánh idempotency replay.
     const second = await request(app.getHttpServer())
       .post('/payments')
+      .set('Authorization', `Bearer ${fixtureToken}`)
       .set('Idempotency-Key', 'e2e-paid-state-2')
       .send({ orderId: order.id, method: 'WALLET' });
 
@@ -210,6 +265,7 @@ describe('POST /payments (e2e, fixture order)', () => {
 
     const res = await request(app.getHttpServer())
       .post('/payments')
+      .set('Authorization', `Bearer ${fixtureToken}`)
       .set('Idempotency-Key', 'e2e-decline-1')
       .send({ orderId: order.id, method: 'CARD' });
 
@@ -226,6 +282,7 @@ describe('POST /payments (e2e, fixture order)', () => {
 
     const declined = await request(app.getHttpServer())
       .post('/payments')
+      .set('Authorization', `Bearer ${fixtureToken}`)
       .set('Idempotency-Key', 'e2e-decline-retry-1')
       .send({ orderId: order.id, method: 'CARD' });
     expect(declined.status).toBe(402);
@@ -233,6 +290,7 @@ describe('POST /payments (e2e, fixture order)', () => {
     nextReference = 'MOCK-OK5678';
     const retried = await request(app.getHttpServer())
       .post('/payments')
+      .set('Authorization', `Bearer ${fixtureToken}`)
       .set('Idempotency-Key', 'e2e-decline-retry-2')
       .send({ orderId: order.id, method: 'WALLET' });
 
