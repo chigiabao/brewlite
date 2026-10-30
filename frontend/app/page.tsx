@@ -26,7 +26,10 @@ export default function MenuPage() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<'popular' | 'price-asc' | 'price-desc'>('popular');
 
-  // Filter and sort products
+  // Chỉ chọn món thực sự lấy từ backend cho ô nổi bật, không ghim ID/giá giả.
+  const featuredProduct = rawProducts?.find((product) => product.stock > 0);
+
+  // Lọc và sắp xếp menu từ dữ liệu API
   const products = useMemo(() => {
     if (!rawProducts) return [];
 
@@ -54,7 +57,7 @@ export default function MenuPage() {
       list.sort((a, b) => b.price - a.price);
     } else {
       // popular
-      list.sort((a, b) => (b.rating ?? 4.5) - (a.rating ?? 4.5));
+      list.sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
     }
 
     return list;
@@ -108,16 +111,16 @@ export default function MenuPage() {
             {/* Social Proof Stats */}
             <div className="pt-8 border-t border-stone-800 grid grid-cols-3 gap-6 text-center lg:text-left">
               <div>
-                <p className="text-2xl sm:text-3xl font-black text-amber-400">15.000+</p>
-                <p className="text-xs text-stone-400 font-medium">Khách hàng tin chọn</p>
+                <p className="text-2xl sm:text-3xl font-black text-amber-400">S / M / L</p>
+                <p className="text-xs text-stone-400 font-medium">Ba kích cỡ đồ uống</p>
               </div>
               <div>
-                <p className="text-2xl sm:text-3xl font-black text-amber-400">100%</p>
-                <p className="text-xs text-stone-400 font-medium">Hạt mộc nguyên bản</p>
+                <p className="text-2xl sm:text-3xl font-black text-amber-400">2</p>
+                <p className="text-xs text-stone-400 font-medium">Lựa chọn topping</p>
               </div>
               <div>
-                <p className="text-2xl sm:text-3xl font-black text-amber-400">4.9 ★</p>
-                <p className="text-xs text-stone-400 font-medium">Đánh giá xuất sắc</p>
+                <p className="text-2xl sm:text-3xl font-black text-amber-400">Ví / Thẻ</p>
+                <p className="text-xs text-stone-400 font-medium">Thanh toán mô phỏng</p>
               </div>
             </div>
           </div>
@@ -128,31 +131,35 @@ export default function MenuPage() {
               <div className="relative h-72 w-full rounded-xl overflow-hidden mb-4 bg-stone-900">
                 <img
                   src="https://images.unsplash.com/photo-1541167760496-1628856ab772?w=800&auto=format&fit=crop&q=80"
-                  alt="Cà phê muối đặc sản"
+                  alt="Hình minh họa cà phê BrewLite"
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 />
-                <span className="absolute top-3 left-3 bg-amber-500 text-stone-950 text-xs font-black px-3 py-1 rounded-full shadow-md">
-                  HOT TREND
-                </span>
-                <span className="absolute bottom-3 right-3 bg-stone-950/80 backdrop-blur-md text-amber-300 text-xs font-bold px-2.5 py-1 rounded-md border border-amber-500/30">
-                  ⭐ 5.0 (250+ reviews)
-                </span>
               </div>
 
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-stone-100">Cà phê Muối Cố Đô</h3>
-                  <span className="text-amber-400 font-extrabold text-lg">38.000đ</span>
-                </div>
-                <p className="text-xs text-stone-400 line-clamp-2">
-                  Lớp kem muối sánh mịn mặn mòi quyện cùng vị cà phê phin đậm đà thơm ngát.
-                </p>
-                <Link
-                  href="/products/2"
-                  className="mt-3 block w-full py-2.5 rounded-lg text-center font-bold text-xs bg-amber-700/80 hover:bg-amber-600 text-white transition shadow"
-                >
-                  Thử Ngay Món Này →
-                </Link>
+                {featuredProduct ? (
+                  <>
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="text-lg font-bold text-stone-100">{featuredProduct.name}</h3>
+                      <span className="text-amber-400 font-extrabold text-lg whitespace-nowrap">
+                        {featuredProduct.price.toLocaleString('vi-VN')}đ
+                      </span>
+                    </div>
+                    <p className="text-xs text-stone-400 line-clamp-2">
+                      {featuredProduct.description || 'Khám phá món đang có trong thực đơn BrewLite.'}
+                    </p>
+                    <Link
+                      href={`/products/${featuredProduct.id}`}
+                      className="mt-3 block w-full py-2.5 rounded-lg text-center font-bold text-xs bg-amber-700/80 hover:bg-amber-600 text-white transition shadow"
+                    >
+                      Xem món nổi bật →
+                    </Link>
+                  </>
+                ) : (
+                  <p className="text-xs text-stone-400">
+                    Thực đơn đang được tải hoặc chưa có món khả dụng. Xem trạng thái ở phần Menu bên dưới.
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -301,8 +308,19 @@ export default function MenuPage() {
           </div>
         )}
 
-        {/* Empty Search Result */}
-        {!isPending && !isError && products.length === 0 && (
+        {/* API trả []: cửa hàng chưa có sản phẩm. Không hiển thị dữ liệu giả. */}
+        {!isPending && !isError && (rawProducts?.length ?? 0) === 0 && (
+          <div className="py-16 text-center bg-white rounded-2xl border border-stone-200 p-8 my-8">
+            <p className="text-stone-700 font-bold">Cửa hàng chưa có sản phẩm trên hệ thống</p>
+            <p className="text-xs text-stone-500 mt-2">Hãy kiểm tra dữ liệu seed hoặc tải lại danh sách.</p>
+            <button type="button" onClick={() => refetch()} className="mt-4 px-4 py-2 bg-amber-800 text-white rounded-lg text-xs font-bold">
+              Tải lại thực đơn
+            </button>
+          </div>
+        )}
+
+        {/* Danh sách có món, nhưng bộ lọc/từ khóa không tìm ra kết quả. */}
+        {!isPending && !isError && (rawProducts?.length ?? 0) > 0 && products.length === 0 && (
           <div className="py-20 text-center bg-white rounded-2xl border border-stone-200 p-8 my-8">
             <span className="text-4xl">🔍</span>
             <p className="text-stone-700 font-bold mt-3">Không tìm thấy món đồ uống phù hợp</p>
