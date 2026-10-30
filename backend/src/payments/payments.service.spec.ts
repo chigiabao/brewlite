@@ -170,6 +170,9 @@ function createOrdersPort(order: OrderRow): OrdersPaymentPort {
     markPaymentFailed: vi.fn(async () => {
       order.status = OrderStatus.PAYMENT_FAILED;
     }),
+    markRefunded: vi.fn(async () => {
+      order.status = OrderStatus.REFUNDED;
+    }),
   };
 }
 

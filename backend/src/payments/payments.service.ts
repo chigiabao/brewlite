@@ -854,7 +854,7 @@ export class PaymentsService {
 
       const order = await tx.order.findUnique({
         where: { id: payment.orderId },
-        select: { id: true, userId: true, status: true, total: true },
+        select: { id: true, userId: true, status: true, total: true, pointsRedeemed: true },
       });
       if (!order) {
         throw new PaymentError(

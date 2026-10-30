@@ -118,9 +118,12 @@ export class FakeStripe {
     return this.updateSession(id, { status: 'expired', payment_status: 'unpaid' });
   }
 
-  signedEvent(session: Stripe.Checkout.Session, type: string, secret: string) {
+  // Accept any object as event data — callers may pass Session, Charge, Dispute, etc.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  signedEvent(eventData: any, type: string, secret: string) {
+    const id: string = eventData.id ?? `obj_${Date.now()}`;
     const payload = JSON.stringify({
-      id: `evt_test_${session.id}_${type}_${Date.now()}`,
+      id: `evt_test_${id}_${type}_${Date.now()}`,
       object: 'event',
       api_version: '2026-09-30.endive',
       created: Math.floor(Date.now() / 1000),
@@ -128,8 +131,7 @@ export class FakeStripe {
       pending_webhooks: 1,
       request: { id: null, idempotency_key: null },
       type,
-      data: { object: session },
-    });
+      data: { object: eventData },    });
     return {
       payload,
       header: this.webhooks.generateTestHeaderString({ payload, secret }),
