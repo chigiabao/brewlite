@@ -1,4 +1,4 @@
-name: Foundation & Sprint 2 CI
+name: BrewLite Release Gates (FIX 05)
 
 on:
   push:
@@ -61,8 +61,12 @@ jobs:
         run: npx prisma generate
       - name: Prisma db seed (Run #1)
         run: npx prisma db seed
-      - name: Prisma db seed (Run #2 - Verify Idempotency)
+      - name: Capture seed snapshot (no PII)
+        run: node scripts/seed-fingerprint.mjs --write ../.ci-artifacts/seed-before.json
+      - name: Prisma db seed (Run #2)
         run: npx prisma db seed
+      - name: ASSERT seed idempotency (fingerprint unchanged)
+        run: node scripts/seed-fingerprint.mjs --compare ../.ci-artifacts/seed-before.json --write ../.ci-artifacts/seed-after.json
       - name: Backend lint
         run: npm run lint
       - name: Backend build
@@ -71,6 +75,13 @@ jobs:
         run: npm test
       - name: Backend E2E & integration tests
         run: npm run test:e2e
+      - name: Upload seed verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-seed-fingerprints
+          path: .ci-artifacts/
+          if-no-files-found: warn
 
   frontend:
     name: Frontend (Lint + Build)
@@ -99,20 +110,42 @@ jobs:
     name: Docker Compose Smoke (HTTP 200 + Healthcheck + Seed x2)
     needs: [contract, backend, frontend]
     runs-on: ubuntu-latest
+    env:
+      MOCK_GATEWAY_TEST_MODE: 'false'
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Ensure new clean Docker project volume
+        run: docker compose down -v --remove-orphans
       - name: Build and start stack with healthcheck wait
         run: docker compose up -d --build --wait
       - name: Check service status
-        run: docker compose ps
+        run: |
+          mkdir -p .ci-artifacts
+          docker compose ps | tee .ci-artifacts/docker-compose-ps.txt
       - name: Check backend HTTP 200
         run: curl --fail --silent --show-error -i http://localhost:3001/
       - name: Check frontend HTTP 200
         run: curl --fail --silent --show-error -I http://localhost:3000/
       - name: Check Prisma migration status in container
         run: docker compose exec -T backend npx prisma migrate status
-      - name: Re-run seed inside container (Run #2 Idempotency check)
+      - name: Capture seed data in running Docker stack
+        run: docker compose exec -T backend node scripts/seed-fingerprint.mjs --write /tmp/seed-f05-before.json | tee .ci-artifacts/docker-seed-before.txt
+      - name: Re-run seed inside container
         run: docker compose exec -T backend npx prisma db seed
+      - name: ASSERT Docker seed idempotency
+        run: docker compose exec -T backend node scripts/seed-fingerprint.mjs --compare /tmp/seed-f05-before.json --write /tmp/seed-f05-after.json | tee .ci-artifacts/docker-seed-after.txt
+      - name: HTTP + JWT boundary smoke
+        run: node scripts/smoke-http.mjs | tee .ci-artifacts/http-smoke.json
+      - name: Upload Docker/HTTP verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-http-smoke
+          path: .ci-artifacts/
+          if-no-files-found: warn
       - name: Save container logs
         if: always()
         run: docker compose logs --no-color backend frontend db
