@@ -1,0 +1,43 @@
+{
+  "fix": "FIX07",
+  "depends_on": [
+    "FIX01",
+    "FIX02",
+    "FIX03",
+    "FIX04",
+    "FIX05",
+    "FIX06"
+  ],
+  "scope": "ChangeOnly",
+  "files": [
+    {
+      "path": "frontend/lib/api.ts",
+      "sha256": "20a6cd572a606810179a0b270e8d16d6730106ff5c894e9f892e72a6318acbdb"
+    },
+    {
+      "path": "frontend/lib/checkout-session.ts",
+      "sha256": "acf29822f22fa767c1a6e7d3f7e8f38cf6f15029c80a52a7bde12f515f112fb1"
+    },
+    {
+      "path": "frontend/app/checkout/page.tsx",
+      "sha256": "e7b895b0c0b32ef8b57f956828283bd7163a6edf1fe01763dd347b38cc1602d8"
+    },
+    {
+      "path": "frontend/app/orders/[id]/confirmed/page.tsx",
+      "sha256": "1813ed6da078cec84a150252705add75622dc26b10e4026cdce31bdde7c9ee6f"
+    },
+    {
+      "path": "frontend/tests/checkout-session.test.mjs",
+      "sha256": "80b2d1096887c4c57e92940cb5f515af643e1ece0cddd999f5e488a722b55aa3"
+    },
+    {
+      "path": "frontend/tests/api-error.test.mjs",
+      "sha256": "bddf6a81020c3fdf8711562b4600de9ee481ea62bbca5943a7b58a3683f2dc6e"
+    },
+    {
+      "path": "docs/FIX07-CONFIRM-RETRY.md",
+      "sha256": "f57f947f3f5c5a084329abfd66d865284cafa0d22f0b3e379d2a829a79b9ffe4"
+    }
+  ],
+  "runtime_e2e_verified": false
+}

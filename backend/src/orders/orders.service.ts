@@ -31,7 +31,11 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateOrderDto } from './orders.dto.js';
 import { StockService } from './stock.service.js';
 import { OrderStatus } from '../generated/prisma/enums.js';
-import { assertTransition } from './order-state.js';
+import {
+  assertPreparationTarget,
+  assertTransition,
+  type PreparationStatus,
+} from './order-state.js';
 import { REWARDS_PORT, type RewardsPort, normalizeCouponCode } from '../rewards/public.js';
 import { getOrderExpiryMs } from '../config/app-config.js';
 
@@ -219,12 +223,8 @@ export class OrdersService {
           },
         });
 
-        if (this.rewards && pointsRedeemed > 0) {
-          await this.rewards.createRedeemEntry(
-            { orderId: createdOrder.id, userId, points: pointsRedeemed },
-            tx,
-          );
-        }
+        // PENDING chỉ reserve điểm khả dụng. REDEEM ledger được ghi trong
+        // transaction thanh toán PAID của F/G; cancel trước PAID hoàn reserve.
 
         return createdOrder;
       });
@@ -304,6 +304,44 @@ export class OrdersService {
     }
 
     return order;
+  }
+
+  /**
+   * FIX 08 — Chuyển bước pha chế trong nội bộ backend.
+   *
+   * Không mở API công khai cho khách hàng: hiện chưa có phân quyền nhân viên.
+   * Khi cần làm UI cho quầy, phải xác thực role nhân viên trước khi gọi hàm này.
+   *
+   * Không cần transaction bao quanh thao tác đọc/ghi đơn lẻ: câu lệnh
+   * updateMany với điều kiện status hiện tại là CAS nguyên tử ở PostgreSQL.
+   * Nếu hai nhân viên cùng cập nhật, chỉ người đầu tiên thành công.
+   */
+  async advancePreparation(orderId: number, to: PreparationStatus) {
+    // Chặn cả dữ liệu sai kiểu đi vào từ JavaScript/runtime.
+    assertPreparationTarget(to);
+
+    const current = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true, status: true },
+    });
+    if (!current) {
+      throw new NotFoundException('ORDER_NOT_FOUND');
+    }
+
+    // Chặn PENDING → PREPARING, PAID → READY và mọi bước không đúng thứ tự.
+    assertTransition(current.status, to);
+
+    const result = await this.prisma.order.updateMany({
+      where: { id: orderId, status: current.status },
+      data: { status: to },
+    });
+    if (result.count !== 1) {
+      // Trạng thái đã đổi sau lần đọc: không được ghi đè kết quả của request khác.
+      throw new ConflictException('ORDER_STATUS_CHANGED');
+    }
+
+    // Chỉ trả thành công sau khi DB xác nhận đã cập nhật đúng một đơn.
+    return { id: orderId, status: to };
   }
 
   async cancel(userId: number, orderId: number) {

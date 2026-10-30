@@ -47,12 +47,6 @@ export interface RewardsPort {
    */
   reserveCouponAndPoints(params: ReserveParams, tx: RewardsTx): Promise<ReserveResult>;
 
-  /** REDEEM ledger sau khi tạo Order (trong cùng transaction). */
-  createRedeemEntry(
-    params: { orderId: number; userId: number; points: number },
-    tx: RewardsTx,
-  ): Promise<void>;
-
   /** Hoàn đúng số điểm/quota đã reserve nếu E hủy Order bằng CAS thành công. */
   releaseReservedOnCancel(
     params: { orderId: number; userId: number; couponCode: string | null; pointsRedeemed: number },
@@ -60,13 +54,14 @@ export interface RewardsPort {
   ): Promise<void>;
 
   /**
-   * Cộng điểm loyalty sau khi Order PAID — chính xác 1 lần nhờ unique constraint.
+   * Finalize REDEEM (nếu có) và EARN CHỈ sau khi Order đã PAID.
    * Phải được gọi trong cùng transaction markPaid (F sở hữu transaction).
+   * pointsRedeemed lấy từ snapshot Order trong transaction, không từ frontend.
    *
    * Nếu LoyaltyEntry EARN đã tồn tại, trả kết quả cũ, không cộng trùng.
    */
   finalizeRewardsOnPaid(
-    params: { orderId: number; userId: number; totalPaid: number },
+    params: { orderId: number; userId: number; totalPaid: number; pointsRedeemed: number },
     tx: RewardsTx,
   ): Promise<{ pointsEarned: number }>;
 
