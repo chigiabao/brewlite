@@ -40,13 +40,50 @@ export default function CheckoutPage() {
   const [validatedCartSignature, setValidatedCartSignature] = useState<string | null>(null);
   const couponRequestId = useRef(0);
 
+  // Balance chỉ có hiệu lực với đúng JWT đã dùng để tải, tránh lộ điểm khi đổi tài khoản.
+  const [balanceResult, setBalanceResult] = useState<{
+    token: string;
+    loyaltyPoints: number | null;
+    error: string;
+  } | null>(null);
+  const [pointsChoice, setPointsChoice] = useState<{ token: string; value: number } | null>(null);
+  const pointsRequested = pointsChoice?.token === token ? pointsChoice.value : 0;
+  const availablePoints = token && balanceResult?.token === token ? balanceResult.loyaltyPoints : null;
+  const balanceLoading = Boolean(token) && balanceResult?.token !== token;
+  const balanceError = token && balanceResult?.token === token ? balanceResult.error : '';
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    // GET /rewards/me dùng bearer từ api client. Không dùng số dư giả khi lỗi API.
+    api<{ loyaltyPoints: number }>('/rewards/me')
+      .then(({ loyaltyPoints }) => {
+        if (cancelled) return;
+        if (!Number.isSafeInteger(loyaltyPoints) || loyaltyPoints < 0) {
+          throw new Error('Số dư điểm trả về không hợp lệ');
+        }
+        setBalanceResult({ token, loyaltyPoints, error: '' });
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setBalanceResult({
+            token, loyaltyPoints: null,
+            error: err instanceof Error ? err.message : 'Không tải được điểm thưởng',
+          });
+        }
+      });
+    return () => { cancelled = true; };
+  }, [token]);
+
   // Demo simulator for US-05 failure test
   const [simulateFailure, setSimulateFailure] = useState(false);
 
   // Một khóa cho một lần thanh toán; bấm thử lại giữ nguyên khóa (Task 10 – F).
   const idemKey = useRef<string | null>(null);
   // Giữ orderId trong cùng phiên trang checkout. Retry không được POST /orders lần nữa.
-  const pendingOrder = useRef<{ id: number; cartKey: string; total: number } | null>(null);
+  const [pendingOrder, setPendingOrder] = useState<{
+    id: number; cartKey: string; total: number; pointsRedeemed: number;
+  } | null>(null);
 
   useEffect(() => {
     if (!items.length) router.replace('/cart');
@@ -58,14 +95,22 @@ export default function CheckoutPage() {
   })));
   const activeCouponCode = validatedCartSignature === cartSignature ? couponCode : null;
   const activeCouponDiscount = activeCouponCode ? couponDiscount : 0;
-  const finalTotal = pendingOrder.current?.cartKey === cartSignature
-    ? pendingOrder.current.total
-    : Math.max(0, total - activeCouponDiscount);
+  // Points chỉ giảm số tiền còn lại SAU coupon, và không vượt balance đang đọc được.
+  const maxRedeemable = Math.min(
+    availablePoints ?? 0,
+    Math.max(0, total - activeCouponDiscount),
+  );
+  const previewPoints = Math.min(pointsRequested, maxRedeemable);
+  const savedOrder = pendingOrder?.cartKey === cartSignature ? pendingOrder : null;
+  const appliedPoints = savedOrder ? savedOrder.pointsRedeemed : previewPoints;
+  const finalTotal = savedOrder
+    ? savedOrder.total
+    : Math.max(0, total - activeCouponDiscount - appliedPoints);
 
   if (!items.length) return null;
 
   const handleApplyCoupon = async () => {
-    if (pendingOrder.current) {
+    if (pendingOrder) {
       setCouponMessage('Đơn đã được tạo. Không thể đổi coupon trên đơn này; hãy hoàn tất thanh toán.');
       return;
     }
@@ -116,10 +161,18 @@ export default function CheckoutPage() {
 
     const cartKey = cartSignature;
 
+    let currentOrder = pendingOrder;
+
     // Không dùng nhầm đơn cũ nếu giỏ đã thay đổi trong khi checkout.
-    if (pendingOrder.current && pendingOrder.current.cartKey !== cartKey) {
-      pendingOrder.current = null;
+    if (currentOrder && currentOrder.cartKey !== cartKey) {
+      currentOrder = null;
+      setPendingOrder(null);
       idemKey.current = null;
+    }
+    // Không cho gửi redeem khi chưa đọc được balance/đang thay đổi tài khoản.
+    if (pointsRequested > 0 && (balanceLoading || availablePoints === null)) {
+      setError('Chưa xác minh được số dư điểm thưởng. Vui lòng tải lại trang.');
+      return;
     }
     idemKey.current ??= crypto.randomUUID();
     setLoading(true);
@@ -127,8 +180,8 @@ export default function CheckoutPage() {
 
     try {
       // E: chỉ tạo đơn 1 lần cho một giỏ. Truyền Idempotency-Key để backend không bị 400 IDEMPOTENCY_KEY_REQUIRED.
-      if (!pendingOrder.current) {
-        const order = await api<{ id: number; total: number }>('/orders', {
+      if (!currentOrder) {
+        const order = await api<{ id: number; total: number; pointsRedeemed: number }>('/orders', {
           method: 'POST',
           headers: { 'Idempotency-Key': idemKey.current },
           body: JSON.stringify({
@@ -136,15 +189,21 @@ export default function CheckoutPage() {
               productId, size, toppings, qty,
             })),
             couponCode: activeCouponCode ?? undefined,
+            pointsToRedeem: previewPoints,
           }),
         });
-        if (!Number.isSafeInteger(order.id) || !Number.isSafeInteger(order.total) || order.total < 0) {
+        if (!Number.isSafeInteger(order.id) || !Number.isSafeInteger(order.total) || order.total < 0 ||
+            !Number.isSafeInteger(order.pointsRedeemed) || order.pointsRedeemed < 0 ||
+            order.pointsRedeemed > previewPoints) {
           throw new Error('Backend trả dữ liệu đơn hàng không hợp lệ. Kiểm tra lịch sử đơn trước khi thử lại.');
         }
-        pendingOrder.current = { id: order.id, cartKey, total: order.total };
+        currentOrder = {
+          id: order.id, cartKey, total: order.total, pointsRedeemed: order.pointsRedeemed,
+        };
+        setPendingOrder(currentOrder);
       }
 
-      const orderId = pendingOrder.current?.id;
+      const orderId = currentOrder?.id;
       if (!orderId) throw new Error('Không tạo được đơn hàng. Vui lòng kiểm tra lại lịch sử đơn.');
 
       // F – Task 8: gọi POST /payments với Idempotency-Key
@@ -167,8 +226,8 @@ export default function CheckoutPage() {
       const msg = (e as Error).message ?? '';
       if (msg.includes('đã được thanh toán') || msg.includes('ORDER_ALREADY_PAID')) {
         clear();
-        if (pendingOrder.current?.id) {
-          router.push(`/orders/${pendingOrder.current.id}/confirmed`);
+        if (currentOrder?.id) {
+          router.push(`/orders/${currentOrder.id}/confirmed`);
           return;
         }
       }
@@ -242,7 +301,7 @@ export default function CheckoutPage() {
               type="text"
               placeholder="Nhập mã (vd: GIAM10, GIAM15K)"
               value={couponInput}
-              disabled={loading || Boolean(pendingOrder.current)}
+              disabled={loading || Boolean(pendingOrder)}
               onChange={(e) => {
                 couponRequestId.current += 1;
                 setValidatingCoupon(false);
@@ -257,7 +316,7 @@ export default function CheckoutPage() {
             <button
               type="button"
               onClick={handleApplyCoupon}
-              disabled={validatingCoupon || loading || Boolean(pendingOrder.current)}
+              disabled={validatingCoupon || loading || Boolean(pendingOrder)}
               className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-amber-400 rounded-xl text-xs font-semibold border border-stone-700 transition"
             >
               {validatingCoupon ? 'Đang kiểm tra…' : 'Áp dụng'}
@@ -270,6 +329,64 @@ export default function CheckoutPage() {
           )}
           {couponCode && !activeCouponCode && (
             <p className="text-xs mt-2 text-amber-400">Giỏ hàng đã thay đổi. Vui lòng áp dụng lại mã giảm giá.</p>
+          )}
+        </div>
+
+        {/* G – Loyalty Points (1 điểm = 1 VNĐ). Backend vẫn là nguồn giá chính thức. */}
+        <div className="py-4 border-b border-stone-800/80">
+          <label htmlFor="redeem-points" className="text-xs font-semibold text-stone-400 uppercase tracking-wider block mb-2">
+            Sử dụng điểm thưởng (Loyalty Points)
+          </label>
+          {!isLoggedIn ? (
+            <p className="text-xs text-amber-400">Đăng nhập để xem và sử dụng điểm tích lũy.</p>
+          ) : balanceLoading ? (
+            <p className="text-xs text-stone-400">Đang tải số dư điểm…</p>
+          ) : balanceError ? (
+            <p role="alert" className="text-xs text-red-400">{balanceError}. Bạn vẫn có thể thanh toán không dùng điểm.</p>
+          ) : (
+            <>
+              <div className="text-sm text-stone-300 mb-2">
+                Số dư khả dụng: <strong className="text-amber-400">{(availablePoints ?? 0).toLocaleString('vi-VN')} điểm</strong>
+                <span className="text-xs text-stone-500 ml-2">(1 điểm = 1đ)</span>
+              </div>
+              <div className="flex gap-2 items-center">
+                <input
+                  id="redeem-points"
+                  type="number"
+                  min={0}
+                  step={1}
+                  max={maxRedeemable}
+                  inputMode="numeric"
+                  value={Math.min(pointsRequested, maxRedeemable) || ''}
+                  disabled={loading || Boolean(pendingOrder) || maxRedeemable === 0}
+                  onChange={(e) => {
+                    const input = e.target.value;
+                    if (!/^\d*$/.test(input)) return;
+                    const n = input ? Number(input) : 0;
+                    if (!Number.isSafeInteger(n)) return;
+                    if (token) setPointsChoice({ token, value: Math.min(n, maxRedeemable) });
+                  }}
+                  placeholder="0"
+                  className="flex-1 min-w-0 bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-sm text-stone-100 focus:outline-none focus:border-amber-500"
+                />
+                <button
+                  type="button"
+                  disabled={loading || Boolean(pendingOrder) || maxRedeemable === 0}
+                  onClick={() => { if (token) setPointsChoice({ token, value: maxRedeemable }); }}
+                  className="px-4 py-2 bg-stone-800 hover:bg-stone-700 disabled:opacity-50 text-amber-400 rounded-xl text-xs font-semibold border border-stone-700"
+                >
+                  Dùng tối đa
+                </button>
+              </div>
+              <p className="text-xs text-stone-500 mt-2">
+                Có thể dùng tối đa {maxRedeemable.toLocaleString('vi-VN')} điểm cho giỏ hiện tại; số điểm thực trừ được backend chốt khi tạo đơn.
+              </p>
+            </>
+          )}
+          {savedOrder && (
+            <p className="text-xs text-emerald-400 mt-2">
+              Đã giữ chỗ {savedOrder.pointsRedeemed.toLocaleString('vi-VN')} điểm cho đơn #{savedOrder.id}. Không đổi điểm sau khi đã tạo đơn.
+            </p>
           )}
         </div>
 
@@ -352,7 +469,13 @@ export default function CheckoutPage() {
               <span className="font-mono">-{activeCouponDiscount.toLocaleString('vi-VN')}đ</span>
             </div>
           )}
-          {pendingOrder.current?.cartKey === cartSignature && (
+          {appliedPoints > 0 && (
+            <div className="flex justify-between text-emerald-400">
+              <span>Đổi điểm thưởng{savedOrder ? ' (đã giữ chỗ)' : ' (dự kiến)'}</span>
+              <span className="font-mono">-{appliedPoints.toLocaleString('vi-VN')}đ</span>
+            </div>
+          )}
+          {savedOrder && (
             <p className="text-xs text-stone-400">Số tiền chính thức đã được backend tính lại khi tạo đơn.</p>
           )}
           <div className="flex justify-between text-base font-bold text-stone-100 pt-2 border-t border-stone-800">

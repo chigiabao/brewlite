@@ -216,12 +216,8 @@ export class OrdersService {
           },
         });
 
-        if (this.rewards && pointsRedeemed > 0) {
-          await this.rewards.createRedeemEntry(
-            { orderId: createdOrder.id, userId, points: pointsRedeemed },
-            tx,
-          );
-        }
+        // PENDING chỉ reserve điểm khả dụng. REDEEM ledger được ghi trong
+        // transaction thanh toán PAID của F/G; cancel trước PAID hoàn reserve.
 
         return createdOrder;
       });

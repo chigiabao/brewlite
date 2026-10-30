@@ -149,8 +149,8 @@ export class RewardsService {
    * hủy đơn + hoàn stock. CAS là hàng rào exactly-once; method này không
    * được gọi trực tiếp từ controller hay khi đơn đã PAID.
    *
-   * REDEEM entry được giữ làm chứng từ lịch sử: CANCELLED xác nhận việc
-   * reserve đã được hoàn. Không phát sinh EARN cho đơn chưa PAID.
+   * Đơn PENDING/PAYMENT_FAILED chưa có REDEEM; với dữ liệu cũ trước FIX06,
+   * xóa REDEEM ghi sớm khi cancel để giữ sổ chỉ ghi đơn PAID.
    */
   async releaseReservedOnCancel(
     params: { orderId: number; userId: number; couponCode: string | null; pointsRedeemed: number },
@@ -179,77 +179,67 @@ export class RewardsService {
       if (refunded.count !== 1) {
         throw new ConflictException('REWARDS_USER_NOT_FOUND');
       }
+      // Cleanup tương thích với đơn cũ từng ghi REDEEM ngay lúc tạo đơn.
+      await tx.loyaltyEntry.deleteMany({
+        where: { orderId, kind: LoyaltyKind.REDEEM },
+      });
       this.logger.log(`points.released orderId=${orderId} userId=${userId} points=${pointsRedeemed}`);
     }
   }
 
   /**
-   * Tạo LoyaltyEntry REDEEM cho order vừa tạo.
-   * E gọi method này sau khi insert Order (đã có orderId) trong cùng transaction.
-   * Chỉ gọi nếu pointsRedeemed > 0.
-   */
-  async createRedeemEntry(
-    params: { orderId: number; userId: number; points: number },
-    tx: RewardsTx,
-  ): Promise<void> {
-    if (params.points <= 0) return;
-    await tx.loyaltyEntry.create({
-      data: {
-        userId: params.userId,
-        orderId: params.orderId,
-        kind: LoyaltyKind.REDEEM,
-        points: params.points,
-      },
-    });
-    this.logger.log(
-      `loyalty.redeem.entry orderId=${params.orderId} userId=${params.userId} points=${params.points}`,
-    );
-  }
-
-  /**
-   * Cộng điểm loyalty sau khi Order PAID — chính xác 1 lần nhờ unique constraint.
-   * F phải gọi trong cùng transaction markPaid.
-   *
-   * Idempotent: LoyaltyEntry unique([orderId, kind=EARN]) chặn double-earn.
-   * Nếu đã tồn tại (idempotent replay), method này return sớm mà không throw.
+   * Chỉ được F gọi SAU markPaid, CÙNG DB transaction với Payment/Order.
+   * PENDING chỉ reserve balance; không có LoyaltyEntry REDEEM/EARN.
+   * Unique (orderId, kind) hỗ trợ exactly-once khi payment replay.
+   * Nếu checkout cũ (trước FIX06) đã ghi REDEEM ở PENDING,
+   * kiểm tra snapshot và không ghi trùng.
    */
   async finalizeRewardsOnPaid(
-    params: { orderId: number; userId: number; totalPaid: number },
+    params: { orderId: number; userId: number; totalPaid: number; pointsRedeemed: number },
     tx: RewardsTx,
   ): Promise<{ pointsEarned: number }> {
-    const { orderId, userId, totalPaid } = params;
-    const pointsEarned = calculateEarnedPoints(totalPaid);
+    const { orderId, userId, totalPaid, pointsRedeemed } = params;
+    assertNonNegativeInteger(pointsRedeemed, 'pointsRedeemed');
+    assertNonNegativeInteger(totalPaid, 'totalPaid');
 
-    if (pointsEarned <= 0) {
-      return { pointsEarned: 0 };
+    if (pointsRedeemed > 0) {
+      const existingRedeem = await tx.loyaltyEntry.findUnique({
+        where: { orderId_kind: { orderId, kind: LoyaltyKind.REDEEM } },
+      });
+      if (existingRedeem) {
+        if (existingRedeem.points !== pointsRedeemed || existingRedeem.userId !== userId) {
+          throw new ConflictException('REDEEM_LEDGER_MISMATCH');
+        }
+      } else {
+        await tx.loyaltyEntry.create({
+          data: { userId, orderId, kind: LoyaltyKind.REDEEM, points: pointsRedeemed },
+        });
+      }
+      this.logger.log(`loyalty.redeem.finalized orderId=${orderId} points=${pointsRedeemed}`);
     }
 
-    // Kiểm tra đã EARN chưa (idempotency guard thủ công để tránh throw P2002 ra ngoài).
-    const existing = await tx.loyaltyEntry.findUnique({
+    const pointsEarned = calculateEarnedPoints(totalPaid);
+    if (pointsEarned === 0) return { pointsEarned: 0 };
+
+    const existingEarn = await tx.loyaltyEntry.findUnique({
       where: { orderId_kind: { orderId, kind: LoyaltyKind.EARN } },
     });
-    if (existing) {
+    if (existingEarn) {
+      if (existingEarn.points !== pointsEarned || existingEarn.userId !== userId) {
+        throw new ConflictException('EARN_LEDGER_MISMATCH');
+      }
       this.logger.warn(`loyalty.earn.duplicate orderId=${orderId} — skipped`);
-      return { pointsEarned: existing.points };
+      return { pointsEarned: existingEarn.points };
     }
 
     await tx.loyaltyEntry.create({
-      data: {
-        userId,
-        orderId,
-        kind: LoyaltyKind.EARN,
-        points: pointsEarned,
-      },
+      data: { userId, orderId, kind: LoyaltyKind.EARN, points: pointsEarned },
     });
-
     await tx.user.update({
       where: { id: userId },
       data: { loyaltyPoints: { increment: pointsEarned } },
     });
-
-    this.logger.log(
-      `loyalty.earn orderId=${orderId} userId=${userId} points=${pointsEarned}`,
-    );
+    this.logger.log(`loyalty.earn orderId=${orderId} points=${pointsEarned}`);
     return { pointsEarned };
   }
 }

@@ -27,7 +27,7 @@ describe('Payments (idempotency) - Task 10 (b)', () => {
               return p;
             }),
           },
-          order: { findUnique: vi.fn(async () => ({ userId: 1, total: 50000 })) },
+          order: { findUnique: vi.fn(async () => ({ userId: 1, total: 50000, pointsRedeemed: 0 })) },
         }),
       ),
     };

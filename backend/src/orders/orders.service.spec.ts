@@ -435,7 +435,6 @@ describe('FIX03 Orders: quote snapshot và hoàn reservation', () => {
   const stock = { reserve: vi.fn(), release: vi.fn() };
   const rewards = {
     reserveCouponAndPoints: vi.fn(),
-    createRedeemEntry: vi.fn(),
     releaseReservedOnCancel: vi.fn(),
     finalizeRewardsOnPaid: vi.fn(),
   };
@@ -447,7 +446,6 @@ describe('FIX03 Orders: quote snapshot và hoàn reservation', () => {
     prisma.order.findFirst.mockResolvedValue(null);
     stock.reserve.mockResolvedValue(undefined);
     stock.release.mockResolvedValue(undefined);
-    rewards.createRedeemEntry.mockResolvedValue(undefined);
     rewards.releaseReservedOnCancel.mockResolvedValue(undefined);
   });
 
@@ -477,9 +475,8 @@ describe('FIX03 Orders: quote snapshot và hoàn reservation', () => {
         pointsRedeemed: 27_000, couponCode: 'GIAM10', discountTotal: 57_000,
       }),
     }));
-    expect(rewards.createRedeemEntry).toHaveBeenCalledWith({
-      orderId: 42, userId: 7, points: 27_000,
-    }, tx);
+    // PENDING chưa ghi REDEEM; chỉ giữ điểm và snapshot số điểm được giảm.
+    expect(rewards.reserveCouponAndPoints).toHaveBeenCalledOnce();
   });
 
   it('hủy PENDING: chuyển trạng thái bằng CAS, hoàn stock và reserve G trong cùng tx', async () => {

@@ -207,12 +207,43 @@ describe('FIX04: actual order -> payment -> rewards checkout (PostgreSQL E2E)', 
     return placed.body.id as number;
   }
 
+  it('PENDING chỉ reserve điểm; PAID finalize REDEEM + EARN 1 lần trong transaction', async () => {
+    const orderId = await createCouponOrder('rewards-paid');
+    expect(await prisma.loyaltyEntry.count({ where: { orderId, kind: 'REDEEM' } })).toBe(0);
+    expect(await prisma.loyaltyEntry.count({ where: { orderId, kind: 'EARN' } })).toBe(0);
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } }))
+      .toMatchObject({ loyaltyPoints: 2_000 });
+
+    const key = testKey('rewards-payment');
+    const pay = () => request(app.getHttpServer())
+      .post('/payments').set('Authorization', `Bearer ${token}`)
+      .set('Idempotency-Key', key)
+      .send({ orderId, method: 'WALLET' });
+    const paid = await pay();
+    expect(paid.status).toBe(200);
+    expect(paid.body).toMatchObject({ orderStatus: 'PAID', amount: 24_000 });
+    const replay = await pay();
+    expect(replay.status).toBe(200);
+    expect(replay.body.idempotentReplay).toBe(true);
+
+    expect(await prisma.loyaltyEntry.findUnique({
+      where: { orderId_kind: { orderId, kind: 'REDEEM' } },
+    })).toMatchObject({ points: 3_000, userId });
+    expect(await prisma.loyaltyEntry.findUnique({
+      where: { orderId_kind: { orderId, kind: 'EARN' } },
+    })).toMatchObject({ points: 240, userId });
+    expect(await prisma.loyaltyEntry.count({ where: { orderId } })).toBe(2);
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } }))
+      .toMatchObject({ loyaltyPoints: 2_240 });
+  });
+
   it('cancel releases stock, coupon quota and reserved points exactly once', async () => {
     const orderId = await createCouponOrder('rewards-cancel');
     expect(await prisma.coupon.findUniqueOrThrow({ where: { code: couponCode! } }))
       .toMatchObject({ usedCount: 1 });
     expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } }))
       .toMatchObject({ loyaltyPoints: 2_000 });
+    expect(await prisma.loyaltyEntry.count({ where: { orderId, kind: 'REDEEM' } })).toBe(0);
     await expect(orders.cancel(userId, orderId))
       .resolves.toEqual({ id: orderId, status: 'CANCELLED' });
     await expect(orders.cancel(userId, orderId)).rejects.toThrow();

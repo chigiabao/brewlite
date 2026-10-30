@@ -30,7 +30,7 @@ function createPrismaMock() {
       ),
     },
     order: {
-      findUnique: vi.fn(async () => ({ userId: 1, total: 85_000 })),
+      findUnique: vi.fn(async () => ({ userId: 1, total: 85_000, pointsRedeemed: 12_000 })),
     },
   };
 
@@ -115,7 +115,7 @@ describe('PaymentsService', () => {
   });
 
   it('thanh toán mới success -> gateway gọi đúng 1 lần, Payment SUCCEEDED, Order PAID', async () => {
-    const { service, prisma, gateway, orders } = setup();
+    const { service, prisma, gateway, orders, rewards } = setup();
 
     const result = await service.pay(baseInput);
 
@@ -128,6 +128,10 @@ describe('PaymentsService', () => {
       idempotentReplay: false,
     });
     expect(orders.markPaid).toHaveBeenCalledTimes(1);
+    expect(rewards.finalizeRewardsOnPaid).toHaveBeenCalledWith(
+      { orderId: 10, userId: 1, totalPaid: 85_000, pointsRedeemed: 12_000 },
+      expect.any(Object),
+    );
     expect(prisma.__payments).toHaveLength(1);
     expect(prisma.__payments[0].status).toBe(PaymentStatus.SUCCEEDED);
   });

@@ -151,11 +151,16 @@ export class PaymentsService {
       // Lấy thông tin userId và total để cộng điểm; idempotent (unique LoyaltyEntry guard).
       const order = await tx.order.findUnique({
         where: { id: payment.orderId },
-        select: { userId: true, total: true },
+        select: { userId: true, total: true, pointsRedeemed: true },
       });
       if (order) {
         await this.rewards.finalizeRewardsOnPaid(
-          { orderId: payment.orderId, userId: order.userId, totalPaid: order.total },
+          {
+            orderId: payment.orderId,
+            userId: order.userId,
+            totalPaid: order.total,
+            pointsRedeemed: order.pointsRedeemed,
+          },
           tx,
         );
       }
