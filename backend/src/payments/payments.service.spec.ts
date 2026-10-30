@@ -51,14 +51,25 @@ function createPrismaMock(initialOrder: OrderRow) {
   let nextPaymentId = 1;
 
   const paymentApi = {
-    findUnique: vi.fn(async ({ where }: { where: PaymentWhere }) => {
-      return (
-        payments.find((payment) =>
-          where.id !== undefined
-            ? payment.id === where.id
-            : payment.idempotencyKey === where.idempotencyKey,
-        ) ?? null
+    findUnique: vi.fn(async ({ where, include }: { where: PaymentWhere; include?: { order?: boolean } }) => {
+      const found = payments.find((payment) =>
+        where.id !== undefined
+          ? payment.id === where.id
+          : payment.idempotencyKey === where.idempotencyKey,
       );
+      if (!found) return null;
+      if (include?.order) {
+        return {
+          ...found,
+          order: {
+            id: found.orderId,
+            userId: order.userId,
+            status: order.status,
+            pointsRedeemed: 0,
+          },
+        };
+      }
+      return found;
     }),
     findFirst: vi.fn(async ({ where }: { where: PaymentWhere }) => {
       return payments.find((payment) => matches(payment, where)) ?? null;
@@ -114,17 +125,29 @@ function createPrismaMock(initialOrder: OrderRow) {
   const orderApi = {
     findFirst: vi.fn(async () => order),
     findUnique: vi.fn(async () => order),
+    updateMany: vi.fn(async ({ data }: { data?: Partial<OrderRow> }) => {
+      if (data) Object.assign(order, data);
+      return { count: 1 };
+    }),
+  };
+
+  const refundApi = {
+    upsert: vi.fn(async ({ create }: { create: unknown }) => create),
+    findUnique: vi.fn(async () => null),
+    findMany: vi.fn(async () => []),
   };
 
   const tx = {
     $queryRaw: vi.fn(async () => [{ id: order.id }]),
     payment: paymentApi,
     order: orderApi,
+    refund: refundApi,
   };
 
   const prisma = {
     payment: paymentApi,
     order: orderApi,
+    refund: refundApi,
     $transaction: vi.fn(
       async (callback: (client: typeof tx) => Promise<unknown>) => callback(tx),
     ),
@@ -158,8 +181,16 @@ function setup() {
     total: 85_000,
   };
   const { prisma, payments } = createPrismaMock(order);
-  const orders = createOrdersPort(order);
-  const rewards = { finalizeRewardsOnPaid: vi.fn(async () => undefined) };
+  const orders = {
+    ...createOrdersPort(order),
+    markRefunded: vi.fn(async () => {
+      order.status = OrderStatus.REFUNDED;
+    }),
+  };
+  const rewards = {
+    finalizeRewardsOnPaid: vi.fn(async () => undefined),
+    refundRewardsOnRefund: vi.fn(async () => undefined),
+  };
   const stripe = new FakeStripe();
   const service = new PaymentsService(
     prisma as unknown as PrismaService,
@@ -169,6 +200,13 @@ function setup() {
   );
 
   return { service, stripe, prisma, orders, rewards, order, payments };
+}
+
+async function createSession() {
+  const context = setup();
+  const result = await context.service.createCheckout(baseInput);
+  const sessionId = context.payments[0].stripeSessionId!;
+  return { ...context, result, sessionId };
 }
 
 const baseInput: PayInput = {
@@ -333,13 +371,6 @@ describe('PaymentsService stripe webhook', () => {
     process.env.STRIPE_WEBHOOK_SECRET = WEBHOOK_SECRET;
   });
 
-  async function createSession() {
-    const context = setup();
-    const result = await context.service.createCheckout(baseInput);
-    const sessionId = context.payments[0].stripeSessionId!;
-    return { ...context, result, sessionId };
-  }
-
   it('completed + paid -> payment SUCCEEDED, order PAID, rewards 1 lần', async () => {
     const { service, stripe, payments, order, rewards, sessionId } = await createSession();
     const session = stripe.markPaid(sessionId);
@@ -479,6 +510,147 @@ describe('PaymentsService stripe webhook', () => {
     const error = await capture(service.handleStripeWebhook(Buffer.from(payload), header));
 
     expect(error.code).toBe(PaymentErrorCode.STRIPE_WEBHOOK_INVALID);
+  });
+});
+
+describe('PaymentsService refund & dispute webhook', () => {
+  it('charge.refunded thành công -> Payment REFUNDED, Order REFUNDED, hoàn/thu hồi loyalty', async () => {
+    const { service, stripe, orders, rewards, payments, sessionId } = await createSession();
+    const session = stripe.markPaid(sessionId);
+    const { payload: payPayload, header: payHeader } = stripe.signedEvent(
+      session,
+      'checkout.session.completed',
+      WEBHOOK_SECRET,
+    );
+    await service.handleStripeWebhook(Buffer.from(payPayload), payHeader);
+    expect(payments[0].status).toBe(PaymentStatus.SUCCEEDED);
+
+    const charge = {
+      id: 'ch_test_refund_1',
+      payment_intent: payments[0].stripePaymentIntentId,
+      refunded: true,
+      amount: 85_000,
+      amount_refunded: 85_000,
+      currency: 'vnd',
+      refunds: {
+        data: [{ id: 're_test_1', amount: 85_000, status: 'succeeded', reason: 'requested_by_customer' }],
+      },
+    };
+    const { payload, header } = stripe.signedEvent(charge, 'charge.refunded', WEBHOOK_SECRET);
+
+    const result = await service.handleStripeWebhook(Buffer.from(payload), header);
+
+    expect(result.received).toBe(true);
+    expect(result.replay).toBe(false);
+    expect(payments[0].status).toBe(PaymentStatus.REFUNDED);
+    expect(rewards.refundRewardsOnRefund).toHaveBeenCalledTimes(1);
+    expect(orders.markRefunded).toHaveBeenCalledWith(10, payments[0].id, expect.anything());
+  });
+
+  it('charge.refunded lặp lại -> replay=true, không trừ điểm lần 2', async () => {
+    const { service, stripe, rewards, payments, sessionId } = await createSession();
+    const session = stripe.markPaid(sessionId);
+    const { payload: payPayload, header: payHeader } = stripe.signedEvent(
+      session,
+      'checkout.session.completed',
+      WEBHOOK_SECRET,
+    );
+    await service.handleStripeWebhook(Buffer.from(payPayload), payHeader);
+
+    const charge = {
+      id: 'ch_test_refund_dup',
+      payment_intent: payments[0].stripePaymentIntentId,
+      refunded: true,
+      amount: 85_000,
+      amount_refunded: 85_000,
+      currency: 'vnd',
+      refunds: { data: [{ id: 're_test_dup', amount: 85_000, status: 'succeeded' }] },
+    };
+    const { payload, header } = stripe.signedEvent(charge, 'charge.refunded', WEBHOOK_SECRET);
+
+    await service.handleStripeWebhook(Buffer.from(payload), header);
+    expect(rewards.refundRewardsOnRefund).toHaveBeenCalledTimes(1);
+
+    const secondResult = await service.handleStripeWebhook(Buffer.from(payload), header);
+    expect(secondResult.received).toBe(true);
+    expect(secondResult.replay).toBe(true);
+    expect(rewards.refundRewardsOnRefund).toHaveBeenCalledTimes(1);
+  });
+
+  it('charge.refunded partial refund -> bỏ qua và log alert', async () => {
+    const { service, stripe, rewards, payments, sessionId } = await createSession();
+    const session = stripe.markPaid(sessionId);
+    const { payload: payPayload, header: payHeader } = stripe.signedEvent(
+      session,
+      'checkout.session.completed',
+      WEBHOOK_SECRET,
+    );
+    await service.handleStripeWebhook(Buffer.from(payPayload), payHeader);
+
+    const charge = {
+      id: 'ch_test_refund_part',
+      payment_intent: payments[0].stripePaymentIntentId,
+      refunded: false,
+      amount: 85_000,
+      amount_refunded: 40_000,
+      currency: 'vnd',
+      refunds: { data: [{ id: 're_test_part', amount: 40_000, status: 'succeeded' }] },
+    };
+    const { payload, header } = stripe.signedEvent(charge, 'charge.refunded', WEBHOOK_SECRET);
+
+    const result = await service.handleStripeWebhook(Buffer.from(payload), header);
+    expect(result.ignored).toBe('partial-refund-not-supported');
+    expect(rewards.refundRewardsOnRefund).not.toHaveBeenCalled();
+    expect(payments[0].status).toBe(PaymentStatus.SUCCEEDED);
+  });
+
+  it('charge.dispute.created -> log và trả manual review required', async () => {
+    const { service, stripe, payments, sessionId } = await createSession();
+    const session = stripe.markPaid(sessionId);
+    const { payload: payPayload, header: payHeader } = stripe.signedEvent(
+      session,
+      'checkout.session.completed',
+      WEBHOOK_SECRET,
+    );
+    await service.handleStripeWebhook(Buffer.from(payPayload), payHeader);
+
+    const dispute = {
+      id: 'dp_test_1',
+      payment_intent: payments[0].stripePaymentIntentId,
+      status: 'needs_response',
+      amount: 85_000,
+    };
+    const { payload, header } = stripe.signedEvent(dispute, 'charge.dispute.created', WEBHOOK_SECRET);
+
+    const result = await service.handleStripeWebhook(Buffer.from(payload), header);
+    expect(result.ignored).toBe('dispute-requires-manual-review');
+  });
+
+  it('bỏ qua refund khi feature flag ENABLE_STRIPE_REFUND=false', async () => {
+    process.env.ENABLE_STRIPE_REFUND = 'false';
+    const { service, stripe, rewards, payments, sessionId } = await createSession();
+    const session = stripe.markPaid(sessionId);
+    const { payload: payPayload, header: payHeader } = stripe.signedEvent(
+      session,
+      'checkout.session.completed',
+      WEBHOOK_SECRET,
+    );
+    await service.handleStripeWebhook(Buffer.from(payPayload), payHeader);
+
+    const charge = {
+      id: 'ch_test_refund_flag',
+      payment_intent: payments[0].stripePaymentIntentId,
+      refunded: true,
+      amount: 85_000,
+      amount_refunded: 85_000,
+      currency: 'vnd',
+    };
+    const { payload, header } = stripe.signedEvent(charge, 'charge.refunded', WEBHOOK_SECRET);
+
+    const result = await service.handleStripeWebhook(Buffer.from(payload), header);
+    expect(result.ignored).toBe('refund-feature-flag-disabled');
+    expect(rewards.refundRewardsOnRefund).not.toHaveBeenCalled();
+    delete process.env.ENABLE_STRIPE_REFUND;
   });
 });
 

@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
 import type { Request } from 'express';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { CurrentUser, JwtAuthGuard, type AuthUser } from '../auth/public.js';
 import { PayDto } from './payments.dto.js';
 import { PaymentsService } from './payments.service.js';
@@ -20,6 +21,7 @@ export class PaymentsController {
   constructor(private readonly payments: PaymentsService) {}
 
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Post('checkout')
   @HttpCode(HttpStatus.OK)
   createCheckout(
@@ -35,7 +37,8 @@ export class PaymentsController {
     });
   }
 
-  @Post('webhook/stripe')
+  @SkipThrottle()
+  @Post(['webhook', 'webhook/stripe'])
   @HttpCode(HttpStatus.OK)
   stripeWebhook(@Req() req: RawBodyRequest<Request>): Promise<StripeWebhookResult> {
     const header = req.headers['stripe-signature'];

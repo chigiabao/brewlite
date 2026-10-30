@@ -33,13 +33,15 @@ export const ALLOWED: Record<OrderStatus, OrderStatus[]> = {
     OrderStatus.PAID,
     OrderStatus.PAYMENT_FAILED,
     OrderStatus.CANCELLED,
+    OrderStatus.REFUNDED,
   ],
-  PAID: [OrderStatus.PREPARING, OrderStatus.CANCELLED],
-  PAYMENT_FAILED: [OrderStatus.PENDING, OrderStatus.CANCELLED],
-  PREPARING: [OrderStatus.READY],
-  READY: [OrderStatus.COMPLETED],
-  COMPLETED: [],
-  CANCELLED: [],
+  PAID: [OrderStatus.PREPARING, OrderStatus.CANCELLED, OrderStatus.REFUNDED],
+  PAYMENT_FAILED: [OrderStatus.PENDING, OrderStatus.CANCELLED, OrderStatus.REFUNDED],
+  PREPARING: [OrderStatus.READY, OrderStatus.REFUNDED],
+  READY: [OrderStatus.COMPLETED, OrderStatus.REFUNDED],
+  COMPLETED: [OrderStatus.REFUNDED],
+  CANCELLED: [OrderStatus.REFUNDED],
+  REFUNDED: [],
 };
 
 // export function assertTransition(from: OrderStatus, to: OrderStatus): void {

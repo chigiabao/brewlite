@@ -8,6 +8,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { CreateOrderDto } from './orders.dto.js';
 import { OrdersService } from './orders.service.js';
 import { JwtAuthGuard, CurrentUser, type AuthUser } from '../auth/public.js';
@@ -17,6 +18,7 @@ import { JwtAuthGuard, CurrentUser, type AuthUser } from '../auth/public.js';
 export class OrdersController {
   constructor(private readonly orders: OrdersService) {}
 
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Post()
   create(
     @CurrentUser() user: AuthUser,

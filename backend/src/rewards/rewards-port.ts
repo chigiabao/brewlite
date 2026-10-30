@@ -69,4 +69,19 @@ export interface RewardsPort {
     params: { orderId: number; userId: number; totalPaid: number },
     tx: RewardsTx,
   ): Promise<{ pointsEarned: number }>;
+
+  /**
+   * Reverse loyalty for a fully refunded order, exactly once per order.
+   * EARN points are clawed back and unspent REDEEM points are restored.
+   * A negative balance is allowed so a refund is never blocked by spent points.
+   */
+  refundRewardsOnRefund(
+    params: {
+      orderId: number;
+      userId: number;
+      pointsRedeemed: number;
+      restoreRedeemedPoints: boolean;
+    },
+    tx: RewardsTx,
+  ): Promise<{ pointsDelta: number; alreadyProcessed: boolean }>;
 }

@@ -22,7 +22,7 @@ try {
   await check('GET /products/:id', `${backend}/products/${menu[0].id}`, 200);
   await check('GET /orders/me without JWT', `${backend}/orders/me`, 401);
   await check('GET /rewards/me without JWT', `${backend}/rewards/me`, 401);
-  await check('POST /payments without JWT', `${backend}/payments`, 401, {
+  await check('POST /payments/checkout without JWT', `${backend}/payments/checkout`, 401, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ orderId: 1, method: 'WALLET' }),
   });

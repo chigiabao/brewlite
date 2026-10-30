@@ -152,6 +152,7 @@ describe('OrdersService', () => {
         pointsRedeemed: 0,
         total: 40000,
         couponCode: null,
+        cancelAfter: expect.any(Date),
         items: {
           create: [
             {
@@ -274,12 +275,18 @@ describe('OrdersService', () => {
 
   it('hủy đơn PENDING và hoàn kho trong transaction', async () => {
     const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
       order: {
         findFirst: vi.fn().mockResolvedValue({
           id: 10,
+          userId: 7,
           status: 'PENDING',
         }),
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+      payment: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
       },
       orderItem: {
         findMany: vi.fn().mockResolvedValue([{ productId: 1, qty: 2 }]),
@@ -298,8 +305,8 @@ describe('OrdersService', () => {
     });
 
     expect(tx.order.updateMany).toHaveBeenCalledWith({
-      where: { id: 10, userId: 7, status: 'PENDING' },
-      data: { status: 'CANCELLED' },
+      where: { id: 10, status: 'PENDING' },
+      data: { status: 'CANCELLED', cancelAfter: null },
     });
 
     expect(stock.release).toHaveBeenCalledWith(tx, [{ productId: 1, qty: 2 }]);
@@ -307,7 +314,12 @@ describe('OrdersService', () => {
 
   it('báo ORDER_NOT_FOUND nếu đơn không thuộc user hoặc không tồn tại', async () => {
     const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
       order: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        updateMany: vi.fn(),
+      },
+      payment: {
         findFirst: vi.fn().mockResolvedValue(null),
         updateMany: vi.fn(),
       },
@@ -330,11 +342,17 @@ describe('OrdersService', () => {
 
   it('không hủy đơn đã thanh toán', async () => {
     const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
       order: {
         findFirst: vi.fn().mockResolvedValue({
           id: 10,
+          userId: 7,
           status: 'PAID',
         }),
+        updateMany: vi.fn(),
+      },
+      payment: {
+        findFirst: vi.fn().mockResolvedValue(null),
         updateMany: vi.fn(),
       },
       orderItem: {
@@ -356,12 +374,18 @@ describe('OrdersService', () => {
 
   it('hủy đơn PAYMENT_FAILED và hoàn kho', async () => {
     const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
       order: {
         findFirst: vi.fn().mockResolvedValue({
           id: 10,
+          userId: 7,
           status: 'PAYMENT_FAILED',
         }),
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+      payment: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
       },
       orderItem: {
         findMany: vi.fn().mockResolvedValue([{ productId: 1, qty: 2 }]),
@@ -382,10 +406,9 @@ describe('OrdersService', () => {
     expect(tx.order.updateMany).toHaveBeenCalledWith({
       where: {
         id: 10,
-        userId: 7,
         status: 'PAYMENT_FAILED',
       },
-      data: { status: 'CANCELLED' },
+      data: { status: 'CANCELLED', cancelAfter: null },
     });
 
     expect(stock.release).toHaveBeenCalledWith(tx, [{ productId: 1, qty: 2 }]);
@@ -484,17 +507,22 @@ describe('FIX03 Orders: quote snapshot và hoàn reservation', () => {
 
   it('hủy PENDING: chuyển trạng thái bằng CAS, hoàn stock và reserve G trong cùng tx', async () => {
     const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
       order: {
-        findFirst: vi.fn().mockResolvedValue({ id: 42, status: 'PENDING', couponCode: 'GIAM10', pointsRedeemed: 27_000 }),
+        findFirst: vi.fn().mockResolvedValue({ id: 42, userId: 7, status: 'PENDING', couponCode: 'GIAM10', pointsRedeemed: 27_000 }),
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+      payment: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
       },
       orderItem: { findMany: vi.fn().mockResolvedValue([{ productId: 1, qty: 2 }]) },
     };
     prisma.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn(tx));
     await expect(service.cancel(7, 42)).resolves.toEqual({ id: 42, status: 'CANCELLED' });
     expect(tx.order.updateMany).toHaveBeenCalledWith({
-      where: { id: 42, userId: 7, status: 'PENDING' },
-      data: { status: 'CANCELLED' },
+      where: { id: 42, status: 'PENDING' },
+      data: { status: 'CANCELLED', cancelAfter: null },
     });
     expect(stock.release).toHaveBeenCalledWith(tx, [{ productId: 1, qty: 2 }]);
     expect(rewards.releaseReservedOnCancel).toHaveBeenCalledTimes(1);
@@ -505,8 +533,13 @@ describe('FIX03 Orders: quote snapshot và hoàn reservation', () => {
 
   it('hủy PAYMENT_FAILED: hoàn lại reservation', async () => {
     const tx = {
-      order: { findFirst: vi.fn().mockResolvedValue({ id: 42, status: 'PAYMENT_FAILED', couponCode: null, pointsRedeemed: 10_000 }),
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      order: { findFirst: vi.fn().mockResolvedValue({ id: 42, userId: 7, status: 'PAYMENT_FAILED', couponCode: null, pointsRedeemed: 10_000 }),
         updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      payment: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      },
       orderItem: { findMany: vi.fn().mockResolvedValue([]) },
     };
     prisma.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn(tx));
@@ -518,8 +551,13 @@ describe('FIX03 Orders: quote snapshot và hoàn reservation', () => {
 
   it('race hai cancel: CAS thua => không release stock, quota, points', async () => {
     const tx = {
-      order: { findFirst: vi.fn().mockResolvedValue({ id: 42, status: 'PENDING', couponCode: 'GIAM10', pointsRedeemed: 10_000 }),
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      order: { findFirst: vi.fn().mockResolvedValue({ id: 42, userId: 7, status: 'PENDING', couponCode: 'GIAM10', pointsRedeemed: 10_000 }),
         updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      payment: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      },
       orderItem: { findMany: vi.fn() },
     };
     prisma.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn(tx));
@@ -530,8 +568,13 @@ describe('FIX03 Orders: quote snapshot và hoàn reservation', () => {
 
   it('G báo lỗi => lỗi nổi lên ngoài transaction, không được trả CANCELLED giả', async () => {
     const tx = {
-      order: { findFirst: vi.fn().mockResolvedValue({ id: 42, status: 'PENDING', couponCode: 'GIAM10', pointsRedeemed: 10_000 }),
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      order: { findFirst: vi.fn().mockResolvedValue({ id: 42, userId: 7, status: 'PENDING', couponCode: 'GIAM10', pointsRedeemed: 10_000 }),
         updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      payment: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      },
       orderItem: { findMany: vi.fn().mockResolvedValue([{ productId: 1, qty: 2 }]) },
     };
     prisma.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn(tx));
@@ -542,8 +585,13 @@ describe('FIX03 Orders: quote snapshot và hoàn reservation', () => {
 
   it('không thể hủy đơn đã PAID để nhận lại điểm (không có chính sách refund)', async () => {
     const tx = {
-      order: { findFirst: vi.fn().mockResolvedValue({ id: 42, status: 'PAID', couponCode: 'GIAM10', pointsRedeemed: 10_000 }),
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      order: { findFirst: vi.fn().mockResolvedValue({ id: 42, userId: 7, status: 'PAID', couponCode: 'GIAM10', pointsRedeemed: 10_000 }),
         updateMany: vi.fn() },
+      payment: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      },
       orderItem: { findMany: vi.fn() },
     };
     prisma.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn(tx));

@@ -1,4 +1,4 @@
-export type PaymentStatusValue = 'PENDING' | 'SUCCEEDED' | 'FAILED';
+export type PaymentStatusValue = 'PENDING' | 'SUCCEEDED' | 'FAILED' | 'REFUNDED';
 
 export type PayInput = {
   userId: number;

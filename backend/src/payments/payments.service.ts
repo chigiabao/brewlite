@@ -6,9 +6,15 @@ import {
 } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import type Stripe from 'stripe';
-import type { Payment } from '../generated/prisma/client.js';
+import type { Payment, Prisma } from '../generated/prisma/client.js';
 import { OrderStatus, PaymentStatus } from '../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import {
+  getCheckoutSessionTtlSeconds,
+  getFrontendUrl,
+  getOrderExpiryMs,
+  isRefundEnabled,
+} from '../config/app-config.js';
 import { REWARDS_PORT, type RewardsPort } from '../rewards/public.js';
 import {
   ORDERS_PAYMENT_PORT,
@@ -25,7 +31,6 @@ import type {
 
 const IDEMPOTENCY_KEY_MAX_LENGTH = 200;
 const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9._:-]+$/;
-const CHECKOUT_SESSION_TTL_SECONDS = 31 * 60;
 const PAID_ORDER_STATUSES: OrderStatus[] = [
   OrderStatus.PAID,
   OrderStatus.PREPARING,
@@ -84,6 +89,13 @@ function isPermanentStripeError(error: unknown): boolean {
 function paymentIntentId(session: Stripe.Checkout.Session): string | null {
   if (typeof session.payment_intent === 'string') return session.payment_intent;
   return session.payment_intent?.id ?? null;
+}
+
+function paymentIntentIdFromChargeOrIntent(
+  value: string | Stripe.PaymentIntent | null | undefined,
+): string | null {
+  if (typeof value === 'string') return value;
+  return value?.id ?? null;
 }
 
 function isPaidOrderStatus(status: OrderStatus): boolean {
@@ -219,6 +231,18 @@ export class PaymentsService {
         order.status = OrderStatus.PENDING;
       }
 
+      // Reserve the whole checkout window before calling Stripe. The order row
+      // is locked here, so the expiry worker cannot cancel between payment
+      // creation and the external Stripe call.
+      await tx.order.updateMany({
+        where: { id: order.id, status: { in: [OrderStatus.PENDING, OrderStatus.PAYMENT_FAILED] } },
+        data: {
+          cancelAfter: new Date(
+            Date.now() + getCheckoutSessionTtlSeconds() * 1000 + getOrderExpiryMs(),
+          ),
+        },
+      });
+
       const active = await tx.payment.findFirst({
         where: { orderId: order.id, status: PaymentStatus.PENDING },
         orderBy: { id: 'asc' },
@@ -338,14 +362,19 @@ export class PaymentsService {
       }
 
       if (session.status === 'open') {
-        const refreshed = await this.prisma.payment.update({
-          where: { id: payment.id },
-          data: {
-            stripeCheckoutUrl: session.url ?? payment.stripeCheckoutUrl,
-            stripeSessionExpiresAt: session.expires_at
-              ? new Date(session.expires_at * 1000)
-              : payment.stripeSessionExpiresAt,
-          },
+        const expiresAt = session.expires_at
+          ? new Date(session.expires_at * 1000)
+          : payment.stripeSessionExpiresAt;
+        const refreshed = await this.prisma.$transaction(async (tx) => {
+          const updated = await tx.payment.update({
+            where: { id: payment.id },
+            data: {
+              stripeCheckoutUrl: session.url ?? payment.stripeCheckoutUrl,
+              stripeSessionExpiresAt: expiresAt,
+            },
+          });
+          await this.extendOrderCheckoutWindow(tx, payment.orderId, expiresAt);
+          return updated;
         });
         return this.toCheckoutResult(refreshed, idempotentReplay);
       }
@@ -370,24 +399,41 @@ export class PaymentsService {
     }
 
     const session = await this.createStripeCheckoutSession(payment, order);
-    const updated = await this.prisma.payment.update({
-      where: { id: payment.id },
-      data: {
-        stripeSessionId: session.id,
-        stripeCheckoutUrl: session.url,
-        stripeSessionExpiresAt: new Date(session.expires_at * 1000),
-      },
+    const sessionExpiresAt = new Date(session.expires_at * 1000);
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const next = await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          stripeSessionId: session.id,
+          stripeCheckoutUrl: session.url,
+          stripeSessionExpiresAt: sessionExpiresAt,
+        },
+      });
+      await this.extendOrderCheckoutWindow(tx, payment.orderId, sessionExpiresAt);
+      return next;
     });
 
     return this.toCheckoutResult(updated, idempotentReplay);
+  }
+
+  private async extendOrderCheckoutWindow(
+    tx: Prisma.TransactionClient,
+    orderId: number,
+    sessionExpiresAt: Date | null,
+  ): Promise<void> {
+    const base = sessionExpiresAt?.getTime() ?? Date.now() + getCheckoutSessionTtlSeconds() * 1000;
+    await tx.order.updateMany({
+      where: { id: orderId, status: { in: [OrderStatus.PENDING, OrderStatus.PAYMENT_FAILED] } },
+      data: { cancelAfter: new Date(base + getOrderExpiryMs()) },
+    });
   }
 
   private async createStripeCheckoutSession(
     payment: Payment,
     order: PayableOrder,
   ): Promise<Stripe.Checkout.Session> {
-    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
-    const expiresAt = Math.floor(Date.now() / 1000) + CHECKOUT_SESSION_TTL_SECONDS;
+    const frontendUrl = getFrontendUrl();
+    const expiresAt = Math.floor(Date.now() / 1000) + getCheckoutSessionTtlSeconds();
 
     let session: Stripe.Checkout.Session;
     try {
@@ -501,9 +547,239 @@ export class PaymentsService {
           event.data.object as Stripe.Checkout.Session,
           event.type,
         );
+      case 'refund.created':
+      case 'refund.updated':
+      case 'charge.refunded':
+        if (!isRefundEnabled()) {
+          this.logger.warn(`stripe.refund.skipped: feature flag disabled event=${event.type}`);
+          return { received: true, type: event.type, ignored: 'refund-feature-flag-disabled' };
+        }
+        if (event.type === 'charge.refunded') {
+          return this.onChargeRefunded(event.data.object as Stripe.Charge, event.type);
+        }
+        return this.onRefundEvent(event.data.object as Stripe.Refund, event.type);
+      case 'charge.dispute.created':
+      case 'charge.dispute.updated':
+      case 'charge.dispute.closed': {
+        const dispute = event.data.object as Stripe.Dispute;
+        const intentId = paymentIntentIdFromChargeOrIntent(dispute.payment_intent);
+        this.logger.error(
+          `stripe.dispute.${event.type} disputeId=${dispute.id} paymentIntent=${intentId ?? 'unknown'} status=${dispute.status} amount=${dispute.amount} — manual review required`,
+        );
+        return { received: true, type: event.type, ignored: 'dispute-requires-manual-review' };
+      }
       default:
         return { received: true, type: event.type, ignored: 'unhandled-event-type' };
     }
+  }
+
+  private async onRefundEvent(
+    refund: Stripe.Refund,
+    eventType: string,
+  ): Promise<StripeWebhookResult> {
+    const intentId = paymentIntentIdFromChargeOrIntent(refund.payment_intent);
+    if (!intentId) {
+      this.logger.warn(`stripe.refund.missing_payment_intent refundId=${refund.id}`);
+      return { received: true, type: eventType, ignored: 'missing-payment-intent' };
+    }
+    if (refund.status !== 'succeeded') {
+      this.logger.log(
+        `stripe.refund.not_succeeded refundId=${refund.id} status=${refund.status}`,
+      );
+      return { received: true, type: eventType, ignored: 'refund-not-succeeded' };
+    }
+
+    const payment = await this.prisma.payment.findFirst({
+      where: { stripePaymentIntentId: intentId },
+      select: { id: true, amount: true },
+    });
+    if (!payment) {
+      this.logger.warn(
+        `stripe.refund.payment_not_found refundId=${refund.id} paymentIntent=${intentId}`,
+      );
+      return { received: true, type: eventType, ignored: 'payment-not-found' };
+    }
+
+    return this.applyFullRefund({
+      paymentId: payment.id,
+      stripeRefundId: refund.id,
+      amount: refund.amount,
+      currency: refund.currency,
+      reason: refund.reason ?? null,
+      eventType,
+    });
+  }
+
+  private async onChargeRefunded(
+    charge: Stripe.Charge,
+    eventType: string,
+  ): Promise<StripeWebhookResult> {
+    const intentId = paymentIntentIdFromChargeOrIntent(charge.payment_intent);
+    if (!intentId) {
+      this.logger.warn(`stripe.charge.refunded.missing_payment_intent chargeId=${charge.id}`);
+      return { received: true, type: eventType, ignored: 'missing-payment-intent' };
+    }
+    if (charge.refunded !== true) {
+      this.logger.error(
+        `stripe.refund.partial_not_supported chargeId=${charge.id} paymentIntent=${intentId} amountRefunded=${charge.amount_refunded} amount=${charge.amount}`,
+      );
+      return { received: true, type: eventType, ignored: 'partial-refund-not-supported' };
+    }
+
+    const payment = await this.prisma.payment.findFirst({
+      where: { stripePaymentIntentId: intentId },
+      select: { id: true, amount: true },
+    });
+    if (!payment) {
+      this.logger.warn(
+        `stripe.charge.refunded.payment_not_found chargeId=${charge.id} paymentIntent=${intentId}`,
+      );
+      return { received: true, type: eventType, ignored: 'payment-not-found' };
+    }
+    if (charge.amount_refunded !== payment.amount) {
+      this.logger.error(
+        `stripe.refund.amount_mismatch chargeId=${charge.id} paymentId=${payment.id} refunded=${charge.amount_refunded} expected=${payment.amount}`,
+      );
+      return { received: true, type: eventType, ignored: 'refund-amount-mismatch' };
+    }
+
+    const refund = charge.refunds?.data?.find(
+      (item) => item.status === 'succeeded' && item.amount === payment.amount,
+    );
+    return this.applyFullRefund({
+      paymentId: payment.id,
+      stripeRefundId: refund?.id ?? `charge-refund:${charge.id}:${charge.amount_refunded}`,
+      amount: charge.amount_refunded,
+      currency: charge.currency,
+      reason: refund?.reason ?? null,
+      eventType,
+    });
+  }
+
+  private async applyFullRefund(input: {
+    paymentId: number;
+    stripeRefundId: string;
+    amount: number;
+    currency: string;
+    reason: string | null;
+    eventType: string;
+  }): Promise<StripeWebhookResult> {
+    return this.prisma.$transaction(async (tx) => {
+      const payment = await tx.payment.findUnique({
+        where: { id: input.paymentId },
+        include: {
+          order: {
+            select: {
+              id: true,
+              userId: true,
+              status: true,
+              pointsRedeemed: true,
+            },
+          },
+        },
+      });
+      if (!payment) {
+        throw new PaymentError(
+          PaymentErrorCode.ORDER_NOT_FOUND,
+          'Payment not found',
+          404,
+          { paymentId: input.paymentId },
+        );
+      }
+
+      await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${payment.orderId} FOR UPDATE`;
+
+      if (payment.amount !== input.amount) {
+        this.logger.error(
+          `stripe.refund.amount_mismatch refundId=${input.stripeRefundId} paymentId=${payment.id} refunded=${input.amount} expected=${payment.amount}`,
+        );
+        return {
+          received: true,
+          type: input.eventType,
+          orderId: payment.orderId,
+          ignored: 'partial-refund-not-supported',
+        };
+      }
+      if (input.currency.toLowerCase() !== 'vnd') {
+        this.logger.error(
+          `stripe.refund.currency_mismatch refundId=${input.stripeRefundId} currency=${input.currency}`,
+        );
+        return {
+          received: true,
+          type: input.eventType,
+          orderId: payment.orderId,
+          ignored: 'unsupported-currency',
+        };
+      }
+
+      const update = await tx.payment.updateMany({
+        where: { id: payment.id, status: PaymentStatus.SUCCEEDED },
+        data: { status: PaymentStatus.REFUNDED },
+      });
+      if (update.count === 0) {
+        const current = await tx.payment.findUnique({
+          where: { id: payment.id },
+          select: { status: true },
+        });
+        return {
+          received: true,
+          type: input.eventType,
+          orderId: payment.orderId,
+          replay: current?.status === PaymentStatus.REFUNDED,
+          ignored:
+            current?.status === PaymentStatus.REFUNDED
+              ? undefined
+              : 'payment-not-refundable',
+        };
+      }
+
+      await tx.refund.upsert({
+        where: { stripeRefundId: input.stripeRefundId },
+        create: {
+          paymentId: payment.id,
+          stripeRefundId: input.stripeRefundId,
+          amount: input.amount,
+          currency: input.currency.toLowerCase(),
+          status: 'SUCCEEDED',
+          reason: input.reason,
+        },
+        update: {
+          amount: input.amount,
+          currency: input.currency.toLowerCase(),
+          status: 'SUCCEEDED',
+          reason: input.reason,
+        },
+      });
+
+      const restoreRedeemedPoints = payment.order.status !== OrderStatus.CANCELLED;
+      await this.rewards.refundRewardsOnRefund(
+        {
+          orderId: payment.order.id,
+          userId: payment.order.userId,
+          pointsRedeemed: payment.order.pointsRedeemed,
+          restoreRedeemedPoints,
+        },
+        tx,
+      );
+
+      if (payment.order.status !== OrderStatus.REFUNDED) {
+        await this.orders.markRefunded(payment.order.id, payment.id, tx);
+      }
+      await tx.order.updateMany({
+        where: { id: payment.order.id },
+        data: { cancelAfter: null },
+      });
+
+      this.logger.log(
+        `stripe.refund.succeeded orderId=${payment.orderId} paymentId=${payment.id} refundId=${input.stripeRefundId} amount=${input.amount}`,
+      );
+      return {
+        received: true,
+        type: input.eventType,
+        orderId: payment.orderId,
+        replay: false,
+      };
+    });
   }
 
   private async onCheckoutCompleted(
@@ -556,6 +832,11 @@ export class PaymentsService {
       }
       if (session.currency && session.currency !== 'vnd') {
         throw this.invalidWebhook(`currency=${session.currency} không hợp lệ`);
+      }
+
+      if (payment.status === PaymentStatus.REFUNDED) {
+        // A late checkout replay must never downgrade a refunded payment back to SUCCEEDED.
+        return { orderId: payment.orderId, replay: true };
       }
 
       const intentId = paymentIntentId(session);

@@ -26,12 +26,14 @@ import {
 } from '@nestjs/common';
 import { unitPrice } from '../common/pricing.js';
 import type { Size } from '../common/pricing.js';
+import type { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateOrderDto } from './orders.dto.js';
 import { StockService } from './stock.service.js';
 import { OrderStatus } from '../generated/prisma/enums.js';
 import { assertTransition } from './order-state.js';
 import { REWARDS_PORT, type RewardsPort, normalizeCouponCode } from '../rewards/public.js';
+import { getOrderExpiryMs } from '../config/app-config.js';
 
 @Injectable()
 export class OrdersService {
@@ -202,6 +204,7 @@ export class OrdersService {
             pointsRedeemed,
             total,
             couponCode: couponCodeToSave,
+            cancelAfter: new Date(Date.now() + getOrderExpiryMs()),
             items: {
               create: pricedItems,
             },
@@ -305,16 +308,17 @@ export class OrdersService {
 
   async cancel(userId: number, orderId: number) {
     return this.prisma.$transaction(async (tx) => {
-      // Kiểm tra đơn có thuộc user không
+      // The same row lock is taken by checkout creation and the expiry worker.
+      await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
+
       const order = await tx.order.findFirst({
         where: { id: orderId, userId },
-        select: { id: true, status: true, couponCode: true, pointsRedeemed: true },
+        select: { id: true, userId: true, status: true, couponCode: true, pointsRedeemed: true },
       });
 
       if (!order) {
         throw new NotFoundException('ORDER_NOT_FOUND');
       }
-      // Chỉ cho phép hủy đơn chưa thanh toán hoặc thanh toán thất bại
       if (
         order.status !== OrderStatus.PENDING &&
         order.status !== OrderStatus.PAYMENT_FAILED
@@ -322,57 +326,120 @@ export class OrdersService {
         throw new ConflictException('ORDER_CANNOT_BE_CANCELLED');
       }
 
-      // Không cho hủy nếu không thể hoàn đầy đủ coupon/points.
-      // Tránh trạng thái CANCELLED nhưng giữ lại tài nguyên đã reserve.
-      if ((order.couponCode || order.pointsRedeemed > 0) && !this.rewards) {
-        throw new ConflictException('REWARDS_SERVICE_UNAVAILABLE');
-      }
-
-      // Kiểm tra state machine
-      assertTransition(order.status, OrderStatus.CANCELLED);
-
-      // CAS: chỉ một request được chuyển trạng thái thành công
-      const updated = await tx.order.updateMany({
-        where: {
-          id: orderId,
-          userId,
-          status: order.status,
-        },
-        data: {
-          status: OrderStatus.CANCELLED,
-        },
+      // A checkout attempt may still be creating/refreshing a Stripe session.
+      // Cancelling now could let Stripe charge an order that is already CANCELLED.
+      const pendingPayment = await tx.payment.findFirst({
+        where: { orderId, status: 'PENDING' },
+        select: { id: true },
       });
-
-      if (updated.count !== 1) {
-        throw new ConflictException('ORDER_STATUS_CHANGED');
+      if (pendingPayment) {
+        throw new ConflictException('ORDER_PAYMENT_IN_PROGRESS');
       }
 
-      // Lấy chi tiết để hoàn kho
-      const items = await tx.orderItem.findMany({
-        where: { orderId },
-        select: {
-          productId: true,
-          qty: true,
-        },
-      });
-
-      await this.stock.release(tx, items);
-      if (this.rewards && (order.couponCode || order.pointsRedeemed > 0)) {
-        await this.rewards.releaseReservedOnCancel(
-          {
-            orderId,
-            userId,
-            couponCode: order.couponCode ?? null,
-            pointsRedeemed: order.pointsRedeemed ?? 0,
-          },
-          tx,
-        );
-      }
-
-      return {
-        id: orderId,
-        status: OrderStatus.CANCELLED,
-      };
+      await this.cancelOrderInTransaction(tx, order);
+      return { id: orderId, status: OrderStatus.CANCELLED };
     });
+  }
+
+  /**
+   * Releases an unpaid order after its payment window has elapsed.
+   * Designed for the scheduler: expected races return `cancelled: false`
+   * instead of throwing, while real data-integrity failures roll back.
+   */
+  async cancelExpired(
+    orderId: number,
+    now = new Date(),
+  ): Promise<{ cancelled: boolean; reason?: string; orderId: number }> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
+
+      const order = await tx.order.findFirst({
+        where: { id: orderId },
+        select: {
+          id: true,
+          userId: true,
+          status: true,
+          couponCode: true,
+          pointsRedeemed: true,
+          cancelAfter: true,
+        },
+      });
+
+      if (
+        !order ||
+        (order.status !== OrderStatus.PENDING &&
+          order.status !== OrderStatus.PAYMENT_FAILED)
+      ) {
+        return { cancelled: false, reason: 'not-cancellable', orderId };
+      }
+      if (!order.cancelAfter || order.cancelAfter.getTime() > now.getTime()) {
+        return { cancelled: false, reason: 'not-due', orderId };
+      }
+
+      const activeSession = await tx.payment.findFirst({
+        where: {
+          orderId,
+          status: 'PENDING',
+          stripeSessionExpiresAt: { gt: now },
+        },
+        select: { id: true },
+      });
+      if (activeSession) {
+        return { cancelled: false, reason: 'payment-in-progress', orderId };
+      }
+
+      await this.cancelOrderInTransaction(tx, order);
+      return { cancelled: true, orderId };
+    });
+  }
+
+  private async cancelOrderInTransaction(
+    tx: Prisma.TransactionClient,
+    order: {
+      id: number;
+      userId: number;
+      status: OrderStatus;
+      couponCode: string | null;
+      pointsRedeemed: number;
+    },
+  ): Promise<void> {
+    // Never leave a payable attempt behind after cancelling the order.
+    await tx.payment.updateMany({
+      where: { orderId: order.id, status: 'PENDING' },
+      data: { status: 'FAILED' },
+    });
+
+    if ((order.couponCode || order.pointsRedeemed > 0) && !this.rewards) {
+      throw new ConflictException('REWARDS_SERVICE_UNAVAILABLE');
+    }
+
+    assertTransition(order.status, OrderStatus.CANCELLED);
+
+    const updated = await tx.order.updateMany({
+      where: { id: order.id, status: order.status },
+      data: { status: OrderStatus.CANCELLED, cancelAfter: null },
+    });
+    if (updated.count !== 1) {
+      throw new ConflictException('ORDER_STATUS_CHANGED');
+    }
+
+    const items = await tx.orderItem.findMany({
+      where: { orderId: order.id },
+      select: { productId: true, qty: true },
+    });
+    await this.stock.release(tx, items);
+
+    if (this.rewards && (order.couponCode || order.pointsRedeemed > 0)) {
+      await this.rewards.releaseReservedOnCancel(
+        {
+          orderId: order.id,
+          userId: order.userId,
+          couponCode: order.couponCode ?? null,
+          pointsRedeemed: order.pointsRedeemed ?? 0,
+        },
+        tx,
+      );
+    }
+
   }
 }

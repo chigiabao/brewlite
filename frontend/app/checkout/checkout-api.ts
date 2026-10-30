@@ -39,7 +39,7 @@ export type CreatedOrder = {
 export type CreateCheckoutResult = {
   orderId: number;
   paymentId: number;
-  status: 'PENDING' | 'SUCCEEDED' | 'FAILED';
+  status: 'PENDING' | 'SUCCEEDED' | 'FAILED' | 'REFUNDED';
   checkoutUrl: string;
   idempotentReplay: boolean;
 };
