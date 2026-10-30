@@ -21,6 +21,7 @@ export class PaymentsController {
       userId: user.userId,
       orderId: dto.orderId,
       method: dto.method,
+      demoDecline: dto.demoDecline,
       idempotencyKey: key,
     });
   }

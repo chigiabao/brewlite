@@ -25,9 +25,13 @@ export function paymentRequestHash(input: {
   userId: number;
   orderId: number;
   method: string;
+  demoDecline?: boolean;
 }): string {
+  // Preserve legacy hash for normal payments; distinguish a demo-decline attempt.
+  const fingerprint: (string | number)[] = [input.userId, input.orderId, input.method];
+  if (input.demoDecline) fingerprint.push('DEMO_DECLINE');
   return createHash('sha256')
-    .update(JSON.stringify([input.userId, input.orderId, input.method]))
+    .update(JSON.stringify(fingerprint))
     .digest('hex');
 }
 
@@ -71,10 +75,18 @@ export class PaymentsService {
 
   async pay(input: PayInput): Promise<PaymentResult> {
     const idempotencyKey = assertValidIdempotencyKey(input.idempotencyKey);
+    // Explicit opt-in + non-production: never let a public client force a declined payment.
+    if (input.demoDecline &&
+        (process.env.MOCK_GATEWAY_TEST_MODE !== 'true' || process.env.NODE_ENV === 'production')) {
+      throw new BadRequestException(
+        'Demo thanh toán thất bại chưa được bật trên backend (MOCK_GATEWAY_TEST_MODE=true, không dùng production)',
+      );
+    }
     const requestHash = paymentRequestHash({
       userId: input.userId,
       orderId: input.orderId,
       method: input.method,
+      demoDecline: input.demoDecline,
     });
 
     const existing = await this.prisma.payment.findUnique({ where: { idempotencyKey } });
@@ -110,10 +122,10 @@ export class PaymentsService {
       throw error;
     }
 
-    return this.chargeAndSettle(payment);
+    return this.chargeAndSettle(payment, input.demoDecline === true);
   }
 
-  private async chargeAndSettle(payment: Payment): Promise<PaymentResult> {
+  private async chargeAndSettle(payment: Payment, demoDecline = false): Promise<PaymentResult> {
     let reference: string;
     try {
       const result = await this.gateway.charge({
@@ -121,6 +133,7 @@ export class PaymentsService {
         orderId: payment.orderId,
         amount: payment.amount,
         method: payment.method,
+        ...(demoDecline ? { ref: 'MOCK-DEMO-0000' } : {}),
       });
       reference = result.reference;
     } catch (error) {

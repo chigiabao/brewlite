@@ -1,8 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Payment } from '../generated/prisma/client.js';
 import { OrderStatus, PaymentStatus } from '../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { MockGatewayService } from './mock-gateway.service.js';
+import { MockGatewayService, type MockChargeInput } from './mock-gateway.service.js';
 import type { OrdersPaymentPort, PayableOrder } from './orders-payment.port.js';
 import {
   PaymentDeclinedError,
@@ -60,7 +60,7 @@ function createPrismaMock() {
   };
 }
 
-function createGateway(charge?: () => Promise<{ reference: string; status: 'SUCCEEDED' }>) {
+function createGateway(charge?: (input: MockChargeInput) => Promise<{ reference: string; status: 'SUCCEEDED' }>) {
   return {
     charge: vi.fn(charge ?? (async () => ({ reference: 'MOCK-ABC123', status: 'SUCCEEDED' as const }))),
   };
@@ -109,6 +109,9 @@ async function expectPaymentError(promise: Promise<unknown>, code: PaymentErrorC
 describe('PaymentsService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('thanh toán mới success -> gateway gọi đúng 1 lần, Payment SUCCEEDED, Order PAID', async () => {
@@ -185,6 +188,47 @@ describe('PaymentsService', () => {
       service.pay({ ...baseInput, method: 'CARD' }),
       PaymentErrorCode.IDEMPOTENCY_KEY_REUSED,
     );
+  });
+
+  it('demo decline không bật -> 400 trước khi tạo payment và không gọi gateway', async () => {
+    vi.stubEnv('MOCK_GATEWAY_TEST_MODE', 'false');
+    const { service, prisma, gateway } = setup();
+    await expect(service.pay({ ...baseInput, demoDecline: true }))
+      .rejects.toMatchObject({ status: 400 });
+    expect(prisma.__payments).toHaveLength(0);
+    expect(gateway.charge).not.toHaveBeenCalled();
+  });
+
+  it('demo decline bị khóa khi NODE_ENV=production ngay cả nếu bật test mode', async () => {
+    vi.stubEnv('MOCK_GATEWAY_TEST_MODE', 'true');
+    vi.stubEnv('NODE_ENV', 'production');
+    const { service, prisma } = setup();
+    await expect(service.pay({ ...baseInput, demoDecline: true }))
+      .rejects.toMatchObject({ status: 400 });
+    expect(prisma.__payments).toHaveLength(0);
+  });
+
+  it('demo mode gọi gateway có reference DECLINE thật; transaction đánh dấu FAILED', async () => {
+    vi.stubEnv('MOCK_GATEWAY_TEST_MODE', 'true');
+    vi.stubEnv('NODE_ENV', 'test');
+    const gateway = createGateway(async (input) => {
+      if (input.ref?.endsWith('0000')) throw new PaymentDeclinedError(input.ref);
+      return { reference: 'MOCK-OK1234', status: 'SUCCEEDED' };
+    });
+    const { service, prisma, orders } = setup({ gateway });
+    await expectPaymentError(
+      service.pay({ ...baseInput, demoDecline: true }),
+      PaymentErrorCode.PAYMENT_DECLINED,
+    );
+    expect(gateway.charge).toHaveBeenCalledWith(expect.objectContaining({ ref: 'MOCK-DEMO-0000' }));
+    expect(orders.markPaymentFailed).toHaveBeenCalledTimes(1);
+    expect(prisma.__payments[0].status).toBe(PaymentStatus.FAILED);
+  });
+
+  it('hash của thanh toán demo và bình thường khác nhau; normal hash giữ tương thích', () => {
+    const input = { userId: 1, orderId: 10, method: 'WALLET' };
+    expect(paymentRequestHash({ ...input, demoDecline: false })).toBe(paymentRequestHash(input));
+    expect(paymentRequestHash({ ...input, demoDecline: true })).not.toBe(paymentRequestHash(input));
   });
 
   it('gateway decline -> Payment FAILED, Order PAYMENT_FAILED, 402', async () => {

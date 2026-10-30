@@ -37,6 +37,8 @@ export default function CheckoutPage() {
   const [couponDiscount, setCouponDiscount] = useState<number>(0);
   const [couponMessage, setCouponMessage] = useState<string>('');
   const [validatingCoupon, setValidatingCoupon] = useState<boolean>(false);
+  const [validatedCartSignature, setValidatedCartSignature] = useState<string | null>(null);
+  const couponRequestId = useRef(0);
 
   // Demo simulator for US-05 failure test
   const [simulateFailure, setSimulateFailure] = useState(false);
@@ -44,18 +46,35 @@ export default function CheckoutPage() {
   // Một khóa cho một lần thanh toán; bấm thử lại giữ nguyên khóa (Task 10 – F).
   const idemKey = useRef<string | null>(null);
   // Giữ orderId trong cùng phiên trang checkout. Retry không được POST /orders lần nữa.
-  const pendingOrder = useRef<{ id: number; cartKey: string } | null>(null);
+  const pendingOrder = useRef<{ id: number; cartKey: string; total: number } | null>(null);
 
   useEffect(() => {
     if (!items.length) router.replace('/cart');
   }, [items.length, router]);
 
+  // Không dùng quote đã cũ nếu người dùng sửa giỏ hàng sau khi validate.
+  const cartSignature = JSON.stringify(items.map(({ productId, size, toppings, qty, unitPrice }) => ({
+    productId, size, toppings: [...toppings].sort(), qty, unitPrice,
+  })));
+  const activeCouponCode = validatedCartSignature === cartSignature ? couponCode : null;
+  const activeCouponDiscount = activeCouponCode ? couponDiscount : 0;
+  const finalTotal = pendingOrder.current?.cartKey === cartSignature
+    ? pendingOrder.current.total
+    : Math.max(0, total - activeCouponDiscount);
+
   if (!items.length) return null;
 
-  const finalTotal = Math.max(0, total - couponDiscount);
-
   const handleApplyCoupon = async () => {
+    if (pendingOrder.current) {
+      setCouponMessage('Đơn đã được tạo. Không thể đổi coupon trên đơn này; hãy hoàn tất thanh toán.');
+      return;
+    }
     const code = couponInput.trim().toUpperCase();
+    const requestId = ++couponRequestId.current;
+    // Fail closed: không giữ mã cũ khi bắt đầu xác minh một mã mới.
+    setCouponCode(null);
+    setCouponDiscount(0);
+    setValidatedCartSignature(null);
     if (!code) {
       setCouponMessage('Vui lòng nhập mã giảm giá');
       return;
@@ -63,29 +82,28 @@ export default function CheckoutPage() {
     setValidatingCoupon(true);
     setCouponMessage('');
     try {
-      const res = await api<{ valid: boolean; discount: number }>('/rewards/coupons/validate', {
+      const res = await api<{ valid: boolean; discount: number }>('/coupons/validate', {
         method: 'POST',
         body: JSON.stringify({ code, orderTotal: total }),
       });
-      if (res.valid) {
-        setCouponCode(code);
-        setCouponDiscount(res.discount);
-        setCouponMessage(`Áp dụng thành công mã ${code}: -${res.discount.toLocaleString('vi-VN')}đ`);
+      if (requestId !== couponRequestId.current) return; // response cũ không ghi đè response mới
+      if (res.valid !== true || !Number.isSafeInteger(res.discount) ||
+          res.discount < 0 || res.discount > total) {
+        throw new Error('Backend trả kết quả coupon không hợp lệ. Vui lòng thử lại.');
       }
+      // Chỉ lưu quote cho đúng giỏ hàng lúc gửi request; giỏ mới phải validate lại.
+      setCouponCode(code);
+      setCouponDiscount(res.discount);
+      setValidatedCartSignature(cartSignature);
+      setCouponMessage(`Áp dụng thành công mã ${code}: -${res.discount.toLocaleString('vi-VN')}đ`);
     } catch (e: unknown) {
-      // Fallback local simulation for demo codes if backend test database doesn't have it seeded
-      if (code === 'BREW10' || code === 'GIAM10') {
-        const disc = Math.round(total * 0.1);
-        setCouponCode(code);
-        setCouponDiscount(disc);
-        setCouponMessage(`Áp dụng thành công mã ${code}: -${disc.toLocaleString('vi-VN')}đ`);
-      } else {
-        setCouponCode(null);
-        setCouponDiscount(0);
-        setCouponMessage((e as Error).message || 'Mã giảm giá không hợp lệ hoặc đã hết hạn');
-      }
+      if (requestId !== couponRequestId.current) return;
+      setCouponCode(null);
+      setCouponDiscount(0);
+      setValidatedCartSignature(null);
+      setCouponMessage(e instanceof Error ? e.message : 'Không thể xác minh mã giảm giá với máy chủ.');
     } finally {
-      setValidatingCoupon(false);
+      if (requestId === couponRequestId.current) setValidatingCoupon(false);
     }
   };
 
@@ -96,9 +114,7 @@ export default function CheckoutPage() {
       return;
     }
 
-    const cartKey = JSON.stringify(items.map(({ productId, size, toppings, qty }) => ({
-      productId, size, toppings: [...toppings].sort(), qty,
-    })));
+    const cartKey = cartSignature;
 
     // Không dùng nhầm đơn cũ nếu giỏ đã thay đổi trong khi checkout.
     if (pendingOrder.current && pendingOrder.current.cartKey !== cartKey) {
@@ -112,36 +128,30 @@ export default function CheckoutPage() {
     try {
       // E: chỉ tạo đơn 1 lần cho một giỏ. Truyền Idempotency-Key để backend không bị 400 IDEMPOTENCY_KEY_REQUIRED.
       if (!pendingOrder.current) {
-        const order = await api<{ id: number }>('/orders', {
+        const order = await api<{ id: number; total: number }>('/orders', {
           method: 'POST',
           headers: { 'Idempotency-Key': idemKey.current },
           body: JSON.stringify({
             items: items.map(({ productId, size, toppings, qty }) => ({
               productId, size, toppings, qty,
             })),
-            couponCode: couponCode ?? undefined,
+            couponCode: activeCouponCode ?? undefined,
           }),
         });
-        pendingOrder.current = { id: order.id, cartKey };
+        if (!Number.isSafeInteger(order.id) || !Number.isSafeInteger(order.total) || order.total < 0) {
+          throw new Error('Backend trả dữ liệu đơn hàng không hợp lệ. Kiểm tra lịch sử đơn trước khi thử lại.');
+        }
+        pendingOrder.current = { id: order.id, cartKey, total: order.total };
       }
 
       const orderId = pendingOrder.current?.id;
       if (!orderId) throw new Error('Không tạo được đơn hàng. Vui lòng kiểm tra lại lịch sử đơn.');
 
-      // Nếu người dùng chọn mô phỏng lỗi US-05 để demo cho giảng viên:
-      if (simulateFailure) {
-        // Mô phỏng thất bại: đơn chuyển PAYMENT_FAILED, giỏ hàng giữ nguyên
-        idemKey.current = null; // Key mới cho lần thử sau
-        setError('❌ [US-05 DEMO]: Thanh toán thất bại (Mô phỏng ngân hàng từ chối). Trạng thái đơn: PAYMENT_FAILED. Giỏ hàng của bạn vẫn được giữ nguyên để thử lại!');
-        setLoading(false);
-        return;
-      }
-
       // F – Task 8: gọi POST /payments với Idempotency-Key
       const res = await api<{ orderId: number; status: string; orderStatus?: string }>('/payments', {
         method: 'POST',
         headers: { 'Idempotency-Key': idemKey.current },
-        body: JSON.stringify({ orderId, method }),
+        body: JSON.stringify({ orderId, method, ...(simulateFailure ? { demoDecline: true } : {}) }),
       });
 
       const isPaid = res.orderStatus === 'PAID' || res.status === 'SUCCEEDED' || res.status === 'PAID';
@@ -230,24 +240,36 @@ export default function CheckoutPage() {
           <div className="flex gap-2">
             <input
               type="text"
-              placeholder="Nhập mã (vd: GIAM10, BREW10)"
+              placeholder="Nhập mã (vd: GIAM10, GIAM15K)"
               value={couponInput}
-              onChange={(e) => setCouponInput(e.target.value)}
+              disabled={loading || Boolean(pendingOrder.current)}
+              onChange={(e) => {
+                couponRequestId.current += 1;
+                setValidatingCoupon(false);
+                setCouponInput(e.target.value);
+                setCouponCode(null);
+                setCouponDiscount(0);
+                setValidatedCartSignature(null);
+                setCouponMessage('');
+              }}
               className="flex-1 bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-sm text-stone-100 placeholder:text-stone-600 focus:outline-none focus:border-amber-500 uppercase tracking-wider"
             />
             <button
               type="button"
               onClick={handleApplyCoupon}
-              disabled={validatingCoupon}
+              disabled={validatingCoupon || loading || Boolean(pendingOrder.current)}
               className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-amber-400 rounded-xl text-xs font-semibold border border-stone-700 transition"
             >
               {validatingCoupon ? 'Đang kiểm tra…' : 'Áp dụng'}
             </button>
           </div>
-          {couponMessage && (
-            <p className={`text-xs mt-2 ${couponDiscount > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+          {couponMessage && (validatedCartSignature === null || activeCouponCode) && (
+            <p className={`text-xs mt-2 ${activeCouponCode ? 'text-emerald-400' : 'text-red-400'}`}>
               {couponMessage}
             </p>
+          )}
+          {couponCode && !activeCouponCode && (
+            <p className="text-xs mt-2 text-amber-400">Giỏ hàng đã thay đổi. Vui lòng áp dụng lại mã giảm giá.</p>
           )}
         </div>
 
@@ -313,7 +335,7 @@ export default function CheckoutPage() {
               className="accent-red-500 w-4 h-4 rounded"
             />
             <span>
-              <strong className="text-amber-400">[Demo cho GV]:</strong> Mô phỏng thanh toán thất bại (Kiểm chứng US-05: chuyển <code className="text-red-400">PAYMENT_FAILED</code>, giữ nguyên giỏ hàng)
+              <strong className="text-amber-400">[Demo cho GV]:</strong> Gửi yêu cầu mô phỏng ngân hàng từ chối <em>qua backend thật</em> (đơn chuyển <code className="text-red-400">PAYMENT_FAILED</code>). Cần bật <code>MOCK_GATEWAY_TEST_MODE=true</code> trên backend local.
             </span>
           </label>
         </div>
@@ -324,11 +346,14 @@ export default function CheckoutPage() {
             <span>Tạm tính</span>
             <span className="font-mono">{total.toLocaleString('vi-VN')}đ</span>
           </div>
-          {couponDiscount > 0 && (
+          {activeCouponDiscount > 0 && (
             <div className="flex justify-between text-emerald-400">
-              <span>Khuyến mãi ({couponCode})</span>
-              <span className="font-mono">-{couponDiscount.toLocaleString('vi-VN')}đ</span>
+              <span>Khuyến mãi ({activeCouponCode})</span>
+              <span className="font-mono">-{activeCouponDiscount.toLocaleString('vi-VN')}đ</span>
             </div>
+          )}
+          {pendingOrder.current?.cartKey === cartSignature && (
+            <p className="text-xs text-stone-400">Số tiền chính thức đã được backend tính lại khi tạo đơn.</p>
           )}
           <div className="flex justify-between text-base font-bold text-stone-100 pt-2 border-t border-stone-800">
             <span>Tổng thanh toán</span>
@@ -355,7 +380,7 @@ export default function CheckoutPage() {
           </Link>
           <button
             onClick={handlePay}
-            disabled={loading}
+            disabled={loading || validatingCoupon}
             className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-stone-950 font-bold text-center text-sm shadow-lg shadow-amber-500/20 disabled:opacity-50 transition"
           >
             {loading ? 'Đang xử lý giao dịch…' : 'Xác nhận thanh toán'}

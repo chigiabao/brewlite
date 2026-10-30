@@ -5,6 +5,7 @@ export type PayInput = {
   orderId: number;
   method: PaymentMethod;
   idempotencyKey: string | undefined;
+  demoDecline?: boolean;
 };
 
 export type PaymentResult = {

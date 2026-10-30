@@ -259,6 +259,56 @@ describe('POST /payments (e2e, fixture order)', () => {
     );
   });
 
+  it('demoDecline không bật trả 400, DB không tạo Payment', async () => {
+    const previous = process.env.MOCK_GATEWAY_TEST_MODE;
+    process.env.MOCK_GATEWAY_TEST_MODE = 'false';
+    try {
+      const order = await seedOrder();
+      await request(app.getHttpServer())
+        .post('/payments')
+        .set('Authorization', `Bearer ${fixtureToken}`)
+        .set('Idempotency-Key', 'e2e-demo-disabled-1')
+        .send({ orderId: order.id, method: 'CARD', demoDecline: true })
+        .expect(400);
+      expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(0);
+      expect((await prisma.order.findUnique({ where: { id: order.id } }))?.status).toBe('PENDING');
+    } finally {
+      if (previous === undefined) delete process.env.MOCK_GATEWAY_TEST_MODE;
+      else process.env.MOCK_GATEWAY_TEST_MODE = previous;
+    }
+  });
+
+  it('demo decline đi qua API thật: 402 -> PAYMENT_FAILED; retry key mới -> PAID', async () => {
+    const previous = process.env.MOCK_GATEWAY_TEST_MODE;
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.MOCK_GATEWAY_TEST_MODE = 'true';
+    process.env.NODE_ENV = 'test';
+    try {
+      const order = await seedOrder();
+      const declined = await request(app.getHttpServer())
+        .post('/payments')
+        .set('Authorization', `Bearer ${fixtureToken}`)
+        .set('Idempotency-Key', 'e2e-demo-declined-1')
+        .send({ orderId: order.id, method: 'WALLET', demoDecline: true });
+      expect(declined.status).toBe(402);
+      expect(declined.body.code).toBe('PAYMENT_DECLINED');
+      expect((await prisma.order.findUnique({ where: { id: order.id } }))?.status).toBe('PAYMENT_FAILED');
+      const retry = await request(app.getHttpServer())
+        .post('/payments')
+        .set('Authorization', `Bearer ${fixtureToken}`)
+        .set('Idempotency-Key', 'e2e-demo-retry-2')
+        .send({ orderId: order.id, method: 'WALLET' });
+      expect(retry.status).toBe(200);
+      expect(retry.body.orderStatus).toBe('PAID');
+      expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(2);
+    } finally {
+      if (previous === undefined) delete process.env.MOCK_GATEWAY_TEST_MODE;
+      else process.env.MOCK_GATEWAY_TEST_MODE = previous;
+      if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = previousNodeEnv;
+    }
+  });
+
   it('gateway decline -> 402 PAYMENT_DECLINED, order PAYMENT_FAILED', async () => {
     const order = await seedOrder();
     nextReference = 'MOCK-DECL0000';
