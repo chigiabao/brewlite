@@ -75,3 +75,16 @@ describe('Order State Machine', () => {
     ).toThrow(ConflictException);
   });
 });
+
+// FIX 08 — Lọc đích pha chế để không lẫn luồng thanh toán/hủy đơn.
+describe('FIX08 — các đích pha chế nội bộ', () => {
+  it('chỉ chấp nhận PREPARING, READY, COMPLETED', async () => {
+    const { assertPreparationTarget } = await import('./order-state.js');
+    for (const state of [OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.COMPLETED]) {
+      expect(() => assertPreparationTarget(state)).not.toThrow();
+    }
+    for (const state of [OrderStatus.PENDING, OrderStatus.PAYMENT_FAILED, OrderStatus.PAID, OrderStatus.CANCELLED]) {
+      expect(() => assertPreparationTarget(state)).toThrow(ConflictException);
+    }
+  });
+});

@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
-import { CHECKOUT_SESSION_KEY, clearCheckoutSession, isDefinitivePaymentFailure, isPaidOrderStatus, jwtSubject, loadCheckoutSession, saveCheckoutSession, type CheckoutSession } from '@/lib/checkout-session';
+import { CHECKOUT_SESSION_KEY, clearCheckoutSession, isDefinitivePaymentFailure, isPaidOrderStatus, jwtSubject, loadCheckoutSession, saveCheckoutSession, type CheckoutSession, type CheckoutAttempt } from '@/lib/checkout-session';
 import { useCart } from '@/store/cart';
 
 function subscribe(callback: () => void) {
@@ -251,14 +251,18 @@ export default function CheckoutPage() {
       const orderId = current.orderId;
       if (orderId === null) throw new Error('Chưa nhận được mã đơn.');
       // Khi thanh toán đang không rõ kết quả, tuyệt đối giữ nguyên method/demoDecline + payment key.
+      const attempt: CheckoutAttempt = current.attempt ?? {
+        key: crypto.randomUUID(),
+        method,
+        demoDecline: simulateFailure,
+      };
       if (!current.attempt) {
         current = {
           ...current,
-          attempt: { key: crypto.randomUUID(), method, demoDecline: simulateFailure },
+          attempt,
         };
         saveCheckoutSession(current);
       }
-      const attempt = current.attempt;
       const res = await api<{ orderId: number; status: string; orderStatus: string }>('/payments', {
         method: 'POST',
         headers: { 'Idempotency-Key': attempt.key },
@@ -372,7 +376,7 @@ export default function CheckoutPage() {
               type="text"
               placeholder="Nhập mã (vd: GIAM10, GIAM15K)"
               value={couponInput}
-              disabled={loading || Boolean(pendingOrder.current)}
+              disabled={loading || Boolean(checkoutSession)}
               onChange={(e) => {
                 couponRequestId.current += 1;
                 setValidatingCoupon(false);
@@ -387,7 +391,7 @@ export default function CheckoutPage() {
             <button
               type="button"
               onClick={handleApplyCoupon}
-              disabled={validatingCoupon || loading || Boolean(pendingOrder.current)}
+              disabled={validatingCoupon || loading || Boolean(checkoutSession)}
               className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-amber-400 rounded-xl text-xs font-semibold border border-stone-700 transition"
             >
               {validatingCoupon ? 'Đang kiểm tra…' : 'Áp dụng'}
@@ -456,7 +460,7 @@ export default function CheckoutPage() {
           )}
           {savedOrder && (
             <p className="text-xs text-emerald-400 mt-2">
-              Đã giữ chỗ {savedOrder.pointsRedeemed.toLocaleString('vi-VN')} điểm cho đơn #{savedOrder.id}. Không đổi điểm sau khi đã tạo đơn.
+              Đã giữ chỗ {(savedOrder.pointsRedeemed ?? 0).toLocaleString('vi-VN')} điểm cho đơn #{savedOrder.orderId}. Không đổi điểm sau khi đã tạo đơn.
             </p>
           )}
         </div>

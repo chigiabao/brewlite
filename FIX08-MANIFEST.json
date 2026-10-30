@@ -1,0 +1,46 @@
+{
+  "fix": "FIX08",
+  "module": "E - Ordering",
+  "goal": "Hoan thien state machine PAID -> PREPARING -> READY -> COMPLETED va CAS",
+  "apply_after": "FIX01-FIX07",
+  "database_migration_required": false,
+  "public_staff_endpoint_added": false,
+  "verification": {
+    "foundation_guard": "PASS",
+    "typescript_transpile_syntax": "PASS (6 TS files)",
+    "isolated_runtime_smoke": "PASS",
+    "vitest": "NOT RUN - dependencies unavailable",
+    "postgresql_e2e": "NOT RUN - no local PostgreSQL/Docker"
+  },
+  "comment_language": "vi",
+  "files": [
+    {
+      "path": "backend/src/orders/order-state.ts",
+      "sha256": "d811f3fe9cc758df1c401048bdd5460ae64e7924eed10a2a3ef6ff0f654df1a5"
+    },
+    {
+      "path": "backend/src/orders/orders.service.ts",
+      "sha256": "1682ea649cd9015f51d4514c35cfb8654369c8d38c1e464818caf358bb4cb2d3"
+    },
+    {
+      "path": "backend/src/orders/public.ts",
+      "sha256": "8410729e46295983076ddd25f85039834808d378ecb2a49efba55894cf503ffe"
+    },
+    {
+      "path": "backend/src/orders/order-state.spec.ts",
+      "sha256": "6d12a8df5debf0914bf59aae6a7e5a284f6607a37833756370052ab9afa127e4"
+    },
+    {
+      "path": "backend/src/orders/orders.preparation.spec.ts",
+      "sha256": "267fcaf3ad58cd31cebcb6475fbcca5f032e89b97449db2f50f7208dd18bf1cf"
+    },
+    {
+      "path": "backend/test/orders-preparation.e2e-spec.ts",
+      "sha256": "e8799823fec9de3aac0588b192dbe9c67b87c8fce5651f4cead1301118ebe539"
+    },
+    {
+      "path": "docs/FIX08-ORDERING-STATE.md",
+      "sha256": "d493d2aedd79dd363771f33c427acdbc3880c6a6ee51873d5b0d3c2e99f5ba6e"
+    }
+  ]
+}
