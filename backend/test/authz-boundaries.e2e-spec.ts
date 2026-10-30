@@ -19,7 +19,15 @@ import { PrismaService } from '../src/prisma/prisma.service.js';
 import { RewardsController } from '../src/rewards/rewards.controller.js';
 import { RewardsService } from '../src/rewards/rewards.service.js';
 
-const paymentService = { pay: vi.fn(async (input: unknown) => input) };
+const paymentService = {
+  createCheckout: vi.fn(async (input: { orderId: number }) => ({
+    orderId: input.orderId,
+    paymentId: 1,
+    status: 'PENDING',
+    checkoutUrl: 'https://checkout.stripe.test/session',
+    idempotentReplay: false,
+  })),
+};
 const ordersService = {
   create: vi.fn(async (userId: number) => ({ userId })),
   findMine: vi.fn(async (userId: number) => [{ userId }]),
@@ -77,16 +85,16 @@ describe('Actual Payments / Orders JWT authorization boundary (HTTP)', () => {
   }
 
   function expectNoBusinessCalls() {
-    expect(paymentService.pay).not.toHaveBeenCalled();
+    expect(paymentService.createCheckout).not.toHaveBeenCalled();
     expect(ordersService.create).not.toHaveBeenCalled();
     expect(ordersService.findMine).not.toHaveBeenCalled();
     expect(ordersService.findOne).not.toHaveBeenCalled();
     expect(rewardsService.getBalance).not.toHaveBeenCalled();
   }
 
-  it('rejects unauthenticated POST /payments with 401 before calling service', async () => {
+  it('rejects unauthenticated POST /payments/checkout with 401 before calling service', async () => {
     await request(app.getHttpServer())
-      .post('/payments')
+      .post('/payments/checkout')
       .set('Idempotency-Key', 'missing-auth-1')
       .send(paymentBody)
       .expect(401);
@@ -99,7 +107,7 @@ describe('Actual Payments / Orders JWT authorization boundary (HTTP)', () => {
       { secret: 'attacker-controlled-signature' },
     );
     await request(app.getHttpServer())
-      .post('/payments')
+      .post('/payments/checkout')
       .set('Authorization', `Bearer ${forged}`)
       .set('Idempotency-Key', 'forged-auth-1')
       .send(paymentBody)
@@ -109,7 +117,7 @@ describe('Actual Payments / Orders JWT authorization boundary (HTTP)', () => {
 
   it('rejects invalid and expired JWTs before calling payment service', async () => {
     await request(app.getHttpServer())
-      .post('/payments')
+      .post('/payments/checkout')
       .set('Authorization', 'Bearer a.b.c')
       .set('Idempotency-Key', 'malformed-auth-1')
       .send(paymentBody)
@@ -119,7 +127,7 @@ describe('Actual Payments / Orders JWT authorization boundary (HTTP)', () => {
       { expiresIn: -1 },
     );
     await request(app.getHttpServer())
-      .post('/payments')
+      .post('/payments/checkout')
       .set('Authorization', `Bearer ${expired}`)
       .set('Idempotency-Key', 'expired-auth-1')
       .send(paymentBody)
@@ -131,7 +139,7 @@ describe('Actual Payments / Orders JWT authorization boundary (HTTP)', () => {
     for (const badSubject of [0, -1, '42', null]) {
       const signed = jwt.sign({ sub: badSubject, email: 'authorized@brewlite.test' });
       await request(app.getHttpServer())
-        .post('/payments')
+        .post('/payments/checkout')
         .set('Authorization', `Bearer ${signed}`)
         .set('Idempotency-Key', 'bad-subject-1')
         .send(paymentBody)
@@ -142,22 +150,22 @@ describe('Actual Payments / Orders JWT authorization boundary (HTTP)', () => {
 
   it('passes the verified JWT identity, NOT a fixed user 1, to PaymentsService', async () => {
     await request(app.getHttpServer())
-      .post('/payments')
+      .post('/payments/checkout')
       .set('Authorization', `Bearer ${token(42)}`)
       .set('Idempotency-Key', 'good-auth-42')
       .send(paymentBody)
       .expect(200);
-    expect(paymentService.pay).toHaveBeenCalledWith({
+    expect(paymentService.createCheckout).toHaveBeenCalledWith({
       userId: 42, orderId: 123, method: 'WALLET', idempotencyKey: 'good-auth-42',
     });
 
     await request(app.getHttpServer())
-      .post('/payments')
+      .post('/payments/checkout')
       .set('Authorization', `Bearer ${token(63)}`)
       .set('Idempotency-Key', 'good-auth-63')
       .send(paymentBody)
       .expect(200);
-    expect(paymentService.pay).toHaveBeenLastCalledWith({
+    expect(paymentService.createCheckout).toHaveBeenLastCalledWith({
       userId: 63, orderId: 123, method: 'WALLET', idempotencyKey: 'good-auth-63',
     });
   });

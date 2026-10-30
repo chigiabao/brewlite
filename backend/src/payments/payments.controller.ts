@@ -1,28 +1,48 @@
-import { Body, Controller, Headers, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import type { RawBodyRequest } from '@nestjs/common';
+import type { Request } from 'express';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { CurrentUser, JwtAuthGuard, type AuthUser } from '../auth/public.js';
 import { PayDto } from './payments.dto.js';
 import { PaymentsService } from './payments.service.js';
-import type { PaymentResult } from './payment.types.js';
+import type { CreateCheckoutResult, StripeWebhookResult } from './payment.types.js';
 
 @Controller('payments')
-@UseGuards(JwtAuthGuard)
 export class PaymentsController {
   constructor(private readonly payments: PaymentsService) {}
 
-  @Post()
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @Post('checkout')
   @HttpCode(HttpStatus.OK)
-  pay(
+  createCheckout(
     @CurrentUser() user: AuthUser,
     @Headers('idempotency-key') key: string | undefined,
     @Body() dto: PayDto,
-  ): Promise<PaymentResult> {
-    // Passport verifies JWT signature/expiry; userId must come from its validated principal.
-    return this.payments.pay({
+  ): Promise<CreateCheckoutResult> {
+    return this.payments.createCheckout({
       userId: user.userId,
       orderId: dto.orderId,
       method: dto.method,
-      demoDecline: dto.demoDecline,
       idempotencyKey: key,
     });
+  }
+
+  @SkipThrottle()
+  @Post(['webhook', 'webhook/stripe'])
+  @HttpCode(HttpStatus.OK)
+  stripeWebhook(@Req() req: RawBodyRequest<Request>): Promise<StripeWebhookResult> {
+    const header = req.headers['stripe-signature'];
+    const signature = Array.isArray(header) ? header[0] : header;
+    return this.payments.handleStripeWebhook(req.rawBody, signature);
   }
 }

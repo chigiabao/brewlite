@@ -2,20 +2,31 @@ import { ConflictException } from '@nestjs/common';
 import { OrderStatus } from '../generated/prisma/enums.js';
 
 /**
- * E — Máy trạng thái đơn hàng theo GUIDE-V2.
+ * E — Máy trạng thái đơn hàng theo GUIDE-V2 + Hardening Refund.
  *
  * Luồng chuẩn: PENDING → PAID → PREPARING → READY → COMPLETED.
- * Ngoại lệ: PAYMENT_FAILED cho phép thử thanh toán lại; CANCELLED kết thúc đơn.
+ * Ngoại lệ: PAYMENT_FAILED cho phép thử thanh toán lại; CANCELLED kết thúc đơn;
+ * REFUNDED là trạng thái hoàn tiền (từ PAID/PREPARING/READY/COMPLETED/PENDING).
  * Mọi thao tác đổi trạng thái phải kiểm tra ở đây và cập nhật DB có điều kiện.
  */
 export const ALLOWED: Record<OrderStatus, readonly OrderStatus[]> = {
-  PENDING: [OrderStatus.PAID, OrderStatus.PAYMENT_FAILED, OrderStatus.CANCELLED],
-  PAYMENT_FAILED: [OrderStatus.PENDING, OrderStatus.CANCELLED],
-  PAID: [OrderStatus.PREPARING, OrderStatus.CANCELLED],
-  PREPARING: [OrderStatus.READY],
-  READY: [OrderStatus.COMPLETED],
-  COMPLETED: [],
-  CANCELLED: [],
+  PENDING: [
+    OrderStatus.PAID,
+    OrderStatus.PAYMENT_FAILED,
+    OrderStatus.CANCELLED,
+    OrderStatus.REFUNDED,
+  ],
+  PAYMENT_FAILED: [
+    OrderStatus.PENDING,
+    OrderStatus.CANCELLED,
+    OrderStatus.REFUNDED,
+  ],
+  PAID: [OrderStatus.PREPARING, OrderStatus.CANCELLED, OrderStatus.REFUNDED],
+  PREPARING: [OrderStatus.READY, OrderStatus.REFUNDED],
+  READY: [OrderStatus.COMPLETED, OrderStatus.REFUNDED],
+  COMPLETED: [OrderStatus.REFUNDED],
+  CANCELLED: [OrderStatus.REFUNDED],
+  REFUNDED: [],
 };
 
 /** Các trạng thái pha chế mà nghiệp vụ nội bộ E được quyền chuyển tới. */

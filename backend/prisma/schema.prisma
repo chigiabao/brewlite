@@ -19,6 +19,7 @@ enum OrderStatus {
   READY
   COMPLETED
   CANCELLED
+  REFUNDED
 }
 
 enum PaymentMethod {
@@ -30,17 +31,26 @@ enum PaymentStatus {
   PENDING
   SUCCEEDED
   FAILED
+  REFUNDED
 }
 
 enum LoyaltyKind {
   EARN
   REDEEM
+  REFUND
+}
+
+enum RefundStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELLED
 }
 
 model Product {
   id       Int         @id @default(autoincrement())
   name     String
-  price    Int         // VND; giá gốc, không tin giá do frontend gửi
+  price    Int // VND; giá gốc, không tin giá do frontend gửi
   imageUrl String
   stock    Int         @default(100)
   version  Int         @default(0) // E: optimistic locking
@@ -57,27 +67,28 @@ model User {
 }
 
 model Order {
-  id              Int            @id @default(autoincrement())
-  userId          Int
-  user            User           @relation(fields: [userId], references: [id])
-  status          OrderStatus    @default(PENDING)
-  subtotal        Int            @default(0)
-  discountTotal   Int            @default(0)
-  pointsRedeemed  Int            @default(0)
-  total           Int            // Số tiền thực phải thanh toán, VND
+  id             Int         @id @default(autoincrement())
+  userId         Int
+  user           User        @relation(fields: [userId], references: [id])
+  status         OrderStatus @default(PENDING)
+  subtotal       Int         @default(0)
+  discountTotal  Int         @default(0)
+  pointsRedeemed Int         @default(0)
+  total          Int // Số tiền thực phải thanh toán, VND
 
-  couponCode      String?
-  coupon          Coupon?        @relation(fields: [couponCode], references: [code])
-  createdAt       DateTime       @default(now())
-idempotencyKey String?
-requestHash    String?
-  items           OrderItem[]
-  payments        Payment[]      // Cho phép thử lại sau PAYMENT_FAILED (mỗi attempt có key riêng)
-  loyaltyEntries  LoyaltyEntry[]
+  couponCode     String?
+  coupon         Coupon?        @relation(fields: [couponCode], references: [code])
+  createdAt      DateTime       @default(now())
+  cancelAfter    DateTime? // Hạn auto-cancel khi đơn chưa thanh toán
+  idempotencyKey String?
+  requestHash    String?
+  items          OrderItem[]
+  payments       Payment[] // Cho phép thử lại sau PAYMENT_FAILED (mỗi attempt có key riêng)
+  loyaltyEntries LoyaltyEntry[]
 
-
-@@unique([userId, idempotencyKey])
+  @@unique([userId, idempotencyKey])
   @@index([userId, createdAt])
+  @@index([status, cancelAfter])
 }
 
 model OrderItem {
@@ -89,7 +100,7 @@ model OrderItem {
   size      String
   toppings  String[] @default([])
   qty       Int
-  unitPrice Int      // Snapshot sau phụ thu size và topping
+  unitPrice Int // Snapshot sau phụ thu size và topping
   lineTotal Int
 }
 
@@ -98,13 +109,23 @@ model Payment {
   orderId        Int
   order          Order         @relation(fields: [orderId], references: [id])
   idempotencyKey String        @unique
-  requestHash    String        // Cùng key, khác payload => 409
+  requestHash    String // Cùng key, khác payload => 409
   amount         Int
   method         PaymentMethod
   status         PaymentStatus @default(PENDING)
   transactionId  String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+
+  // Stripe fields
+  stripeSessionId        String?   @unique // Checkout Session id (cs_...)
+  stripePaymentIntentId  String? // PaymentIntent id (pi_...), dùng cho refund
+  stripeCheckoutUrl      String? // cache session.url để replay nhanh
+  stripeSessionExpiresAt DateTime? // = session.expires_at, để biết còn open không
+  paidAt                 DateTime?
+  refunds                Refund[]
+  // NOTE: migration 20261030120000 adds a partial unique index:
+  // one PENDING payment per order (Payment_orderId_pending_key).
 
   @@index([orderId])
 }
@@ -128,9 +149,24 @@ model LoyaltyEntry {
   orderId   Int
   order     Order       @relation(fields: [orderId], references: [id])
   kind      LoyaltyKind
-  points    Int         // số nguyên dương, EARN cộng / REDEEM trừ
+  points    Int // số nguyên dương, EARN cộng / REDEEM trừ
   createdAt DateTime    @default(now())
 
   @@unique([orderId, kind]) // Không cộng/trừ điểm hai lần cho cùng đơn
   @@index([userId])
+}
+
+model Refund {
+  id             Int          @id @default(autoincrement())
+  paymentId      Int
+  payment        Payment      @relation(fields: [paymentId], references: [id])
+  stripeRefundId String       @unique
+  amount         Int // VND, luôn dương
+  currency       String       @default("vnd")
+  status         RefundStatus
+  reason         String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([paymentId])
 }
