@@ -34,6 +34,7 @@ describe('Payments idempotency (integration, real PostgreSQL)', () => {
   });
 
   beforeEach(async () => {
+    await prisma.loyaltyEntry.deleteMany({ where: { userId: USER_ID } });
     await prisma.payment.deleteMany({ where: { order: { userId: USER_ID } } });
     await prisma.order.deleteMany({ where: { userId: USER_ID } });
     await prisma.user.upsert({

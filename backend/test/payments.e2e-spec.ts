@@ -1,5 +1,6 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { JwtService } from '@nestjs/jwt';
 import request from 'supertest';
 import type { App } from 'supertest/types.js';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -13,6 +14,7 @@ const generator = { next: () => nextReference };
 describe('POST /payments (e2e, fixture order)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
+  let jwt: string;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
@@ -26,6 +28,10 @@ describe('POST /payments (e2e, fixture order)', () => {
     );
     await app.init();
     prisma = app.get(PrismaService);
+    // E2E dùng JWT thật (không override guard). JWT_SECRET phải cấu hình khi chạy.
+    jwt = new JwtService({ secret: process.env.JWT_SECRET }).sign({
+      sub: 1, email: 'fixture-e2e@brewlite.test',
+    });
   });
 
   afterAll(async () => {
@@ -34,6 +40,7 @@ describe('POST /payments (e2e, fixture order)', () => {
 
   beforeEach(async () => {
     nextReference = 'MOCK-OK1234';
+    await prisma.loyaltyEntry.deleteMany({ where: { userId: 1 } });
     await prisma.payment.deleteMany({ where: { order: { userId: 1 } } });
     await prisma.order.deleteMany({ where: { userId: 1 } });
     await prisma.user.upsert({
@@ -47,11 +54,18 @@ describe('POST /payments (e2e, fixture order)', () => {
     return prisma.order.create({ data: { userId: 1, total } });
   }
 
+  it('không có JWT thì 401, dù có Idempotency-Key', async () => {
+    await request(app.getHttpServer()).post('/payments')
+      .set('Idempotency-Key', 'g03-no-jwt')
+      .send({ orderId: 1, method: 'WALLET' }).expect(401);
+  });
+
   it('thiếu Idempotency-Key -> 400 IDEMPOTENCY_KEY_REQUIRED', async () => {
     const order = await seedOrder();
 
     const res = await request(app.getHttpServer())
       .post('/payments')
+      .set('Authorization', `Bearer ${jwt}`)
       .send({ orderId: order.id, method: 'WALLET' });
 
     expect(res.status).toBe(400);
@@ -64,6 +78,7 @@ describe('POST /payments (e2e, fixture order)', () => {
 
     const res = await request(app.getHttpServer())
       .post('/payments')
+      .set('Authorization', `Bearer ${jwt}`)
       .set('Idempotency-Key', 'e2e-amount-1')
       .send({ orderId: order.id, method: 'WALLET', amount: 1 });
 
@@ -76,6 +91,7 @@ describe('POST /payments (e2e, fixture order)', () => {
 
     const res = await request(app.getHttpServer())
       .post('/payments')
+      .set('Authorization', `Bearer ${jwt}`)
       .set('Idempotency-Key', 'e2e-wallet-1')
       .send({ orderId: order.id, method: 'WALLET' });
 
@@ -100,6 +116,7 @@ describe('POST /payments (e2e, fixture order)', () => {
 
     const res = await request(app.getHttpServer())
       .post('/payments')
+      .set('Authorization', `Bearer ${jwt}`)
       .set('Idempotency-Key', 'e2e-card-1')
       .send({ orderId: order.id, method: 'CARD' });
 
@@ -114,10 +131,12 @@ describe('POST /payments (e2e, fixture order)', () => {
 
     const first = await request(app.getHttpServer())
       .post('/payments')
+      .set('Authorization', `Bearer ${jwt}`)
       .set('Idempotency-Key', key)
       .send({ orderId: order.id, method: 'WALLET' });
     const second = await request(app.getHttpServer())
       .post('/payments')
+      .set('Authorization', `Bearer ${jwt}`)
       .set('Idempotency-Key', key)
       .send({ orderId: order.id, method: 'WALLET' });
 
@@ -135,10 +154,12 @@ describe('POST /payments (e2e, fixture order)', () => {
 
     await request(app.getHttpServer())
       .post('/payments')
+      .set('Authorization', `Bearer ${jwt}`)
       .set('Idempotency-Key', key)
       .send({ orderId: order.id, method: 'WALLET' });
     const res = await request(app.getHttpServer())
       .post('/payments')
+      .set('Authorization', `Bearer ${jwt}`)
       .set('Idempotency-Key', key)
       .send({ orderId: order.id, method: 'CARD' });
 
@@ -152,6 +173,7 @@ describe('POST /payments (e2e, fixture order)', () => {
 
     const res = await request(app.getHttpServer())
       .post('/payments')
+      .set('Authorization', `Bearer ${jwt}`)
       .set('Idempotency-Key', 'e2e-decline-1')
       .send({ orderId: order.id, method: 'CARD' });
 

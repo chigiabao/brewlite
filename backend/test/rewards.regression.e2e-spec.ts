@@ -131,7 +131,7 @@ describe.skipIf(!process.env.REWARDS_TEST_DATABASE_URL)('G-04 PostgreSQL quota/r
     const rejected = results.find((result) => result.status === 'rejected');
     expect(rejected?.reason).toBeInstanceOf(BadRequestException);
     expect(await state(fixture)).toEqual({
-      usedCount: 0, points: 20, stock: 99, orders: 1, earns: 0, redeems: 1, payments: 0,
+      usedCount: 0, points: 20, stock: 99, orders: 1, earns: 0, redeems: 0, payments: 0,
     });
   });
 
@@ -162,7 +162,6 @@ describe.skipIf(!process.env.REWARDS_TEST_DATABASE_URL)('G-04 PostgreSQL quota/r
         pointsRedeemed: quote.pointsDiscount, discountTotal: quote.totalDiscount,
         couponCode: fixture.coupon.code,
       } });
-      await rewards.createRedeemEntry({ orderId: order.id, userId: fixture.user.id, points: 5_000 }, tx);
       throw new Error('abort-create-order');
     })).rejects.toThrow('abort-create-order');
     expect(await state(fixture)).toEqual(before);
@@ -204,30 +203,104 @@ describe.skipIf(!process.env.REWARDS_TEST_DATABASE_URL)('G-04 PostgreSQL quota/r
     });
   });
 
-  it.each([
-    ['decline', () => new PaymentDeclinedError('MOCK-G04-0000'), 'PAYMENT_DECLINED'],
-    ['timeout', () => new GatewayTimeoutError(), 'GATEWAY_TIMEOUT'],
-  ] as const)('%s replay earns zero; retry with a new key reuses reservations', async (_label, error, code) => {
+  it('decline chắc chắn => FAILED, retry key mới trên chính Order cũ', async () => {
     const fixture = await seed();
     const order = await place(fixture);
-    const charge = vi.spyOn(gateway, 'charge').mockRejectedValueOnce(error());
+    const charge = vi.spyOn(gateway, 'charge').mockRejectedValueOnce(new PaymentDeclinedError('MOCK-DECL0000'));
     const input = payInput(fixture, order.id);
-    await expect(payments.pay(input)).rejects.toMatchObject({ code });
-    const failed = await state(fixture);
-    expect(failed).toEqual({
-      usedCount: 1, points: 3_000, stock: 99, orders: 1, earns: 0, redeems: 1, payments: 1,
+    await expect(payments.pay(input)).rejects.toMatchObject({ code: 'PAYMENT_DECLINED' });
+    expect(await state(fixture)).toEqual({
+      usedCount: 1, points: 3_000, stock: 99, orders: 1, earns: 0, redeems: 0, payments: 1,
     });
     await expect(payments.pay(input)).rejects.toMatchObject({ code: 'PAYMENT_DECLINED' });
-    expect(charge).toHaveBeenCalledTimes(1);
-    expect(await state(fixture)).toEqual(failed);
-    const retryInput = payInput(fixture, order.id);
-    const paid = await payments.pay(retryInput);
-    expect(paid.orderStatus).toBe('PAID');
-    await payments.pay(retryInput);
+    await payments.pay(payInput(fixture, order.id));
     expect(charge).toHaveBeenCalledTimes(2);
-    expect(await state(fixture)).toEqual({
+    expect(await state(fixture)).toMatchObject({
       usedCount: 1, points: 3_940, stock: 99, orders: 1, earns: 1, redeems: 1, payments: 2,
     });
+  });
+
+  it('timeout là UNKNOWN; key khác bị 409; cùng key phục hồi sau lease', async () => {
+    const fixture = await seed();
+    const order = await place(fixture);
+    const charge = vi.spyOn(gateway, 'charge').mockRejectedValueOnce(new GatewayTimeoutError());
+    const input = payInput(fixture, order.id);
+    await expect(payments.pay(input)).rejects.toMatchObject({ code: 'GATEWAY_TIMEOUT' });
+    expect(await prisma.payment.findUniqueOrThrow({ where: { idempotencyKey: input.idempotencyKey } }))
+      .toMatchObject({ status: 'PENDING' });
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe('PENDING');
+    await expect(payments.pay(payInput(fixture, order.id))).rejects.toMatchObject({ code: 'PAYMENT_IN_PROGRESS' });
+    await expect(payments.pay(input)).rejects.toMatchObject({ code: 'PAYMENT_IN_PROGRESS' });
+    // Giả lập hết lease để không phải sleep 60 giây trong bộ test.
+    await prisma.payment.update({ where: { idempotencyKey: input.idempotencyKey },
+      data: { processingLeaseUntil: new Date(0) } });
+    await payments.pay(input);
+    expect(charge).toHaveBeenCalledTimes(2);
+    expect(await state(fixture)).toMatchObject({
+      usedCount: 1, points: 3_940, stock: 99, orders: 1, earns: 1, redeems: 1, payments: 1,
+    });
+  });
+
+  it('hai Idempotency-Key khác nhau, cùng Order: chỉ một payment được charge', async () => {
+    const fixture = await seed();
+    const order = await place(fixture);
+    const charge = vi.spyOn(gateway, 'charge');
+    const results = await Promise.allSettled([
+      payments.pay(payInput(fixture, order.id)), payments.pay(payInput(fixture, order.id)),
+    ]);
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    expect(results.find((r) => r.status === 'rejected')?.reason)
+      .toMatchObject({ code: expect.stringMatching(/PAYMENT_IN_PROGRESS|ORDER_ALREADY_PAID/) });
+    expect(charge).toHaveBeenCalledTimes(1);
+    expect(await state(fixture)).toMatchObject({ payments: 1, earns: 1, redeems: 1 });
+  });
+
+  it('POST /orders trùng key không giữ quota, điểm hoặc stock lần hai; payload khác => 409', async () => {
+    const fixture = await seed();
+    const key = randomUUID();
+    const payload = { items: [{ productId: fixture.product.id, size: 'S' as const,
+      toppings: [] as ('Trân châu' | 'Kem')[], qty: 1 }],
+      couponCode: fixture.coupon.code, pointsToRedeem: 5_000 };
+    const [first, second] = await Promise.all([
+      orders.create(fixture.user.id, payload, key),
+      orders.create(fixture.user.id, payload, key),
+    ]);
+    expect(second.id).toBe(first.id);
+    expect(await state(fixture)).toEqual({
+      usedCount: 1, points: 3_000, stock: 99, orders: 1, earns: 0, redeems: 0, payments: 0,
+    });
+    await expect(orders.create(fixture.user.id, { ...payload, pointsToRedeem: 3 }, key))
+      .rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('CANCELLED hoàn điểm/quota/stock đúng một lần; không có REDEEM ở đơn chưa PAID', async () => {
+    const fixture = await seed();
+    const before = await state(fixture);
+    const order = await place(fixture);
+    const first = await orders.cancel(fixture.user.id, order.id);
+    const second = await orders.cancel(fixture.user.id, order.id);
+    expect(first.status).toBe('CANCELLED');
+    expect(second.status).toBe('CANCELLED');
+    expect(await state(fixture)).toMatchObject({ ...before, orders: 1 });
+    await expect(payments.pay(payInput(fixture, order.id)))
+      .rejects.toMatchObject({ code: 'ORDER_NOT_PAYABLE' });
+  });
+
+  it('gateway SUCCEEDED nhưng DB settle rollback: không dùng key mới, retry same-key giữ 1 charge logic', async () => {
+    const fixture = await seed();
+    const order = await place(fixture);
+    const input = payInput(fixture, order.id);
+    const spy = vi.spyOn(rewards, 'finalizeRewardsOnPaid').mockRejectedValueOnce(new Error('DB unavailable'));
+    await expect(payments.pay(input)).rejects.toMatchObject({ code: 'PAYMENT_RECONCILIATION_REQUIRED' });
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe('PENDING');
+    expect(await state(fixture)).toMatchObject({ earns: 0, redeems: 0, payments: 1 });
+    await expect(payments.pay(payInput(fixture, order.id))).rejects.toMatchObject({ code: 'PAYMENT_IN_PROGRESS' });
+    await prisma.payment.update({ where: { idempotencyKey: input.idempotencyKey },
+      data: { processingLeaseUntil: new Date(0) } });
+    spy.mockRestore();
+    const result = await payments.pay(input);
+    expect(result.orderStatus).toBe('PAID');
+    expect(await state(fixture)).toMatchObject({ earns: 1, redeems: 1, payments: 1 });
   });
 
   it('same key with changed payload/user is rejected without changing rewards', async () => {

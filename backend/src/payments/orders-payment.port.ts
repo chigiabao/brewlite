@@ -55,11 +55,21 @@ export class MockOrdersPaymentAdapter implements OrdersPaymentPort {
     if (!order) {
       throw new PaymentError(PaymentErrorCode.ORDER_NOT_FOUND, 'Không tìm thấy đơn hàng', 404);
     }
+    // Retry bị từ chối thêm lần nữa: Order vốn là PAYMENT_FAILED, không cần
+    // tự chuyển PAYMENT_FAILED → PAYMENT_FAILED (state machine không cho phép).
+    if (to === OrderStatus.PAYMENT_FAILED && order.status === OrderStatus.PAYMENT_FAILED) {
+      return;
+    }
     assertTransition(order.status, to);
-    if (tx) {
-      await tx.order.update({ where: { id: orderId }, data: { status: to } });
-    } else {
-      await this.prisma.order.update({ where: { id: orderId }, data: { status: to } });
+    // G-04: compare-and-swap theo trạng thái đã đọc; CANCELLED không được bị PAID ghi đè.
+    const client = tx ?? this.prisma;
+    const updated = await client.order.updateMany({
+      where: { id: orderId, status: order.status },
+      data: { status: to },
+    });
+    if (updated.count !== 1) {
+      throw new PaymentError(PaymentErrorCode.ORDER_NOT_PAYABLE,
+        'Trạng thái đơn thay đổi trong khi thanh toán', 409);
     }
     this.logger.log(`payment.order.${to} orderId=${orderId} paymentId=${paymentId}`);
   }

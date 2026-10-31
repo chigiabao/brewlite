@@ -11,6 +11,7 @@ export const PaymentErrorCode = {
   PAYMENT_DECLINED: 'PAYMENT_DECLINED',
   GATEWAY_TIMEOUT: 'GATEWAY_TIMEOUT',
   PAYMENT_INTERNAL_ERROR: 'PAYMENT_INTERNAL_ERROR',
+  PAYMENT_RECONCILIATION_REQUIRED: 'PAYMENT_RECONCILIATION_REQUIRED',
 } as const;
 
 export type PaymentErrorCode = (typeof PaymentErrorCode)[keyof typeof PaymentErrorCode];

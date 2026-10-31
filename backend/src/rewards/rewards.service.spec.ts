@@ -30,7 +30,7 @@ const makeTx = (overrides: Partial<ReturnType<typeof makeBaseTx>> = {}) => ({
 function makeBaseTx() {
   return {
     order: {
-      findUnique: vi.fn().mockResolvedValue({ userId: 1, status: 'PAID', total: 85_000 }),
+      findUnique: vi.fn().mockResolvedValue({ userId: 1, status: 'PAID', total: 85_000, pointsRedeemed: 0 }),
     },
     coupon: {
       findUnique: vi.fn(),
@@ -323,7 +323,7 @@ describe('RewardsService.finalizeRewardsOnPaid', () => {
   it('totalPaid < 100 → 0 points earned, không tạo entry', async () => {
     const tx = makeTx() as unknown as Parameters<typeof service.finalizeRewardsOnPaid>[1];
     const txMock = tx as unknown as ReturnType<typeof makeBaseTx>;
-    txMock.order.findUnique.mockResolvedValue({ userId: 1, status: 'PAID', total: 50 });
+    txMock.order.findUnique.mockResolvedValue({ userId: 1, status: 'PAID', total: 50, pointsRedeemed: 0 });
 
     const result = await service.finalizeRewardsOnPaid(
       { orderId: 10, userId: 1, totalPaid: 50 },
@@ -338,7 +338,7 @@ describe('RewardsService.finalizeRewardsOnPaid', () => {
   it('totalPaid=0 (order free) → 0 points, không tạo entry', async () => {
     const tx = makeTx() as unknown as Parameters<typeof service.finalizeRewardsOnPaid>[1];
     const txMock = tx as unknown as ReturnType<typeof makeBaseTx>;
-    txMock.order.findUnique.mockResolvedValue({ userId: 1, status: 'PAID', total: 0 });
+    txMock.order.findUnique.mockResolvedValue({ userId: 1, status: 'PAID', total: 0, pointsRedeemed: 0 });
 
     const result = await service.finalizeRewardsOnPaid(
       { orderId: 10, userId: 1, totalPaid: 0 },
@@ -449,6 +449,7 @@ describe('G-04 Rewards quota/replay regression', () => {
 
   it('replay REDEEM không trừ balance lần hai', async () => {
     const tx = makeBaseTx();
+    tx.order.findUnique.mockResolvedValue({ userId: 1, status: 'PAID', total: 85_000, pointsRedeemed: 5_000 });
     tx.loyaltyEntry.createMany.mockResolvedValue({ count: 0 });
     await service.createRedeemEntry({ orderId: 10, userId: 1, points: 5_000 }, asTx(tx));
     expect(tx.loyaltyEntry.createMany).toHaveBeenCalledWith({
@@ -467,4 +468,27 @@ describe('G-04 Rewards quota/replay regression', () => {
     )).rejects.toThrow('ledger unavailable');
     expect(tx.user.update).not.toHaveBeenCalled();
   });
+  it('REDEEM bị chặn khi Order còn PENDING (đã giữ điểm nhưng chưa trả tiền)', async () => {
+    const tx = makeBaseTx();
+    tx.order.findUnique.mockResolvedValue({ userId: 1, status: 'PENDING', pointsRedeemed: 5_000 });
+    await expect(service.createRedeemEntry({ orderId: 10, userId: 1, points: 5_000 }, asTx(tx)))
+      .rejects.toBeInstanceOf(ConflictException);
+    expect(tx.loyaltyEntry.createMany).not.toHaveBeenCalled();
+  });
+
+  it('CANCELLED hoàn quota và balance đã giữ, không ghi ledger', async () => {
+    const tx = makeBaseTx();
+    tx.order.findUnique.mockResolvedValue({ userId: 1, status: 'CANCELLED',
+      couponCode: 'GIAM10', pointsRedeemed: 5_000 });
+    tx.coupon.updateMany.mockResolvedValue({ count: 1 });
+    await service.releaseOnCancel(10, 1, asTx(tx));
+    expect(tx.user.update).toHaveBeenCalledWith({ where: { id: 1 },
+      data: { loyaltyPoints: { increment: 5_000 } } });
+    expect(tx.coupon.updateMany).toHaveBeenCalledWith({
+      where: { code: 'GIAM10', usedCount: { gt: 0 } },
+      data: { usedCount: { decrement: 1 } },
+    });
+    expect(tx.loyaltyEntry.createMany).not.toHaveBeenCalled();
+  });
+
 });

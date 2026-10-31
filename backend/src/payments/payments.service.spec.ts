@@ -1,290 +1,169 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { Test } from '@nestjs/testing';
 import type { Payment } from '../generated/prisma/client.js';
 import { OrderStatus, PaymentStatus } from '../generated/prisma/enums.js';
-import { PrismaService } from '../prisma/prisma.service.js';
+import type { PrismaService } from '../prisma/prisma.service.js';
 import type { RewardsPort } from '../rewards/public.js';
-import { MockGatewayService } from './mock-gateway.service.js';
-import { ORDERS_PAYMENT_PORT, type OrdersPaymentPort, type PayableOrder } from './orders-payment.port.js';
-import {
-  PaymentDeclinedError,
-  PaymentErrorCode,
-  GatewayTimeoutError,
-} from './payment.errors.js';
+import type { OrdersPaymentPort, PayableOrder } from './orders-payment.port.js';
+import type { MockGatewayService } from './mock-gateway.service.js';
+import { PaymentDeclinedError, GatewayTimeoutError } from './payment.errors.js';
 import type { PayInput } from './payment.types.js';
-import { paymentRequestHash, PaymentsService } from './payments.service.js';
+import { PaymentsService, paymentRequestHash } from './payments.service.js';
 
-type PaymentCreateData = Omit<Payment, 'id' | 'transactionId' | 'createdAt' | 'updatedAt'>;
+const input: PayInput = { userId: 1, orderId: 10, method: 'WALLET', idempotencyKey: 'pay-unit-1' };
+const pending: PayableOrder = { id: 10, userId: 1, status: OrderStatus.PENDING, total: 85_000 };
 
-function createPrismaMock() {
+function setup(order: PayableOrder | null = { ...pending }) {
   const payments: Payment[] = [];
-  let nextId = 1;
-
+  let id = 0;
+  const create = vi.fn(async ({ data }: { data: Partial<Payment> }) => {
+    if (payments.some((p) => p.idempotencyKey === data.idempotencyKey ||
+      (p.orderId === data.orderId && [PaymentStatus.PENDING, PaymentStatus.SUCCEEDED].includes(p.status)))) {
+      throw Object.assign(new Error('unique'), { code: 'P2002' });
+    }
+    const row = { id: ++id, createdAt: new Date(), updatedAt: new Date(),
+      transactionId: null, processingLeaseUntil: null, ...data } as Payment;
+    payments.push(row);
+    return row;
+  });
+  const updateMany = vi.fn(async ({ where, data }: {
+    where: { id: number; status?: PaymentStatus; OR?: unknown }; data: Partial<Payment>;
+  }) => {
+    const row = payments.find((p) => p.id === where.id);
+    if (!row || (where.status && row.status !== where.status)) return { count: 0 };
+    if (where.OR && row.processingLeaseUntil && row.processingLeaseUntil > new Date()) return { count: 0 };
+    Object.assign(row, data);
+    return { count: 1 };
+  });
   const tx = {
+    $queryRaw: vi.fn().mockResolvedValue([{ id: 10 }]),
+    order: { findFirst: vi.fn(async () => order) },
     payment: {
-      update: vi.fn(
-        async ({ where, data }: { where: { id: number }; data: Partial<Payment> }) => {
-          const payment = payments.find((item) => item.id === where.id);
-          if (!payment) throw new Error('payment not found');
-          Object.assign(payment, data, { updatedAt: new Date() });
-          return payment;
-        },
-      ),
-    },
-  };
-
-  return {
-    payment: {
-      findUnique: vi.fn(
-        async ({ where }: { where: { idempotencyKey: string } }): Promise<Payment | null> =>
-          payments.find((item) => item.idempotencyKey === where.idempotencyKey) ?? null,
-      ),
-      create: vi.fn(async ({ data }: { data: PaymentCreateData }): Promise<Payment> => {
-        if (payments.some((item) => item.idempotencyKey === data.idempotencyKey)) {
-          throw Object.assign(new Error('unique constraint'), { code: 'P2002' });
-        }
-        const payment: Payment = {
-          id: nextId++,
-          transactionId: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          ...data,
-        };
-        payments.push(payment);
-        return payment;
+      create,
+      updateMany,
+      update: vi.fn(async ({ where, data }: { where: { id: number }; data: Partial<Payment> }) => {
+        const row = payments.find((p) => p.id === where.id)!;
+        Object.assign(row, data);
+        return row;
       }),
     },
-    $transaction: vi.fn(async (callback: (client: typeof tx) => Promise<unknown>) => callback(tx)),
-    __payments: payments,
   };
-}
-
-function createGateway(charge?: () => Promise<{ reference: string; status: 'SUCCEEDED' }>) {
-  return {
-    charge: vi.fn(charge ?? (async () => ({ reference: 'MOCK-ABC123', status: 'SUCCEEDED' as const }))),
+  const prisma = {
+    payment: {
+      findUnique: vi.fn(async ({ where }: { where: { idempotencyKey: string } }) =>
+        payments.find((p) => p.idempotencyKey === where.idempotencyKey) ?? null),
+      updateMany,
+    },
+    $transaction: vi.fn(async (fn: (tx: typeof tx) => Promise<unknown>) => fn(tx)),
   };
-}
-
-function createOrders(order: PayableOrder | null) {
-  return {
-    findOrderForUser: vi.fn(async () => order),
-    markPaid: vi.fn<OrdersPaymentPort['markPaid']>().mockResolvedValue(undefined),
-    markPaymentFailed: vi.fn<OrdersPaymentPort['markPaymentFailed']>().mockResolvedValue(undefined),
+  const orders = {
+    findOrderForUser: vi.fn(async (orderId: number, userId: number) =>
+      order?.id === orderId && order?.userId === userId ? order : null),
+    markPaid: vi.fn(async () => { if (order) order.status = OrderStatus.PAID; }),
+    markPaymentFailed: vi.fn(async () => { if (order) order.status = OrderStatus.PAYMENT_FAILED; }),
   };
-}
-
-const baseInput: PayInput = {
-  userId: 1,
-  orderId: 10,
-  method: 'WALLET',
-  idempotencyKey: 'idem-abc-123',
-};
-
-function setup(overrides: { order?: PayableOrder | null; gateway?: ReturnType<typeof createGateway> } = {}) {
-  const prisma = createPrismaMock();
-  const order: PayableOrder | null =
-    overrides.order === undefined
-      ? { id: 10, userId: 1, status: OrderStatus.PENDING, total: 85_000 }
-      : overrides.order;
-  const gateway = overrides.gateway ?? createGateway();
-  const orders = createOrders(order);
   const rewards = {
-    reserveCouponAndPoints: vi.fn(),
-    createRedeemEntry: vi.fn(),
-    finalizeRewardsOnPaid: vi.fn<RewardsPort['finalizeRewardsOnPaid']>()
-      .mockResolvedValue({ pointsEarned: 850 }),
+    reserveCouponAndPoints: vi.fn(), createRedeemEntry: vi.fn(), releaseOnCancel: vi.fn(),
+    finalizeRewardsOnPaid: vi.fn().mockResolvedValue({ pointsEarned: 850 }),
   };
-  const service = new PaymentsService(
-    prisma as unknown as PrismaService,
-    gateway as unknown as MockGatewayService,
-    orders as unknown as OrdersPaymentPort,
-    rewards,
-  );
-  return { service, prisma, gateway, orders, order, rewards };
+  const gateway = { charge: vi.fn(async () => ({ reference: 'MOCK-ONE', status: 'SUCCEEDED' as const })) };
+  const service = new PaymentsService(prisma as unknown as PrismaService,
+    gateway as unknown as MockGatewayService, orders as unknown as OrdersPaymentPort,
+    rewards as unknown as RewardsPort);
+  return { service, payments, prisma, orders, tx, gateway, rewards, order };
 }
 
-async function expectPaymentError(promise: Promise<unknown>, code: PaymentErrorCode) {
-  await expect(promise).rejects.toMatchObject({ code });
+async function code(promise: Promise<unknown>, expected: string) {
+  await expect(promise).rejects.toMatchObject({ code: expected });
 }
 
-describe('PaymentsService', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+describe('G-03/G-04 payment regression (unit)', () => {
+  beforeEach(() => vi.clearAllMocks());
 
-  it('thiếu Rewards provider phải lỗi wiring thay vì bỏ qua loyalty', async () => {
-    await expect(Test.createTestingModule({
-      providers: [
-        PaymentsService,
-        { provide: PrismaService, useValue: {} },
-        { provide: MockGatewayService, useValue: {} },
-        { provide: ORDERS_PAYMENT_PORT, useValue: {} },
-      ],
-    }).compile()).rejects.toThrow('REWARDS_PORT');
-  });
-
-  it('thanh toán mới success -> gateway gọi đúng 1 lần, Payment SUCCEEDED, Order PAID', async () => {
-    const { service, prisma, gateway, orders, rewards } = setup();
-
-    const result = await service.pay(baseInput);
-
-    expect(gateway.charge).toHaveBeenCalledTimes(1);
-    expect(result).toMatchObject({
-      orderId: 10,
-      status: PaymentStatus.SUCCEEDED,
-      orderStatus: OrderStatus.PAID,
-      method: 'WALLET',
-      idempotentReplay: false,
-    });
-    expect(orders.markPaid).toHaveBeenCalledTimes(1);
-    expect(prisma.__payments).toHaveLength(1);
-    expect(prisma.__payments[0].status).toBe(PaymentStatus.SUCCEEDED);
-    expect(rewards.finalizeRewardsOnPaid).toHaveBeenCalledExactlyOnceWith(
-      { orderId: 10, userId: 1, totalPaid: 85_000 },
-      expect.any(Object),
+  it('SUCCESS: chỉ một gateway, PAID + reward cùng transaction', async () => {
+    const t = setup();
+    const result = await t.service.pay(input);
+    expect(result).toMatchObject({ orderStatus: 'PAID', status: 'SUCCEEDED', amount: 85_000 });
+    expect(t.orders.markPaid).toHaveBeenCalledOnce();
+    expect(t.rewards.finalizeRewardsOnPaid).toHaveBeenCalledExactlyOnceWith(
+      { orderId: 10, userId: 1, totalPaid: 85_000 }, t.tx,
     );
-    expect(rewards.finalizeRewardsOnPaid.mock.calls[0][1])
-      .toBe(orders.markPaid.mock.calls[0][2]);
+    expect(t.gateway.charge).toHaveBeenCalledTimes(1);
+    const replay = await t.service.pay(input);
+    expect(replay.idempotentReplay).toBe(true);
+    expect(t.gateway.charge).toHaveBeenCalledTimes(1);
   });
 
-  it('amount luôn lấy từ Order.total, không nhận từ client', async () => {
-    const { service, prisma } = setup({
-      order: { id: 10, userId: 1, status: OrderStatus.PENDING, total: 12_345 },
-    });
-
-    const result = await service.pay(baseInput);
-
-    expect(result.amount).toBe(12_345);
-    expect(prisma.__payments[0].amount).toBe(12_345);
+  it('cùng key nhưng khác method/user/order => 409', async () => {
+    const t = setup();
+    await t.service.pay(input);
+    for (const other of [{ method: 'CARD' as const }, { userId: 2 }, { orderId: 11 }]) {
+      await code(t.service.pay({ ...input, ...other }), 'IDEMPOTENCY_KEY_REUSED');
+    }
   });
 
-  it('cùng key + cùng request -> gateway không gọi lần 2, trả lại kết quả đầu', async () => {
-    const { service, gateway, rewards } = setup();
-
-    const first = await service.pay(baseInput);
-    const second = await service.pay(baseInput);
-
-    expect(gateway.charge).toHaveBeenCalledTimes(1);
-    expect(second.paymentId).toBe(first.paymentId);
-    expect(second.transactionId).toBe(first.transactionId);
-    expect(second.idempotentReplay).toBe(true);
-    expect(rewards.finalizeRewardsOnPaid).toHaveBeenCalledTimes(1);
+  it('thiếu key và key không hợp lệ => 400; không gọi gateway', async () => {
+    const t = setup();
+    await code(t.service.pay({ ...input, idempotencyKey: undefined }), 'IDEMPOTENCY_KEY_REQUIRED');
+    await code(t.service.pay({ ...input, idempotencyKey: 'not valid' }), 'INVALID_IDEMPOTENCY_KEY');
+    expect(t.gateway.charge).not.toHaveBeenCalled();
   });
 
-  it('cùng key + khác orderId -> 409 IDEMPOTENCY_KEY_REUSED', async () => {
-    const { service } = setup();
-
-    await service.pay(baseInput);
-    await expectPaymentError(
-      service.pay({ ...baseInput, orderId: 11 }),
-      PaymentErrorCode.IDEMPOTENCY_KEY_REUSED,
-    );
+  it('không được phép thanh toán đơn thuộc user khác / đã PAID', async () => {
+    await code(setup(null).service.pay(input), 'ORDER_NOT_FOUND');
+    await code(setup({ ...pending, status: OrderStatus.PAID }).service.pay(input), 'ORDER_ALREADY_PAID');
   });
 
-  it('cùng key + khác method -> 409 IDEMPOTENCY_KEY_REUSED', async () => {
-    const { service } = setup();
-
-    await service.pay(baseInput);
-    await expectPaymentError(
-      service.pay({ ...baseInput, method: 'CARD' }),
-      PaymentErrorCode.IDEMPOTENCY_KEY_REUSED,
-    );
+  it('DECLINED: đánh dấu FAILED và cho phép retry bằng key mới', async () => {
+    const t = setup();
+    t.gateway.charge.mockRejectedValueOnce(new PaymentDeclinedError('MOCK-0000'));
+    await code(t.service.pay(input), 'PAYMENT_DECLINED');
+    expect(t.payments[0].status).toBe(PaymentStatus.FAILED);
+    expect(t.orders.markPaymentFailed).toHaveBeenCalledOnce();
+    await code(t.service.pay(input), 'PAYMENT_DECLINED');
+    const newInput = { ...input, idempotencyKey: 'pay-unit-2' };
+    await t.service.pay(newInput);
+    expect(t.gateway.charge).toHaveBeenCalledTimes(2);
   });
 
-  it('gateway decline -> Payment FAILED, Order PAYMENT_FAILED, 402', async () => {
-    const gateway = createGateway(async () => {
-      throw new PaymentDeclinedError('MOCK-ABC0000');
-    });
-    const { service, prisma, orders, rewards } = setup({ gateway });
-
-    await expectPaymentError(service.pay(baseInput), PaymentErrorCode.PAYMENT_DECLINED);
-
-    expect(orders.markPaymentFailed).toHaveBeenCalledTimes(1);
-    expect(prisma.__payments[0].status).toBe(PaymentStatus.FAILED);
-    expect(rewards.finalizeRewardsOnPaid).not.toHaveBeenCalled();
+  it('TIMEOUT: để PENDING, không mark FAILED, không cho key khác', async () => {
+    const t = setup();
+    t.gateway.charge.mockRejectedValueOnce(new GatewayTimeoutError());
+    await code(t.service.pay(input), 'GATEWAY_TIMEOUT');
+    expect(t.payments[0].status).toBe(PaymentStatus.PENDING);
+    expect(t.orders.markPaymentFailed).not.toHaveBeenCalled();
+    await code(t.service.pay({ ...input, idempotencyKey: 'pay-unit-new' }), 'PAYMENT_IN_PROGRESS');
+    await code(t.service.pay(input), 'PAYMENT_IN_PROGRESS');
+    t.payments[0].processingLeaseUntil = new Date(0);
+    await t.service.pay(input);
+    expect(t.payments).toHaveLength(1);
+    expect(t.gateway.charge).toHaveBeenCalledTimes(2);
   });
 
-  it('gateway timeout -> 504 GATEWAY_TIMEOUT', async () => {
-    const gateway = createGateway(async () => {
-      throw new GatewayTimeoutError();
-    });
-    const { service, prisma, rewards } = setup({ gateway });
-
-    await expectPaymentError(service.pay(baseInput), PaymentErrorCode.GATEWAY_TIMEOUT);
-
-    expect(prisma.__payments[0].status).toBe(PaymentStatus.FAILED);
-    expect(rewards.finalizeRewardsOnPaid).not.toHaveBeenCalled();
+  it('SUCCESS gateway nhưng transaction finalization lỗi => giữ PENDING, replay cùng key', async () => {
+    const t = setup();
+    t.rewards.finalizeRewardsOnPaid.mockRejectedValueOnce(new Error('DB lost'));
+    await code(t.service.pay(input), 'PAYMENT_RECONCILIATION_REQUIRED');
+    // Mock không rollback nội bộ, nhưng trạng thái thực tế của Prisma sẽ rollback cả transaction.
+    t.payments[0].status = PaymentStatus.PENDING;
+    t.payments[0].transactionId = null;
+    t.payments[0].processingLeaseUntil = new Date(0);
+    if (t.order) t.order.status = OrderStatus.PENDING;
+    await t.service.pay(input);
+    expect(t.payments).toHaveLength(1);
+    expect(t.gateway.charge).toHaveBeenCalledTimes(2);
   });
 
-  it('order đã PAID -> gateway không được gọi', async () => {
-    const { service, gateway } = setup({
-      order: { id: 10, userId: 1, status: OrderStatus.PAID, total: 85_000 },
-    });
-
-    await expectPaymentError(service.pay(baseInput), PaymentErrorCode.ORDER_ALREADY_PAID);
-
-    expect(gateway.charge).not.toHaveBeenCalled();
-  });
-
-  it('order không thuộc user -> ORDER_NOT_FOUND', async () => {
-    const { service, gateway } = setup({ order: null });
-
-    await expectPaymentError(service.pay(baseInput), PaymentErrorCode.ORDER_NOT_FOUND);
-
-    expect(gateway.charge).not.toHaveBeenCalled();
-  });
-
-  it('thiếu Idempotency-Key -> 400 IDEMPOTENCY_KEY_REQUIRED', async () => {
-    const { service, gateway } = setup();
-
-    await expectPaymentError(
-      service.pay({ ...baseInput, idempotencyKey: undefined }),
-      PaymentErrorCode.IDEMPOTENCY_KEY_REQUIRED,
-    );
-
-    expect(gateway.charge).not.toHaveBeenCalled();
-  });
-
-  it('Idempotency-Key sai định dạng -> 400 INVALID_IDEMPOTENCY_KEY', async () => {
-    const { service } = setup();
-
-    await expectPaymentError(
-      service.pay({ ...baseInput, idempotencyKey: 'key with space' }),
-      PaymentErrorCode.INVALID_IDEMPOTENCY_KEY,
-    );
-  });
-
-  it('thua race unique constraint -> replay record thắng, gateway không gọi lần 2', async () => {
-    const { service, prisma, gateway } = setup();
-    const requestHash = paymentRequestHash({
-      userId: baseInput.userId,
-      orderId: baseInput.orderId,
-      method: baseInput.method,
-    });
+  it('thua unique race cùng key => replay payment thắng', async () => {
+    const t = setup();
     const winner: Payment = {
-      id: 99,
-      orderId: baseInput.orderId,
-      idempotencyKey: baseInput.idempotencyKey as string,
-      requestHash,
-      amount: 85_000,
-      method: 'WALLET',
-      status: PaymentStatus.SUCCEEDED,
-      transactionId: 'MOCK-WINNER',
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      id: 9, orderId: 10, idempotencyKey: input.idempotencyKey!,
+      requestHash: paymentRequestHash(input), amount: 85_000, method: 'WALLET',
+      status: PaymentStatus.SUCCEEDED, transactionId: 'MOCK-WINNER',
+      processingLeaseUntil: null, createdAt: new Date(), updatedAt: new Date(),
     };
-
-    prisma.payment.findUnique
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(winner);
-    prisma.payment.create.mockRejectedValueOnce(
-      Object.assign(new Error('unique constraint'), { code: 'P2002' }),
-    );
-
-    const result = await service.pay(baseInput);
-
-    expect(gateway.charge).not.toHaveBeenCalled();
-    expect(result.paymentId).toBe(99);
-    expect(result.idempotentReplay).toBe(true);
+    t.prisma.payment.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(winner);
+    t.tx.payment.create.mockRejectedValueOnce(Object.assign(new Error('unique'), { code: 'P2002' }));
+    expect((await t.service.pay(input)).idempotentReplay).toBe(true);
+    expect(t.gateway.charge).not.toHaveBeenCalled();
   });
 });

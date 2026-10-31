@@ -30,6 +30,9 @@ export type MockChargeResult = {
 @Injectable()
 export class MockGatewayService {
   private readonly logger = new Logger(MockGatewayService.name);
+  // Cổng mock: cùng paymentId luôn nhận cùng quyết định, kể cả sau lỗi settle DB.
+  // Production gateway phải thay bằng API charge/query idempotent dựa trên paymentId.
+  private readonly decisions = new Map<number, MockChargeResult | Error>();
 
   constructor(
     @Optional()
@@ -42,6 +45,9 @@ export class MockGatewayService {
 
   async charge(input: MockChargeInput): Promise<MockChargeResult> {
     await this.simulateLatency();
+    const decided = this.decisions.get(input.paymentId);
+    if (decided instanceof Error) throw decided;
+    if (decided) return decided;
 
     const reference = input.ref ?? this.forcedReference() ?? this.generator.next();
 
@@ -56,13 +62,17 @@ export class MockGatewayService {
       this.logger.warn(
         `payment.gateway.declined orderId=${input.orderId} paymentId=${input.paymentId} reference=${reference}`,
       );
-      throw new PaymentDeclinedError(reference);
+      const declined = new PaymentDeclinedError(reference);
+      this.decisions.set(input.paymentId, declined);
+      throw declined;
     }
 
     this.logger.log(
       `payment.gateway.succeeded orderId=${input.orderId} paymentId=${input.paymentId} reference=${reference}`,
     );
-    return { reference, status: 'SUCCEEDED' };
+    const succeeded = { reference, status: 'SUCCEEDED' as const };
+    this.decisions.set(input.paymentId, succeeded);
+    return succeeded;
   }
 
   private forcedReference(): string | undefined {

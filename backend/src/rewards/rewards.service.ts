@@ -156,9 +156,7 @@ export class RewardsService {
         throw new BadRequestException('Không đủ điểm loyalty để đổi');
       }
 
-      // Tạo LoyaltyEntry REDEEM; unique([orderId, kind]) sẽ được enforce sau khi Order được tạo.
-      // Tại bước reserve, chưa có orderId nên entry này được tạo sau khi Order insert bởi E.
-      // G chỉ trừ điểm user ở đây; E sẽ tạo LoyaltyEntry REDEEM sau khi có orderId.
+      // Chỉ giữ balance ở PENDING; REDEEM sẽ được ghi sau PAID.
       this.logger.log(`points.reserved userId=${userId} points=${pointsDiscount}`);
     }
 
@@ -167,27 +165,51 @@ export class RewardsService {
   }
 
   /**
-   * Tạo LoyaltyEntry REDEEM cho order vừa tạo.
-   * E gọi method này sau khi insert Order (đã có orderId) trong cùng transaction.
-   * Chỉ gọi nếu pointsRedeemed > 0.
+   * G-03: tại PENDING chỉ GIỮ điểm bằng cách trừ balance, không ghi REDEEM.
+   * REDEEM chỉ được ghi cùng transaction chuyển đơn sang PAID.
    */
   async createRedeemEntry(
     params: { orderId: number; userId: number; points: number },
     tx: RewardsTx,
   ): Promise<void> {
     if (params.points <= 0) return;
+    const order = await tx.order.findUnique({
+      where: { id: params.orderId },
+      select: { status: true, userId: true, pointsRedeemed: true },
+    });
+    if (!order || order.status !== OrderStatus.PAID ||
+      order.userId !== params.userId || order.pointsRedeemed !== params.points) {
+      throw new ConflictException('Chỉ ghi REDEEM cho đơn PAID với đúng số điểm đã giữ');
+    }
     await tx.loyaltyEntry.createMany({
-      data: [{
-        userId: params.userId,
-        orderId: params.orderId,
-        kind: LoyaltyKind.REDEEM,
-        points: params.points,
-      }],
+      data: [{ userId: params.userId, orderId: params.orderId,
+        kind: LoyaltyKind.REDEEM, points: params.points }],
       skipDuplicates: true,
     });
-    this.logger.log(
-      `loyalty.redeem.entry orderId=${params.orderId} userId=${params.userId} points=${params.points}`,
-    );
+  }
+
+  /** G-04: chỉ gọi sau CAS PENDING/PAYMENT_FAILED → CANCELLED trong cùng transaction.
+   * Quota, điểm và tồn kho được hoàn đúng một lần nhờ điều kiện CAS ở OrdersService.
+   */
+  async releaseOnCancel(orderId: number, userId: number, tx: RewardsTx): Promise<void> {
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      select: { userId: true, status: true, couponCode: true, pointsRedeemed: true },
+    });
+    if (!order || order.userId !== userId || order.status !== OrderStatus.CANCELLED) {
+      throw new ConflictException('Chỉ hoàn rewards cho đơn đã CANCELLED');
+    }
+    if (order.pointsRedeemed > 0) {
+      await tx.user.update({ where: { id: userId },
+        data: { loyaltyPoints: { increment: order.pointsRedeemed } } });
+    }
+    if (order.couponCode) {
+      const released = await tx.coupon.updateMany({
+        where: { code: order.couponCode, usedCount: { gt: 0 } },
+        data: { usedCount: { decrement: 1 } },
+      });
+      if (released.count !== 1) throw new ConflictException('Không thể hoàn lượt coupon');
+    }
   }
 
   /**
@@ -206,7 +228,7 @@ export class RewardsService {
     // snapshot so a stale callback cannot earn for another user or amount.
     const order = await tx.order.findUnique({
       where: { id: orderId },
-      select: { userId: true, status: true, total: true },
+      select: { userId: true, status: true, total: true, pointsRedeemed: true },
     });
     if (!order || order.userId !== userId) {
       throw new NotFoundException('Không tìm thấy đơn hàng của bạn');
@@ -214,6 +236,8 @@ export class RewardsService {
     if (order.status !== OrderStatus.PAID || order.total !== totalPaid) {
       throw new ConflictException('Rewards chỉ được finalize theo tổng tiền của đơn đã PAID');
     }
+    // G-03: REDEEM + EARN và trạng thái PAID nằm trong cùng transaction.
+    await this.createRedeemEntry({ orderId, userId, points: order.pointsRedeemed }, tx);
     const pointsEarned = calculateEarnedPoints(order.total);
 
     if (pointsEarned <= 0) {

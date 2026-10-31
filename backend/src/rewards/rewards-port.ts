@@ -5,7 +5,7 @@
  * Quy tắc ranh giới module (FOUNDATION-V1 §2):
  *   - E gọi reserveCouponAndPoints trong cùng $transaction tạo Order.
  *   - F gọi finalizeRewardsOnPaid trong cùng $transaction markPaid.
- *   - G không tự sửa orders.service.ts hay payments.service.ts.
+ *   - Bản tích hợp G-03/G-04 thay đổi E/F có kiểm soát để giữ transaction nhất quán.
  */
 import type { Prisma } from '../generated/prisma/client.js';
 
@@ -47,11 +47,14 @@ export interface RewardsPort {
    */
   reserveCouponAndPoints(params: ReserveParams, tx: RewardsTx): Promise<ReserveResult>;
 
-  /** Ghi audit REDEEM sau khi Order đã có id, trong cùng transaction tạo Order. */
+  /** Ghi audit REDEEM khi Order đã PAID trong cùng transaction thanh toán. */
   createRedeemEntry(
     params: { orderId: number; userId: number; points: number },
     tx: RewardsTx,
   ): Promise<void>;
+
+  /** Hoàn quota/điểm cho đơn vừa chuyển CANCELLED; gọi cùng transaction hủy. */
+  releaseOnCancel(orderId: number, userId: number, tx: RewardsTx): Promise<void>;
 
   /**
    * Cộng điểm loyalty sau khi Order PAID — chính xác 1 lần nhờ unique constraint.

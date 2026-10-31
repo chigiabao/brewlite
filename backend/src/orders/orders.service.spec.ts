@@ -21,6 +21,7 @@ function setup() {
   const rewards: RewardsPort = {
     reserveCouponAndPoints: vi.fn(),
     createRedeemEntry: vi.fn(),
+    releaseOnCancel: vi.fn(),
     finalizeRewardsOnPaid: vi.fn(),
   };
   return {
@@ -85,10 +86,7 @@ describe('OrdersService – coupon + loyalty checkout integration', () => {
         couponCode: 'GIAM10',
       }),
     }));
-    expect(rewards.createRedeemEntry).toHaveBeenCalledWith(
-      { orderId: 42, userId: 1, points: 5_000 },
-      tx as unknown as RewardsTx,
-    );
+    expect(rewards.createRedeemEntry).not.toHaveBeenCalled(); // PENDING chưa ghi REDEEM
   });
 
   it('không tìm thấy Product thì không reserve coupon/points', async () => {
@@ -118,5 +116,33 @@ describe('OrdersService – coupon + loyalty checkout integration', () => {
     })).rejects.toBeInstanceOf(ConflictException);
     expect(tx.order.create).not.toHaveBeenCalled();
     expect(rewards.createRedeemEntry).not.toHaveBeenCalled();
+  });
+});
+
+describe('G-04: fulfillment CAS và trạng thái', () => {
+  it('PAID → PREPARING qua compare-and-swap', async () => {
+    const tx = { order: {
+      findUnique: vi.fn().mockResolvedValue({ status: OrderStatus.PAID }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    } };
+    const prisma = { $transaction: vi.fn(async (fn: (value: typeof tx) => Promise<unknown>) => fn(tx)) };
+    const service = new OrdersService(prisma as unknown as PrismaService, {} as RewardsPort);
+    expect(await service.advanceFulfillment(7, OrderStatus.PREPARING)).toBe(OrderStatus.PREPARING);
+    expect(tx.order.updateMany).toHaveBeenCalledWith({
+      where: { id: 7, status: OrderStatus.PAID },
+      data: { status: OrderStatus.PREPARING },
+    });
+  });
+
+  it('một yêu cầu thua CAS không được ghi đè trạng thái mới', async () => {
+    const tx = { order: {
+      findUnique: vi.fn().mockResolvedValue({ status: OrderStatus.PAID }),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    } };
+    const prisma = { $transaction: vi.fn(async (fn: (value: typeof tx) => Promise<unknown>) => fn(tx)) };
+    const service = new OrdersService(prisma as unknown as PrismaService, {} as RewardsPort);
+    await expect(service.advanceFulfillment(7, OrderStatus.PREPARING))
+      .rejects.toBeInstanceOf(ConflictException);
+    await expect(service.advanceFulfillment(7, OrderStatus.COMPLETED)).rejects.toThrow();
   });
 });

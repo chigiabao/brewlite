@@ -65,6 +65,8 @@ model Order {
   discountTotal   Int            @default(0)
   pointsRedeemed  Int            @default(0)
   total           Int            // Số tiền thực phải thanh toán, VND
+  createKey       String?        // Idempotency-Key của POST /orders (duy nhất theo user)
+  createHash      String?        // Hash payload, chặn cùng key nhưng đổi nội dung
   couponCode      String?
   coupon          Coupon?        @relation(fields: [couponCode], references: [code])
   createdAt       DateTime       @default(now())
@@ -73,6 +75,7 @@ model Order {
   loyaltyEntries  LoyaltyEntry[]
 
   @@index([userId, createdAt])
+  @@unique([userId, createKey])
 }
 
 model OrderItem {
@@ -98,6 +101,7 @@ model Payment {
   method         PaymentMethod
   status         PaymentStatus @default(PENDING)
   transactionId  String?
+  processingLeaseUntil DateTime? // Thời điểm hết hạn quyền xử lý attempt PENDING
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
