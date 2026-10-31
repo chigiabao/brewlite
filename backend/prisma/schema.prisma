@@ -83,7 +83,7 @@ model Order {
   idempotencyKey String?
   requestHash    String?
   items          OrderItem[]
-  payments       Payment[] // Cho phép thử lại sau PAYMENT_FAILED (mỗi attempt có key riêng)
+  payments        Payment[] // Cho phép thử lại sau PAYMENT_FAILED (mỗi attempt có key riêng)
   loyaltyEntries LoyaltyEntry[]
 
   @@unique([userId, idempotencyKey])

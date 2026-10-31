@@ -37,7 +37,8 @@
     "PREPARING",
     "READY",
     "COMPLETED",
-    "CANCELLED"
+    "CANCELLED",
+    "REFUNDED"
   ],
   "allowedTransitions": {
     "PENDING": [
@@ -47,20 +48,28 @@
     ],
     "PAID": [
       "PREPARING",
-      "CANCELLED"
+      "CANCELLED",
+      "REFUNDED"
     ],
     "PAYMENT_FAILED": [
       "PAID",
       "CANCELLED"
     ],
     "PREPARING": [
-      "READY"
+      "READY",
+      "REFUNDED"
     ],
     "READY": [
-      "COMPLETED"
+      "COMPLETED",
+      "REFUNDED"
     ],
-    "COMPLETED": [],
-    "CANCELLED": []
+    "COMPLETED": [
+      "REFUNDED"
+    ],
+    "CANCELLED": [
+      "REFUNDED"
+    ],
+    "REFUNDED": []
   },
   "paymentMethods": [
     "WALLET",
