@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { AdminService } from './admin.service.js';
 import { OrderStatus } from '../generated/prisma/enums.js';
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 
 describe('AdminService', () => {
   let service: AdminService;
@@ -37,6 +37,12 @@ describe('AdminService', () => {
         create: vi.fn(),
         update: vi.fn(),
         delete: vi.fn(),
+      },
+      payment: {
+        updateMany: vi.fn(),
+      },
+      loyaltyEntry: {
+        findFirst: vi.fn(),
       },
       $transaction: vi.fn((callback) => callback(mockPrisma)),
     };
@@ -94,5 +100,25 @@ describe('AdminService', () => {
     await expect(service.updateOrderStatus(999, OrderStatus.PREPARING)).rejects.toThrow(
       NotFoundException,
     );
+  });
+
+  it('prevents duplicate coupon creation with ConflictException', async () => {
+    mockPrisma.coupon.findUnique.mockResolvedValueOnce({ code: 'GIAM10' });
+    await expect(service.createCoupon({ code: 'GIAM10' })).rejects.toThrow(ConflictException);
+  });
+
+  it('safely deactivates coupon if it has existing orders', async () => {
+    mockPrisma.coupon.findUnique.mockResolvedValueOnce({
+      code: 'GIAM10',
+      _count: { orders: 5 },
+    });
+    mockPrisma.coupon.update.mockResolvedValueOnce({ code: 'GIAM10', active: false });
+
+    await service.deleteCoupon('GIAM10');
+    expect(mockPrisma.coupon.update).toHaveBeenCalledWith({
+      where: { code: 'GIAM10' },
+      data: { active: false },
+    });
+    expect(mockPrisma.coupon.delete).not.toHaveBeenCalled();
   });
 });

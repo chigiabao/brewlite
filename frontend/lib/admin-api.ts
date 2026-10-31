@@ -3,13 +3,15 @@ import { api } from './api';
 export interface DashboardStats {
   totalRevenue: number;
   revenueToday: number;
+  ordersTodayCount?: number;
+  averageOrderValue?: number;
   totalOrders: number;
   ordersByStatus: Record<string, number>;
   totalProducts: number;
   lowStockCount: number;
   totalCustomers: number;
   totalLoyaltyPoints: number;
-  revenueChart: { date: string; revenue: number; orderCount: number }[];
+  revenueChart: { date: string; label: string; revenue: number; orderCount: number }[];
   recentOrders: AdminOrder[];
   topSellingProducts: {
     id: number;
