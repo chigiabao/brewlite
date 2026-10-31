@@ -81,6 +81,11 @@ export function AuthHeader() {
             {email}
           </span>
         )}
+        {email === 'admin@brewlite.vn' && (
+          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-400 text-stone-950 font-bold uppercase tracking-wider">
+            Admin
+          </span>
+        )}
       </Link>
       <button
         onClick={handleLogout}

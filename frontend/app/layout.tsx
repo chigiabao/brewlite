@@ -65,6 +65,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 >
                   Lịch sử đơn
                 </Link>
+                <Link
+                  href="/admin"
+                  className="flex items-center gap-1 text-amber-300 hover:text-amber-100 transition-colors px-2.5 py-1 rounded-full bg-amber-950/70 border border-amber-600/50 text-xs font-bold shadow-sm hover:scale-105"
+                >
+                  <span>⚡ Quản trị (Admin)</span>
+                </Link>
               </nav>
 
               {/* Header Right Actions */}
