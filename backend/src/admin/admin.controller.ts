@@ -9,7 +9,10 @@ import {
   Post,
   Put,
   Query,
+  UseGuards,
 } from '@nestjs/common';
+import { CurrentUser, JwtAuthGuard, type AuthUser } from '../auth/public.js';
+import { AdminRoleGuard } from './admin-role.guard.js';
 import { AdminService } from './admin.service.js';
 import {
   AdjustUserPointsDto,
@@ -21,9 +24,17 @@ import {
   UpdateStockDto,
 } from './admin.dto.js';
 
+// FIX 10: khóa cả controller, kể cả endpoint mới thêm về sau.
+@UseGuards(JwtAuthGuard, AdminRoleGuard)
 @Controller('admin')
 export class AdminController {
   constructor(private readonly admin: AdminService) {}
+
+  // Endpoint kiểm tra session: FE phải gọi API này thay vì tự đoán Admin từ email.
+  @Get('session')
+  session(@CurrentUser() user: AuthUser) {
+    return { userId: user.userId, email: user.email, role: 'ADMIN' as const };
+  }
 
   // 1. Thống kê & Tổng quan Dashboard
   @Get('stats')

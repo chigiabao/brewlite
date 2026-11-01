@@ -81,6 +81,7 @@ export interface AdminCoupon {
 export interface AdminUser {
   id: number;
   email: string;
+  role: 'CUSTOMER' | 'ADMIN';
   loyaltyPoints: number;
   orderCount: number;
   paidOrderCount: number;
@@ -88,6 +89,8 @@ export interface AdminUser {
 }
 
 export const adminApi = {
+  getSession: () => api<{ userId: number; email: string; role: 'ADMIN' }>('/admin/session'),
+
   getStats: () => api<DashboardStats>('/admin/stats'),
 
   getOrders: (status?: string, search?: string) => {

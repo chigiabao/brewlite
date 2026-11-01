@@ -31,27 +31,6 @@ const STATUS_LABELS: Record<string, { label: string; bg: string; text: string; b
   PAYMENT_FAILED: { label: 'Thanh toán lỗi', bg: 'bg-rose-950/60', text: 'text-rose-400', border: 'border-rose-700/50' },
 };
 
-function parseJwtEmail(token: string | null): string | null {
-  if (!token) return null;
-  try {
-    const parts = token.split('.');
-    if (parts.length === 3) {
-      const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-      const json = decodeURIComponent(
-        atob(base64)
-          .split('')
-          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-          .join(''),
-      );
-      const parsed = JSON.parse(json);
-      return parsed.email || null;
-    }
-  } catch {
-    return null;
-  }
-  return null;
-}
-
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<'overview' | 'orders' | 'products' | 'coupons' | 'users'>('overview');
   const [loading, setLoading] = useState(true);
@@ -59,6 +38,8 @@ export default function AdminPage() {
 
   // Authentication State
   const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
+  const [isAdminVerified, setIsAdminVerified] = useState(false);
+  const [isCheckingAccess, setIsCheckingAccess] = useState(true);
 
   // Dữ liệu
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -99,64 +80,60 @@ export default function AdminPage() {
     setTimeout(() => setToast(null), 3500);
   }, []);
 
-  // Kiểm tra tài khoản đăng nhập hiện tại
+  // FIX 10: server kiểm chứng quyền bằng JWT + role trong CSDL.
+  // Email trong payload JWT/localStorage tuyệt đối KHÔNG chứng minh quyền Admin.
   useEffect(() => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-    const email = parseJwtEmail(token);
-    setCurrentUserEmail(email);
+    let cancelled = false;
+    const checkAccess = async () => {
+      try {
+        const session = await adminApi.getSession();
+        if (cancelled) return;
+        setCurrentUserEmail(session.email);
+        setIsAdminVerified(true);
+      } catch {
+        if (cancelled) return;
+        setCurrentUserEmail(null);
+        setIsAdminVerified(false);
+      } finally {
+        if (!cancelled) setIsCheckingAccess(false);
+      }
+    };
+    void checkAccess();
+    return () => { cancelled = true; };
   }, []);
 
-  // Tải dữ liệu toàn bộ
   const refreshAll = useCallback(async () => {
+    if (!isAdminVerified) return;
     setLoading(true);
     try {
+      // Không nuốt lỗi 401/403 để tránh hiển thị dashboard với dữ liệu giả trống.
       const [s, o, p, c, u] = await Promise.all([
-        adminApi.getStats().catch(() => null),
-        adminApi.getOrders().catch(() => []),
-        adminApi.getProducts().catch(() => []),
-        adminApi.getCoupons().catch(() => []),
-        adminApi.getUsers().catch(() => []),
+        adminApi.getStats(), adminApi.getOrders(), adminApi.getProducts(),
+        adminApi.getCoupons(), adminApi.getUsers(),
       ]);
-      if (s) setStats(s);
+      setStats(s);
       setOrders(o);
       setProducts(p);
       setCoupons(c);
       setUsers(u);
-    } catch {
-      showToast('Không thể kết nối đến máy chủ API', 'error');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Không thể tải dữ liệu quản trị', 'error');
+      // Quyền bị thu hồi sau đăng nhập: buộc UI khóa, backend cũng chặn mọi thao tác.
+      if (err instanceof Error && 'status' in err && (err.status === 401 || err.status === 403)) {
+        setIsAdminVerified(false);
+      }
     } finally {
       setLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, isAdminVerified]);
 
-  useEffect(() => {
-    refreshAll();
-  }, [refreshAll]);
-
-  // Đăng nhập nhanh tài khoản Admin demo
-  const handleQuickAdminLogin = async () => {
-    try {
-      const res = await fetch('http://localhost:3001/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'admin@brewlite.vn', password: 'password123' }),
-      });
-      if (!res.ok) throw new Error('Không thể đăng nhập admin');
-      const data = await res.json();
-      localStorage.setItem('token', data.accessToken);
-      window.dispatchEvent(new Event('storage'));
-      setCurrentUserEmail('admin@brewlite.vn');
-      showToast('Đã cấp quyền Quản trị viên (admin@brewlite.vn)', 'success');
-      refreshAll();
-    } catch {
-      showToast('Đăng nhập thất bại. Vui lòng kiểm tra backend', 'error');
-    }
-  };
+  useEffect(() => { void refreshAll(); }, [refreshAll]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     window.dispatchEvent(new Event('storage'));
     setCurrentUserEmail(null);
+    setIsAdminVerified(false);
     showToast('Đã đăng xuất tài khoản quản trị');
   };
 
@@ -310,6 +287,25 @@ export default function AdminPage() {
     return Math.max(...values, 500000);
   }, [stats]);
 
+  if (isCheckingAccess) {
+    return <div className="p-12 text-center text-amber-200">Đang xác minh quyền quản trị…</div>;
+  }
+  if (!isAdminVerified) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-5 p-8 text-center">
+        <h1 className="text-2xl font-bold text-amber-300">Quyền quản trị bắt buộc</h1>
+        <p className="max-w-md text-stone-300">
+          Chỉ tài khoản có quyền ADMIN do máy chủ xác minh mới truy cập được.
+          Hãy đăng nhập bằng tài khoản quản trị đã được cấp quyền.
+        </p>
+        <Link href="/login" className="rounded-lg bg-amber-600 px-6 py-3 font-bold text-stone-950">
+          Đến trang đăng nhập / đổi tài khoản
+        </Link>
+        <Link href="/" className="text-amber-300 underline">Về cửa hàng</Link>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#0a0908] text-stone-100 font-sans selection:bg-amber-700 selection:text-white pb-24">
       {/* Toast Notification */}
@@ -357,38 +353,14 @@ export default function AdminPage() {
           {/* User Session & Quick Tools */}
           <div className="flex items-center gap-3">
             {/* User status */}
-            {currentUserEmail === 'admin@brewlite.vn' ? (
+            {currentUserEmail && (
               <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-stone-900/90 border border-amber-700/40 text-xs">
-                <span className="w-2 h-2 rounded-full bg-amber-400"></span>
                 <span className="text-stone-300 font-medium">Quản trị viên:</span>
-                <strong className="text-amber-300 font-mono">admin@brewlite.vn</strong>
-                <button
-                  onClick={handleLogout}
-                  className="ml-1 text-[11px] text-stone-400 hover:text-rose-400 transition"
-                  title="Đăng xuất"
-                >
+                <strong className="text-amber-300 font-mono">{currentUserEmail}</strong>
+                <button onClick={handleLogout} className="text-stone-400 hover:text-rose-400" title="Đăng xuất">
                   [Thoát]
                 </button>
               </div>
-            ) : currentUserEmail ? (
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-950/40 border border-amber-800 text-xs">
-                <span className="text-stone-300">Tài khoản:</span>
-                <strong className="text-amber-300 truncate max-w-[120px]">{currentUserEmail}</strong>
-                <button
-                  onClick={handleQuickAdminLogin}
-                  className="ml-1 text-[11px] text-amber-400 hover:text-amber-200 underline font-semibold"
-                >
-                  Đổi sang Admin
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={handleQuickAdminLogin}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 text-xs font-bold border border-amber-700/60 transition shadow-sm"
-              >
-                <span>🔑</span>
-                <span>Đăng nhập Admin</span>
-              </button>
             )}
 
             {/* Refresh Button */}
@@ -1390,7 +1362,7 @@ export default function AdminPage() {
                           <td className="py-3.5 px-4 font-bold text-stone-400">#{user.id}</td>
                           <td className="py-3.5 px-4 font-bold text-stone-100">
                             {user.email}
-                            {user.email === 'admin@brewlite.vn' && (
+                            {user.role === 'ADMIN' && (
                               <span className="ml-2 text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">
                                 ADMIN
                               </span>

@@ -11,6 +11,12 @@ datasource db {
   provider = "postgresql"
 }
 
+// FIX 10: quyền quản trị được lưu ở CSDL, không nhận từ payload JWT/client.
+enum UserRole {
+  CUSTOMER
+  ADMIN
+}
+
 enum OrderStatus {
   PENDING
   PAID
@@ -61,6 +67,7 @@ model User {
   id             Int            @id @default(autoincrement())
   email          String         @unique
   passwordHash   String
+  role           UserRole       @default(CUSTOMER) // User mới không thể tự nhận ADMIN
   loyaltyPoints  Int            @default(0)
   orders         Order[]
   loyaltyEntries LoyaltyEntry[]

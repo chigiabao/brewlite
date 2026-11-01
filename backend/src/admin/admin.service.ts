@@ -552,6 +552,7 @@ export class AdminService {
       return {
         id: u.id,
         email: u.email,
+        role: u.role, // FIX 10: UI hiển thị đúng vai trò lưu trong DB, không đoán theo email.
         loyaltyPoints: u.loyaltyPoints,
         orderCount: u.orders.length,
         paidOrderCount: validOrders.length,

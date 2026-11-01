@@ -5,6 +5,7 @@ import 'dotenv/config';
 import * as bcrypt from 'bcryptjs';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client.js';
+import { UserRole } from '../src/generated/prisma/enums.js';
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
@@ -82,9 +83,9 @@ async function seedCoupons(): Promise<void> {
   }
 }
 
+// FIX 10: tài khoản demo có thể xóa ở production; tuyệt đối không seed admin với mật khẩu công khai.
 const SEED_USERS = [
   { email: 'customer@gmail.com', password: 'password123', loyaltyPoints: 50 },
-  { email: 'admin@gmail.com', password: 'password123', loyaltyPoints: 100 },
   { email: 'demo@gmail.com', password: 'password123', loyaltyPoints: 0 },
 ] as const;
 
