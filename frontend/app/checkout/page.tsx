@@ -47,7 +47,7 @@ export default function CheckoutPage() {
 
   const token = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const isLoggedIn = Boolean(token);
-  const [method, setMethod] = useState<'WALLET' | 'CARD'>('WALLET');
+  const [method, setMethod] = useState<'WALLET' | 'CARD' | 'VNPAY'>('VNPAY');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
@@ -261,21 +261,22 @@ export default function CheckoutPage() {
       const attempt = current.attempt;
       // Kiểm tra rõ ràng để TypeScript và runtime không dùng một lượt thanh toán rỗng.
       if (!attempt) throw new Error('Chưa tạo được khóa thanh toán, vui lòng thử lại.');
-      const res = await api<{ orderId: number; status: string; orderStatus: string }>('/payments', {
+      const res = await api<{
+        orderId: number;
+        paymentId: number;
+        status: string;
+        checkoutUrl: string;
+      }>('/payments/checkout', {
         method: 'POST',
         headers: { 'Idempotency-Key': attempt.key },
         body: JSON.stringify({ orderId, method: attempt.method,
           ...(attempt.demoDecline ? { demoDecline: true } : {}) }),
       });
       if (res.orderId !== orderId) throw new Error('Payment trả mã đơn không khớp. Cần kiểm tra thủ công.');
-      if (isPaidOrderStatus(res.orderStatus) && res.status === 'SUCCEEDED') {
-        finishPaid(orderId);
-      } else if (res.orderStatus === 'PAYMENT_FAILED' || res.status === 'FAILED') {
-        saveCheckoutSession({ ...current, attempt: null });
-        setError('Thanh toán thất bại. Đơn được giữ lại; thử lại sẽ tạo khóa thanh toán mới.');
-      } else {
-        setError('Chưa xác định được kết quả thanh toán. Bấm Thử lại để gửi đúng khóa giao dịch cũ.');
+      if (!res.checkoutUrl || typeof res.checkoutUrl !== 'string') {
+        throw new Error('Backend không trả về URL thanh toán VNPay hợp lệ.');
       }
+      window.location.assign(res.checkoutUrl);
     } catch (e: unknown) {
       const apiError = e instanceof ApiError ? e : null;
       const message = e instanceof Error ? e.message : 'Không thể kết nối máy chủ';

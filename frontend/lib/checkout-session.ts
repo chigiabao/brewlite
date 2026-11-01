@@ -1,5 +1,5 @@
 /** FIX07 — Dữ liệu tiếp tục checkout cùng tab sau reload (không lưu JWT hoặc thông tin thẻ). */
-export type CheckoutMethod = 'WALLET' | 'CARD';
+export type CheckoutMethod = 'WALLET' | 'CARD' | 'VNPAY';
 export type CheckoutItem = {
   productId: number;
   size: 'S' | 'M' | 'L';
@@ -61,7 +61,7 @@ export function loadCheckoutSession(token: string | null): CheckoutSession | nul
         (obj.orderTotal !== null && (!Number.isSafeInteger(obj.orderTotal) || (obj.orderTotal ?? -1) < 0)) ||
         (obj.pointsRedeemed !== null && (!Number.isSafeInteger(obj.pointsRedeemed) || (obj.pointsRedeemed ?? -1) < 0)) ||
         (obj.attempt !== null && (!obj.attempt || typeof obj.attempt.key !== 'string' || !obj.attempt.key ||
-          !['WALLET', 'CARD'].includes(obj.attempt.method) || typeof obj.attempt.demoDecline !== 'boolean'))) {
+          !['WALLET', 'CARD', 'VNPAY'].includes(obj.attempt.method) || typeof obj.attempt.demoDecline !== 'boolean'))) {
       return null;
     }
     return obj as CheckoutSession;
