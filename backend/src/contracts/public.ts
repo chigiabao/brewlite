@@ -5,7 +5,7 @@
  */
 export type Size = 'S' | 'M' | 'L';
 export type Topping = 'Trân châu' | 'Kem';
-export type PayMethod = 'WALLET' | 'CARD';
+export type PayMethod = 'WALLET' | 'CARD' | 'VNPAY';
 export type OrderStatusV1 =
   | 'PENDING'
   | 'PAID'
