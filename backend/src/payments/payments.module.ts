@@ -5,6 +5,7 @@ import { MockOrdersPaymentAdapter, ORDERS_PAYMENT_PORT } from './orders-payment.
 import { PaymentsController } from './payments.controller.js';
 import { PaymentsService } from './payments.service.js';
 import { stripeProvider } from './stripe.provider.js';
+import { VnpayService } from './vnpay/vnpay.service.js';
 
 @Module({
   imports: [
@@ -14,9 +15,11 @@ import { stripeProvider } from './stripe.provider.js';
   controllers: [PaymentsController],
   providers: [
     PaymentsService,
+    VnpayService,
     stripeProvider,
     MockOrdersPaymentAdapter,
     { provide: ORDERS_PAYMENT_PORT, useExisting: MockOrdersPaymentAdapter },
   ],
+  exports: [VnpayService],
 })
 export class PaymentsModule {}

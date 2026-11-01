@@ -1,6 +1,6 @@
-import { IsIn, IsInt, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
-export const PAYMENT_METHODS = ['WALLET', 'CARD'] as const;
+export const PAYMENT_METHODS = ['WALLET', 'CARD', 'VNPAY'] as const;
 export type PaymentMethodInput = (typeof PAYMENT_METHODS)[number];
 
 export class PayDto {
@@ -10,4 +10,8 @@ export class PayDto {
 
   @IsIn(PAYMENT_METHODS)
   method!: PaymentMethodInput;
+
+  @IsOptional()
+  @IsString()
+  bankCode?: string;
 }

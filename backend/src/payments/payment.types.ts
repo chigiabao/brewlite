@@ -3,8 +3,15 @@ export type PaymentStatusValue = 'PENDING' | 'SUCCEEDED' | 'FAILED' | 'REFUNDED'
 export type PayInput = {
   userId: number;
   orderId: number;
-  method: 'WALLET' | 'CARD';
+  method: 'WALLET' | 'CARD' | 'VNPAY';
   idempotencyKey: string | undefined;
+  ipAddr?: string;
+  bankCode?: string;
+};
+
+export type VnpayIpnResponse = {
+  RspCode: string;
+  Message: string;
 };
 
 

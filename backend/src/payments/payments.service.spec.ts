@@ -1,12 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Payment } from '../generated/prisma/client.js';
-import { OrderStatus, PaymentStatus } from '../generated/prisma/enums.js';
+import { OrderStatus, PaymentGateway, PaymentStatus } from '../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { OrdersPaymentPort, PayableOrder } from './orders-payment.port.js';
 import { PaymentError, PaymentErrorCode } from './payment.errors.js';
 import type { PayInput } from './payment.types.js';
 import { paymentRequestHash, PaymentsService } from './payments.service.js';
 import { FakeStripe, stripeError } from '../../test/helpers/fake-stripe.js';
+import {
+  buildQueryString,
+  hmacSha512,
+  sortObject,
+  VnpayService,
+} from './vnpay/vnpay.service.js';
 
 const WEBHOOK_SECRET = 'whsec_unit_test';
 process.env.STRIPE_WEBHOOK_SECRET = WEBHOOK_SECRET;
@@ -51,12 +57,12 @@ function createPrismaMock(initialOrder: OrderRow) {
   let nextPaymentId = 1;
 
   const paymentApi = {
-    findUnique: vi.fn(async ({ where, include }: { where: PaymentWhere; include?: { order?: boolean } }) => {
-      const found = payments.find((payment) =>
-        where.id !== undefined
-          ? payment.id === where.id
-          : payment.idempotencyKey === where.idempotencyKey,
-      );
+    findUnique: vi.fn(async ({ where, include }: { where: PaymentWhere & { vnpTxnRef?: string }; include?: { order?: boolean } }) => {
+      const found = payments.find((payment) => {
+        if (where.id !== undefined) return payment.id === where.id;
+        if (where.vnpTxnRef !== undefined) return payment.vnpTxnRef === where.vnpTxnRef;
+        return payment.idempotencyKey === where.idempotencyKey;
+      });
       if (!found) return null;
       if (include?.order) {
         return {
@@ -93,6 +99,12 @@ function createPrismaMock(initialOrder: OrderRow) {
         transactionId: null,
         createdAt: now,
         updatedAt: now,
+        gateway: PaymentGateway.STRIPE,
+        vnpTxnRef: null,
+        vnpTransactionNo: null,
+        vnpBankCode: null,
+        vnpCardType: null,
+        vnpPayDate: null,
         stripeSessionId: null,
         stripePaymentIntentId: null,
         stripeCheckoutUrl: null,
@@ -195,11 +207,13 @@ function setup() {
     refundRewardsOnRefund: vi.fn(async () => undefined),
   };
   const stripe = new FakeStripe();
+  const vnpay = new VnpayService();
   const service = new PaymentsService(
     prisma as unknown as PrismaService,
     stripe as never,
     orders,
     rewards as never,
+    vnpay,
   );
 
   return { service, stripe, prisma, orders, rewards, order, payments };
@@ -654,6 +668,125 @@ describe('PaymentsService refund & dispute webhook', () => {
     expect(result.ignored).toBe('refund-feature-flag-disabled');
     expect(rewards.refundRewardsOnRefund).not.toHaveBeenCalled();
     delete process.env.ENABLE_STRIPE_REFUND;
+  });
+
+  describe('VNPay integration flow', () => {
+    const vnpaySecret = 'RA3KNOEAW2MYGQG30C3L0B5O1W86Q78W';
+
+    function signVnpayParams(params: Record<string, unknown>): Record<string, unknown> {
+      const sorted = sortObject(params);
+      const signData = buildQueryString(sorted);
+      const hash = hmacSha512(vnpaySecret, signData);
+      return { ...params, vnp_SecureHash: hash };
+    }
+
+    it('tạo VNPay checkout URL và lưu txnRef', async () => {
+      const { service, payments, order } = setup();
+      const res = await service.createCheckout({
+        userId: 1,
+        orderId: 10,
+        method: 'VNPAY',
+        idempotencyKey: 'vnp-idem-1',
+      });
+
+      expect(res.paymentId).toBeDefined();
+      expect(res.checkoutUrl).toContain('https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?');
+      expect(res.checkoutUrl).toContain('vnp_Amount=8500000');
+      expect(payments[0].gateway).toBe(PaymentGateway.VNPAY);
+      expect(payments[0].vnpTxnRef).toBeDefined();
+    });
+
+    it('IPN signature không hợp lệ -> trả về RspCode 97', async () => {
+      const { service } = setup();
+      const res = await service.handleVnpayIpn({
+        vnp_TxnRef: 'unknown',
+        vnp_SecureHash: 'bad_signature',
+      });
+      expect(res.RspCode).toBe('97');
+    });
+
+    it('IPN không tìm thấy payment -> trả về RspCode 01', async () => {
+      const { service } = setup();
+      const query = signVnpayParams({
+        vnp_Amount: '8500000',
+        vnp_ResponseCode: '00',
+        vnp_TxnRef: '999_999_000',
+      });
+      const res = await service.handleVnpayIpn(query);
+      expect(res.RspCode).toBe('01');
+    });
+
+    it('IPN sai số tiền -> trả về RspCode 04', async () => {
+      const { service, payments } = setup();
+      await service.createCheckout({
+        userId: 1,
+        orderId: 10,
+        method: 'VNPAY',
+        idempotencyKey: 'vnp-idem-2',
+      });
+
+      const query = signVnpayParams({
+        vnp_Amount: '5000000', // Sai: mong đợi 8500000
+        vnp_ResponseCode: '00',
+        vnp_TxnRef: payments[0].vnpTxnRef!,
+      });
+      const res = await service.handleVnpayIpn(query);
+      expect(res.RspCode).toBe('04');
+    });
+
+    it('IPN thành công (vnp_ResponseCode 00) -> Payment SUCCEEDED, Order PAID, cộng Loyalty', async () => {
+      const { service, payments, order, rewards } = setup();
+      await service.createCheckout({
+        userId: 1,
+        orderId: 10,
+        method: 'VNPAY',
+        idempotencyKey: 'vnp-idem-3',
+      });
+
+      const query = signVnpayParams({
+        vnp_Amount: '8500000',
+        vnp_ResponseCode: '00',
+        vnp_TxnRef: payments[0].vnpTxnRef!,
+        vnp_TransactionNo: 'VN12345678',
+        vnp_BankCode: 'NCB',
+        vnp_CardType: 'ATM',
+        vnp_PayDate: '20261031133000',
+      });
+
+      const res = await service.handleVnpayIpn(query);
+      expect(res.RspCode).toBe('00');
+      expect(payments[0].status).toBe(PaymentStatus.SUCCEEDED);
+      expect(payments[0].vnpTransactionNo).toBe('VN12345678');
+      expect(order.status).toBe(OrderStatus.PAID);
+      expect(rewards.finalizeRewardsOnPaid).toHaveBeenCalledTimes(1);
+
+      // Gọi lại lần 2 -> Idempotent replay, trả 02, không cộng điểm lần 2
+      const repeatRes = await service.handleVnpayIpn(query);
+      expect(repeatRes.RspCode).toBe('02');
+      expect(rewards.finalizeRewardsOnPaid).toHaveBeenCalledTimes(1);
+    });
+
+    it('IPN thất bại hoặc hủy (vnp_ResponseCode != 00) -> Payment FAILED, Order PAYMENT_FAILED', async () => {
+      const { service, payments, order, rewards } = setup();
+      await service.createCheckout({
+        userId: 1,
+        orderId: 10,
+        method: 'VNPAY',
+        idempotencyKey: 'vnp-idem-4',
+      });
+
+      const query = signVnpayParams({
+        vnp_Amount: '8500000',
+        vnp_ResponseCode: '24', // Khách hủy
+        vnp_TxnRef: payments[0].vnpTxnRef!,
+      });
+
+      const res = await service.handleVnpayIpn(query);
+      expect(res.RspCode).toBe('00');
+      expect(payments[0].status).toBe(PaymentStatus.FAILED);
+      expect(order.status).toBe(OrderStatus.PAYMENT_FAILED);
+      expect(rewards.finalizeRewardsOnPaid).not.toHaveBeenCalled();
+    });
   });
 });
 

@@ -196,6 +196,42 @@ npm run dev
 # Frontend chạy tại http://localhost:3000
 ```
 
+### Chạy thử VNPay Sandbox qua ngrok
+
+VNPay cần gọi được IPN từ Internet, vì vậy chỉ mở tunnel cho backend là đủ:
+
+```bash
+# Terminal 1 - backend local
+cd backend
+npm run start:dev
+
+# Terminal 2 - public tunnel tới backend port 3001
+ngrok http 3001
+```
+
+Giả sử ngrok cấp URL `https://abc-xyz.ngrok-free.app`, thêm vào `backend/.env`
+(không commit file này):
+
+```env
+VNPAY_RETURN_URL=https://abc-xyz.ngrok-free.app/payments/vnpay/return
+VNPAY_IPN_URL=https://abc-xyz.ngrok-free.app/payments/vnpay/ipn
+```
+
+Sau đó vào trang quản trị VNPay Sandbox, cấu hình **IPN URL** đúng bằng
+`VNPAY_IPN_URL`. `VNPAY_RETURN_URL` là callback mở trong browser; backend sẽ
+redirect tiếp tới `FRONTEND_URL/orders/vnpay-return`. Không dùng
+`/payments/vnpay-return` vì đó không phải route của ứng dụng.
+
+Flow kiểm thử:
+
+1. Mở frontend tại `http://localhost:3000`, đăng nhập và tạo đơn chọn VNPay.
+2. VNPay redirect browser về `VNPAY_RETURN_URL`, backend chuyển tiếp về trang kết quả frontend.
+3. VNPay gọi server-to-server tới `VNPAY_IPN_URL`; backend kiểm tra chữ ký, số tiền và cập nhật Payment/Order.
+4. Tại trang xác nhận đơn, bấm cập nhật trạng thái nếu IPN đến chậm.
+
+Nếu dùng `docker compose`, đặt cùng hai biến trong file `.env` ở thư mục gốc rồi
+chạy `docker compose up -d --build`; compose đã truyền chúng vào container backend.
+
 ---
 
 ## 👥 Tài khoản thử nghiệm (Demo Accounts)

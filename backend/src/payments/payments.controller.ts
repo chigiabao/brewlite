@@ -1,20 +1,30 @@
 import {
   Body,
   Controller,
+  Get,
   Headers,
   HttpCode,
   HttpStatus,
   Post,
+  Query,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
 import type { Request } from 'express';
+import type { Response } from 'express';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { CurrentUser, JwtAuthGuard, type AuthUser } from '../auth/public.js';
+import { getFrontendUrl } from '../config/app-config.js';
 import { PayDto } from './payments.dto.js';
 import { PaymentsService } from './payments.service.js';
-import type { CreateCheckoutResult, StripeWebhookResult } from './payment.types.js';
+import type {
+  CreateCheckoutResult,
+  StripeWebhookResult,
+  VnpayIpnResponse,
+} from './payment.types.js';
+import type { VnpayIpnQuery } from './vnpay/vnpay.service.js';
 
 @Controller('payments')
 export class PaymentsController {
@@ -28,12 +38,19 @@ export class PaymentsController {
     @CurrentUser() user: AuthUser,
     @Headers('idempotency-key') key: string | undefined,
     @Body() dto: PayDto,
+    @Req() req: Request,
   ): Promise<CreateCheckoutResult> {
+    const ipAddr =
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      req.socket.remoteAddress ||
+      '127.0.0.1';
+
     return this.payments.createCheckout({
       userId: user.userId,
       orderId: dto.orderId,
       method: dto.method,
       idempotencyKey: key,
+      ...(dto.method === 'VNPAY' ? { ipAddr, bankCode: dto.bankCode } : {}),
     });
   }
 
@@ -44,5 +61,37 @@ export class PaymentsController {
     const header = req.headers['stripe-signature'];
     const signature = Array.isArray(header) ? header[0] : header;
     return this.payments.handleStripeWebhook(req.rawBody, signature);
+  }
+
+  @SkipThrottle()
+  @Get('vnpay/ipn')
+  @HttpCode(HttpStatus.OK)
+  vnpayIpnGet(@Query() query: VnpayIpnQuery): Promise<VnpayIpnResponse> {
+    return this.payments.handleVnpayIpn(query);
+  }
+
+  @SkipThrottle()
+  @Post('vnpay/ipn')
+  @HttpCode(HttpStatus.OK)
+  vnpayIpnPost(@Query() query: VnpayIpnQuery, @Body() body: VnpayIpnQuery): Promise<VnpayIpnResponse> {
+    // VNPay có thể gửi params trong query hoặc trong body
+    const combined = { ...body, ...query };
+    return this.payments.handleVnpayIpn(combined);
+  }
+
+  /**
+   * VNPay opens this URL in the customer's browser after checkout.
+   * Keep the public callback on the backend, then send the browser to the
+   * frontend page that renders the result. The IPN endpoint remains the
+   * server-to-server source of truth for payment settlement.
+   */
+  @SkipThrottle()
+  @Get('vnpay/return')
+  vnpayReturn(@Query() query: VnpayIpnQuery, @Res() response: Response): void {
+    const frontendReturnUrl = new URL(`${getFrontendUrl()}/orders/vnpay-return`);
+    for (const [key, value] of Object.entries(query)) {
+      if (typeof value === 'string') frontendReturnUrl.searchParams.set(key, value);
+    }
+    response.redirect(HttpStatus.FOUND, frontendReturnUrl.toString());
   }
 }

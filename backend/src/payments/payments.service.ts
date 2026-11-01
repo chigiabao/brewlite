@@ -7,7 +7,7 @@ import {
 import { createHash } from 'node:crypto';
 import type Stripe from 'stripe';
 import type { Payment, Prisma } from '../generated/prisma/client.js';
-import { OrderStatus, PaymentStatus } from '../generated/prisma/enums.js';
+import { OrderStatus, PaymentGateway, PaymentMethod, PaymentStatus } from '../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
   getCheckoutSessionTtlSeconds,
@@ -23,10 +23,12 @@ import {
 } from './orders-payment.port.js';
 import { PaymentError, PaymentErrorCode } from './payment.errors.js';
 import { STRIPE_CLIENT } from './stripe.provider.js';
+import { VnpayService, type VnpayIpnQuery } from './vnpay/vnpay.service.js';
 import type {
   CreateCheckoutResult,
   PayInput,
   StripeWebhookResult,
+  VnpayIpnResponse,
 } from './payment.types.js';
 
 const IDEMPOTENCY_KEY_MAX_LENGTH = 200;
@@ -111,6 +113,7 @@ export class PaymentsService {
     @Inject(STRIPE_CLIENT) private readonly stripe: Stripe,
     @Inject(ORDERS_PAYMENT_PORT) private readonly orders: OrdersPaymentPort,
     @Inject(REWARDS_PORT) private readonly rewards: RewardsPort,
+    private readonly vnpayService: VnpayService,
   ) {}
 
   // ============================================================
@@ -165,7 +168,7 @@ export class PaymentsService {
               404,
             );
           }
-          return this.ensureCheckoutSession(active, order, true);
+          return this.ensureCheckoutSession(active, order, true, input);
         }
 
         throw error;
@@ -176,6 +179,7 @@ export class PaymentsService {
           outcome.payment,
           outcome.order,
           outcome.reusedActive,
+          input,
         );
         return {
           ...result,
@@ -263,13 +267,15 @@ export class PaymentsService {
         return { payment: active, order, reusedActive: true };
       }
 
+      const gateway = input.method === 'VNPAY' ? PaymentGateway.VNPAY : PaymentGateway.STRIPE;
       const payment = await tx.payment.create({
         data: {
           orderId: order.id,
           idempotencyKey: input.idempotencyKey!,
           requestHash,
           amount: order.total,
-          method: input.method,
+          method: input.method as PaymentMethod,
+          gateway,
           status: PaymentStatus.PENDING,
         },
       });
@@ -336,14 +342,19 @@ export class PaymentsService {
       );
     }
 
-    return this.ensureCheckoutSession(existing, order, true);
+    return this.ensureCheckoutSession(existing, order, true, input);
   }
 
   private async ensureCheckoutSession(
     payment: Payment,
     order: PayableOrder,
     idempotentReplay: boolean,
+    input?: PayInput,
   ): Promise<CreateCheckoutResult> {
+    if (payment.gateway === PaymentGateway.VNPAY || payment.method === PaymentMethod.VNPAY) {
+      return this.ensureVnpaySession(payment, order, idempotentReplay, input);
+    }
+
     if (payment.stripeSessionId && payment.stripeCheckoutUrl) {
       const expiresAt = payment.stripeSessionExpiresAt?.getTime() ?? 0;
       if (expiresAt > Date.now()) {
@@ -406,6 +417,44 @@ export class PaymentsService {
         data: {
           stripeSessionId: session.id,
           stripeCheckoutUrl: session.url,
+          stripeSessionExpiresAt: sessionExpiresAt,
+        },
+      });
+      await this.extendOrderCheckoutWindow(tx, payment.orderId, sessionExpiresAt);
+      return next;
+    });
+
+    return this.toCheckoutResult(updated, idempotentReplay);
+  }
+
+  private async ensureVnpaySession(
+    payment: Payment,
+    order: PayableOrder,
+    idempotentReplay: boolean,
+    input?: PayInput,
+  ): Promise<CreateCheckoutResult> {
+    if (payment.stripeCheckoutUrl) {
+      const expiresAt = payment.stripeSessionExpiresAt?.getTime() ?? 0;
+      if (expiresAt > Date.now()) {
+        return this.toCheckoutResult(payment, idempotentReplay);
+      }
+    }
+
+    const { checkoutUrl, txnRef } = this.vnpayService.createPaymentUrl({
+      orderId: order.id,
+      paymentId: payment.id,
+      amount: order.total,
+      ipAddr: input?.ipAddr,
+      bankCode: input?.bankCode,
+    });
+
+    const sessionExpiresAt = new Date(Date.now() + 30 * 60 * 1000);
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const next = await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          vnpTxnRef: txnRef,
+          stripeCheckoutUrl: checkoutUrl,
           stripeSessionExpiresAt: sessionExpiresAt,
         },
       });
@@ -1008,5 +1057,99 @@ export class PaymentsService {
       checkoutUrl: payment.stripeCheckoutUrl,
       idempotentReplay,
     };
+  }
+
+  // ============================================================
+  // VNPAY IPN WEBHOOK HANDLER
+  // ============================================================
+  async handleVnpayIpn(query: VnpayIpnQuery): Promise<VnpayIpnResponse> {
+    if (!this.vnpayService.verifyIpnSignature(query)) {
+      this.logger.warn(`vnpay.ipn.invalid_signature txnRef=${query.vnp_TxnRef}`);
+      return { RspCode: '97', Message: 'Invalid Checksum' };
+    }
+
+    const txnRef = query.vnp_TxnRef;
+    if (!txnRef) {
+      return { RspCode: '01', Message: 'Order not found' };
+    }
+
+    const payment = await this.prisma.payment.findUnique({
+      where: { vnpTxnRef: txnRef },
+      include: { order: true },
+    });
+
+    if (!payment) {
+      this.logger.warn(`vnpay.ipn.payment_not_found txnRef=${txnRef}`);
+      return { RspCode: '01', Message: 'Order not found' };
+    }
+
+    const vnpAmount = Number(query.vnp_Amount);
+    const expectedAmount = payment.amount * 100;
+    if (vnpAmount !== expectedAmount) {
+      this.logger.warn(
+        `vnpay.ipn.invalid_amount expected=${expectedAmount} received=${vnpAmount} paymentId=${payment.id}`,
+      );
+      return { RspCode: '04', Message: 'Invalid amount' };
+    }
+
+    if (payment.status === PaymentStatus.SUCCEEDED) {
+      return { RspCode: '02', Message: 'Order already confirmed' };
+    }
+
+    const isSuccess = query.vnp_ResponseCode === '00';
+    const payDate = this.vnpayService.parseIpnPayDate(query.vnp_PayDate);
+
+    return this.prisma.$transaction(async (tx) => {
+      if (isSuccess) {
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: {
+            status: PaymentStatus.SUCCEEDED,
+            transactionId: query.vnp_TransactionNo ?? txnRef,
+            vnpTransactionNo: query.vnp_TransactionNo,
+            vnpBankCode: query.vnp_BankCode,
+            vnpCardType: query.vnp_CardType,
+            vnpPayDate: payDate ?? new Date(),
+            paidAt: new Date(),
+          },
+        });
+
+        if (payment.order.status === OrderStatus.PAYMENT_FAILED) {
+          await this.orders.markPending(payment.order.id, tx);
+        }
+        await this.orders.markPaid(payment.order.id, payment.id, tx);
+
+        await this.rewards.finalizeRewardsOnPaid(
+          {
+            orderId: payment.order.id,
+            userId: payment.order.userId,
+            totalPaid: payment.order.total,
+            pointsRedeemed: payment.order.pointsRedeemed ?? 0,
+          },
+          tx,
+        );
+
+        this.logger.log(
+          `vnpay.payment.succeeded orderId=${payment.order.id} paymentId=${payment.id} txnRef=${txnRef}`,
+        );
+        return { RspCode: '00', Message: 'Confirm Success' };
+      } else {
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: {
+            status: PaymentStatus.FAILED,
+            transactionId: query.vnp_TransactionNo,
+            vnpTransactionNo: query.vnp_TransactionNo,
+            vnpBankCode: query.vnp_BankCode,
+          },
+        });
+
+        await this.orders.markPaymentFailed(payment.order.id, payment.id, tx);
+        this.logger.warn(
+          `vnpay.payment.failed orderId=${payment.order.id} paymentId=${payment.id} code=${query.vnp_ResponseCode}`,
+        );
+        return { RspCode: '00', Message: 'Confirm Success' };
+      }
+    });
   }
 }

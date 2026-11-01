@@ -17,13 +17,13 @@ services:
 
   backend:
     build: ./backend
+    env_file:
+      - ./backend/.env
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-brew}:${POSTGRES_PASSWORD:-brew}@db:5432/${POSTGRES_DB:-brewlite}
       JWT_SECRET: ${JWT_SECRET:-local-only-change-me-before-deploy}
       FRONTEND_URL: http://localhost:3000
       PORT: 3001
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
     depends_on:
       db:
         condition: service_healthy

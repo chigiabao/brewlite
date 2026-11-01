@@ -469,7 +469,30 @@ export default function CheckoutPage() {
           <div className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-3">
             Chọn phương thức thanh toán
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <label
+              className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition ${
+                selectedMethod === 'VNPAY'
+                  ? 'bg-amber-500/10 border-amber-500/50 text-stone-100'
+                  : 'bg-stone-950 border-stone-800/80 text-stone-400 hover:border-stone-700'
+              }`}
+            >
+              <input
+                type="radio"
+                name="paymentMethod"
+                checked={selectedMethod === 'VNPAY'}
+                disabled={loading || Boolean(checkoutSession?.attempt)}
+                onChange={() => setMethod('VNPAY')}
+                className="accent-amber-500"
+              />
+              <div>
+                <div className="font-semibold text-sm flex items-center gap-1.5 text-amber-400">
+                  <span>📱</span> VNPAY-QR
+                </div>
+                <div className="text-[11px] text-stone-400">Quét mã QR qua ngân hàng</div>
+              </div>
+            </label>
+
             <label
               className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition ${
                 selectedMethod === 'WALLET'
