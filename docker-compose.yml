@@ -22,8 +22,11 @@ services:
       JWT_SECRET: ${JWT_SECRET:-local-only-change-me-before-deploy}
       FRONTEND_URL: http://localhost:3000
       PORT: 3001
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      # FIX 11: mặc định demo offline không cần Stripe; đổi thành STRIPE khi có key thật.
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-MOCK}
+      MOCK_GATEWAY_TEST_MODE: ${MOCK_GATEWAY_TEST_MODE:-true}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
     depends_on:
       db:
         condition: service_healthy
@@ -46,6 +49,7 @@ services:
       context: ./frontend
       args:
         NEXT_PUBLIC_API_URL: http://localhost:3001
+        NEXT_PUBLIC_PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-MOCK}
     depends_on:
       backend:
         condition: service_healthy

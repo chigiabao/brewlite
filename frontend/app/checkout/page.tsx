@@ -7,6 +7,9 @@ import { api, ApiError } from '@/lib/api';
 import { CHECKOUT_SESSION_KEY, clearCheckoutSession, isDefinitivePaymentFailure, isPaidOrderStatus, jwtSubject, loadCheckoutSession, saveCheckoutSession, type CheckoutSession } from '@/lib/checkout-session';
 import { useCart } from '@/store/cart';
 
+// FIX 11: Hai luồng riêng biệt. Mock trả kết quả ngay; Stripe chuyển tới trang thanh toán.
+const STRIPE_MODE = process.env.NEXT_PUBLIC_PAYMENT_PROVIDER === 'STRIPE';
+
 function subscribe(callback: () => void) {
   window.addEventListener('storage', callback);
   return () => window.removeEventListener('storage', callback);
@@ -47,7 +50,7 @@ export default function CheckoutPage() {
 
   const token = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const isLoggedIn = Boolean(token);
-  const [method, setMethod] = useState<'WALLET' | 'CARD'>('WALLET');
+  const [method, setMethod] = useState<'WALLET' | 'CARD'>(STRIPE_MODE ? 'CARD' : 'WALLET');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
@@ -125,6 +128,7 @@ export default function CheckoutPage() {
   );
   const previewPoints = Math.min(pointsRequested, maxRedeemable);
   const sessionMismatch = Boolean(checkoutSession && checkoutSession.cartKey !== cartSignature);
+  const providerMismatch = Boolean(checkoutSession?.provider && (checkoutSession.provider ?? 'MOCK') !== (STRIPE_MODE ? 'STRIPE' : 'MOCK'));
   const selectedMethod = checkoutSession?.attempt?.method ?? method;
   const savedOrder = checkoutSession?.cartKey === cartSignature && checkoutSession.orderId !== null
     ? checkoutSession : null;
@@ -186,7 +190,7 @@ export default function CheckoutPage() {
   };
 
   const handlePay = async () => {
-    if (inFlight.current || sessionMismatch || !items.length) return;
+    if (inFlight.current || sessionMismatch || providerMismatch || !items.length) return;
     const activeToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     const subject = jwtSubject(activeToken);
     if (!activeToken || !subject) {
@@ -212,7 +216,7 @@ export default function CheckoutPage() {
       if (!current) {
         // LƯU TRƯỚC KHI POST: mất mạng ở bước tạo Order vẫn retry cùng key + cùng payload.
         current = {
-          version: 1, subject, cartKey: cartSignature,
+          version: 1, subject, cartKey: cartSignature, provider: STRIPE_MODE ? 'STRIPE' : 'MOCK',
           orderKey: crypto.randomUUID(),
           orderRequest: {
             items: items.map(({ productId, size, toppings, qty }) => ({ productId, size, toppings, qty })),
@@ -261,6 +265,25 @@ export default function CheckoutPage() {
       const attempt = current.attempt;
       // Kiểm tra rõ ràng để TypeScript và runtime không dùng một lượt thanh toán rỗng.
       if (!attempt) throw new Error('Chưa tạo được khóa thanh toán, vui lòng thử lại.');
+      if (STRIPE_MODE) {
+        // Stripe chỉ mở phiên. KHÔNG xóa giỏ/ghi PAID khi vừa nhận checkoutUrl.
+        // Việc xác nhận và xóa giỏ thực hiện sau khi GET /orders/:id trả PAID.
+        const checkout = await api<{ orderId: number; checkoutUrl: string; status: string }>('/payments/checkout', {
+          method: 'POST', headers: { 'Idempotency-Key': attempt.key },
+          body: JSON.stringify({ orderId, method: attempt.method }),
+        });
+        if (checkout.orderId !== orderId || checkout.status !== 'PENDING') {
+          throw new Error('Phiên Stripe trả dữ liệu không hợp lệ; hãy kiểm tra lịch sử đơn.');
+        }
+        const target = new URL(checkout.checkoutUrl);
+        // Không tin URL điều hướng ngoài từ API bị can thiệp.
+        if (target.protocol !== 'https:' || target.hostname !== 'checkout.stripe.com') {
+          throw new Error('URL Stripe không hợp lệ; không tự động chuyển trang.');
+        }
+        window.location.assign(checkout.checkoutUrl);
+        return;
+      }
+
       const res = await api<{ orderId: number; status: string; orderStatus: string }>('/payments', {
         method: 'POST',
         headers: { 'Idempotency-Key': attempt.key },
@@ -298,6 +321,7 @@ export default function CheckoutPage() {
       }
       if (current?.orderId !== null && current?.orderId !== undefined &&
           (isDefinitivePaymentFailure(apiError?.status, apiError?.code) ||
+            (apiError?.status === 409 && apiError.code === 'STRIPE_SESSION_EXPIRED') ||
             apiError?.status === 400)) {
         // Backend đã trả kết quả lỗi rõ ràng; lần thử MỚI dùng payment key mới.
         saveCheckoutSession({ ...current, attempt: null });
@@ -469,6 +493,7 @@ export default function CheckoutPage() {
             Chọn phương thức thanh toán
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {!STRIPE_MODE && (
             <label
               className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition ${
                 selectedMethod === 'WALLET'
@@ -488,9 +513,10 @@ export default function CheckoutPage() {
                 <div className="font-semibold text-sm flex items-center gap-1.5">
                   <span>📱</span> Ví điện tử
                 </div>
-                <div className="text-[11px] text-stone-400">MoMo / ZaloPay (Không tiền mặt)</div>
+                <div className="text-[11px] text-stone-400">Ví điện tử giả lập (không liên kết MoMo/ZaloPay thật)</div>
               </div>
             </label>
+            )}
 
             <label
               className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition ${
@@ -511,14 +537,14 @@ export default function CheckoutPage() {
                 <div className="font-semibold text-sm flex items-center gap-1.5">
                   <span>💳</span> Thẻ ngân hàng
                 </div>
-                <div className="text-[11px] text-stone-400">ATM Napas / Visa / Mastercard</div>
+                <div className="text-[11px] text-stone-400">{STRIPE_MODE ? 'Thẻ được xử lý trên Stripe Checkout' : 'Thẻ giả lập, không trừ tiền thật'}</div>
               </div>
             </label>
           </div>
         </div>
 
-        {/* Công cụ demo cho giảng viên (US-05 Acceptance Criteria) */}
-        <div className="py-3 px-3.5 my-4 bg-stone-950/70 border border-stone-800 rounded-xl">
+        {/* Công cụ demo cho giảng viên (US-05 Acceptance Criteria), chỉ có ở Mock */}
+        {!STRIPE_MODE && <div className="py-3 px-3.5 my-4 bg-stone-950/70 border border-stone-800 rounded-xl">
           <label className="flex items-center gap-2.5 cursor-pointer text-xs text-stone-400 hover:text-stone-300">
             <input
               type="checkbox"
@@ -531,7 +557,7 @@ export default function CheckoutPage() {
               <strong className="text-amber-400">[Demo cho GV]:</strong> Gửi yêu cầu mô phỏng ngân hàng từ chối <em>qua backend thật</em> (đơn chuyển <code className="text-red-400">PAYMENT_FAILED</code>). Cần bật <code>MOCK_GATEWAY_TEST_MODE=true</code> trên backend local.
             </span>
           </label>
-        </div>
+        </div>}
 
         {/* Tổng kết tiền */}
         <div className="space-y-1.5 py-3 text-sm">
@@ -562,6 +588,11 @@ export default function CheckoutPage() {
           </div>
         </div>
 
+        {providerMismatch && (
+          <p role="alert" className="text-amber-300 text-xs mt-3">
+            Chế độ thanh toán đã thay đổi. Vui lòng kiểm tra đơn trong lịch sử trước khi tạo giao dịch mới.
+          </p>
+        )}
         {sessionMismatch && (
           <div role="alert" className="mt-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">
             Giỏ hàng đã thay đổi so với phiên thanh toán được lưu. Để tránh tạo đơn trùng, hãy kiểm tra
@@ -593,10 +624,10 @@ export default function CheckoutPage() {
           </Link>
           <button
             onClick={handlePay}
-            disabled={loading || validatingCoupon || sessionMismatch || !cartHydrated}
+            disabled={loading || validatingCoupon || sessionMismatch || providerMismatch || !cartHydrated}
             className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-stone-950 font-bold text-center text-sm shadow-lg shadow-amber-500/20 disabled:opacity-50 transition"
           >
-            {loading ? 'Đang xử lý giao dịch…' : checkoutSession?.attempt ? 'Thử lại giao dịch cũ' : checkoutSession ? 'Tiếp tục thanh toán' : 'Xác nhận thanh toán'}
+            {loading ? (STRIPE_MODE ? 'Đang mở Stripe…' : 'Đang xử lý giao dịch…') : checkoutSession?.attempt ? 'Thử lại giao dịch cũ' : checkoutSession ? 'Tiếp tục thanh toán' : 'Xác nhận thanh toán'}
           </button>
         </div>
       </div>

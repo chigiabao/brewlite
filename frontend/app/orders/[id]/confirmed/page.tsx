@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { useSyncExternalStore } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { api } from '@/lib/api';
-import { isPaidOrderStatus } from '@/lib/checkout-session';
+import { clearCheckoutSession, isPaidOrderStatus, loadCheckoutSession } from '@/lib/checkout-session';
+import { useCart } from '@/store/cart';
 
 type OrderDetail = {
   id: number;
@@ -30,6 +31,12 @@ const STATUS_LABEL: Record<string, string> = {
 export default function ConfirmedPage() {
   const { id } = useParams<{ id: string }>();
   const token = useSyncExternalStore(subscribe, tokenSnapshot, serverTokenSnapshot);
+  // FIX 11: bảo đảm giỏ đã hydrate trước khi dọn sau Stripe webhook.
+  const cartHydrated = useSyncExternalStore(
+    (callback) => useCart.persist.onFinishHydration(callback),
+    () => useCart.persist.hasHydrated(),
+    () => false,
+  );
   const orderId = Number(id);
   const validId = Number.isSafeInteger(orderId) && orderId > 0;
   const { data: order, isLoading, error, refetch, isFetching } = useQuery({
@@ -39,9 +46,28 @@ export default function ConfirmedPage() {
     retry: 1,
     staleTime: 0,
     refetchOnMount: 'always',
+    // Webhook Stripe có thể đến sau redirect; tự cập nhật khi đơn chưa PAID.
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status && isPaidOrderStatus(status) ? false : 3000;
+    },
   });
   const paid = Boolean(order && isPaidOrderStatus(order.status));
   const label = order ? (STATUS_LABEL[order.status] ?? order.status) : '';
+
+  useEffect(() => {
+    if (!paid || !token || !cartHydrated) return;
+    const session = loadCheckoutSession(token);
+    if (!session || session.orderId !== orderId) return;
+    // Chỉ xóa GIỎ ĐÃ THANH TOÁN. Nếu user thay giỏ trong tab, giữ giỏ mới.
+    const currentCartKey = JSON.stringify(useCart.getState().items.map(
+      ({ productId, size, toppings, qty, unitPrice }) => ({
+        productId, size, toppings: [...toppings].sort(), qty, unitPrice,
+      }),
+    ));
+    if (session.cartKey === currentCartKey) useCart.getState().clear();
+    clearCheckoutSession();
+  }, [paid, token, orderId, cartHydrated]);
 
   return (
     <div className="max-w-lg mx-auto py-12 px-4">

@@ -1,4 +1,20 @@
 const DEFAULT_FRONTEND_URL = 'http://localhost:3000';
+
+// FIX 11: Mock phục vụ demo trên máy cá nhân; môi trường production bắt buộc Stripe.
+export type PaymentProvider = 'MOCK' | 'STRIPE';
+export function getPaymentProvider(): PaymentProvider {
+  const raw = (process.env.PAYMENT_PROVIDER || 'MOCK').trim().toUpperCase();
+  if (raw !== 'MOCK' && raw !== 'STRIPE') {
+    throw new Error('PAYMENT_PROVIDER must be MOCK or STRIPE');
+  }
+  return raw;
+}
+
+export function isMockDeclineEnabled(): boolean {
+  return !isProduction() && getPaymentProvider() === 'MOCK' &&
+    process.env.MOCK_GATEWAY_TEST_MODE === 'true';
+}
+
 const DEFAULT_ORDER_EXPIRY_MINUTES = 30;
 const DEFAULT_CHECKOUT_TTL_MINUTES = 31;
 
@@ -88,13 +104,20 @@ export function validateEnvironment(): void {
   const required = [
     'DATABASE_URL',
     'JWT_SECRET',
-    'STRIPE_SECRET_KEY',
-    'STRIPE_WEBHOOK_SECRET',
   ] as const;
 
   for (const key of required) {
     if (!process.env[key]?.trim()) errors.push(`${key} is required`);
   }
+
+  // Chỉ bắt buộc Stripe keys khi cấu hình cổng Stripe.
+  try {
+    if (getPaymentProvider() === 'STRIPE') {
+      for (const key of ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET']) {
+        if (!process.env[key]?.trim()) errors.push(`${key} is required for Stripe`);
+      }
+    }
+  } catch (error) { errors.push((error as Error).message); }
 
   try {
     getAllowedOrigins();
@@ -111,6 +134,12 @@ export function validateEnvironment(): void {
   }
 
   if (isProduction()) {
+    if (getPaymentProvider() !== 'STRIPE') {
+      errors.push('Mock Payment is forbidden in production; use PAYMENT_PROVIDER=STRIPE');
+    }
+    if (process.env.MOCK_GATEWAY_TEST_MODE === 'true') {
+      errors.push('MOCK_GATEWAY_TEST_MODE must not be enabled in production');
+    }
     const jwtSecret = process.env.JWT_SECRET ?? '';
     if (jwtSecret.length < 32) {
       errors.push('JWT_SECRET must be at least 32 characters in production');
