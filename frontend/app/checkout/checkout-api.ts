@@ -44,7 +44,7 @@ export type CreateCheckoutResult = {
   idempotentReplay: boolean;
 };
 
-export type CheckoutMethod = 'WALLET' | 'CARD';
+export type CheckoutMethod = 'WALLET' | 'CARD' | 'VNPAY';
 
 export async function createOrder(
   input: CreateOrderRequest,

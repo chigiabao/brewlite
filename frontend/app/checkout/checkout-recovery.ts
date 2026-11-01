@@ -1,4 +1,4 @@
-export type CheckoutMethod = 'WALLET' | 'CARD';
+export type CheckoutMethod = 'WALLET' | 'CARD' | 'VNPAY';
 
 export type CheckoutAttempt = {
   cartKey: string;

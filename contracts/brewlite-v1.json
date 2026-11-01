@@ -73,7 +73,8 @@
   },
   "paymentMethods": [
     "WALLET",
-    "CARD"
+    "CARD",
+    "VNPAY"
   ],
   "api": [
     {
