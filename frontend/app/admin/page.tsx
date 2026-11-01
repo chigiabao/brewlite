@@ -31,8 +31,15 @@ const STATUS_LABELS: Record<string, { label: string; bg: string; text: string; b
   PAYMENT_FAILED: { label: 'Thanh toán lỗi', bg: 'bg-rose-950/60', text: 'text-rose-400', border: 'border-rose-700/50' },
 };
 
+type AdminTab = 'overview' | 'orders' | 'products' | 'coupons' | 'users';
+type StockFilter = 'ALL' | 'LOW' | 'NORMAL';
+
+const DEFAULT_COUPON_EXPIRY = new Date(
+  Date.now() + 60 * 24 * 60 * 60 * 1000,
+).toISOString().slice(0, 10);
+
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'orders' | 'products' | 'coupons' | 'users'>('overview');
+  const [activeTab, setActiveTab] = useState<AdminTab>('overview');
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
@@ -54,7 +61,7 @@ export default function AdminPage() {
 
   // Bộ lọc sản phẩm
   const [productSearch, setProductSearch] = useState('');
-  const [stockFilter, setStockFilter] = useState<'ALL' | 'LOW' | 'NORMAL'>('ALL');
+  const [stockFilter, setStockFilter] = useState<StockFilter>('ALL');
 
   // Modals state
   const [selectedOrder, setSelectedOrder] = useState<AdminOrder | null>(null);
@@ -71,7 +78,7 @@ export default function AdminPage() {
     discountAmount: 0,
     minOrderValue: 0,
     maxUses: 100,
-    expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+    expiresAt: DEFAULT_COUPON_EXPIRY,
   });
   const [pointsDelta, setPointsDelta] = useState(50);
 
@@ -80,30 +87,8 @@ export default function AdminPage() {
     setTimeout(() => setToast(null), 3500);
   }, []);
 
-  // FIX 10: server kiểm chứng quyền bằng JWT + role trong CSDL.
-  // Email trong payload JWT/localStorage tuyệt đối KHÔNG chứng minh quyền Admin.
-  useEffect(() => {
-    let cancelled = false;
-    const checkAccess = async () => {
-      try {
-        const session = await adminApi.getSession();
-        if (cancelled) return;
-        setCurrentUserEmail(session.email);
-        setIsAdminVerified(true);
-      } catch {
-        if (cancelled) return;
-        setCurrentUserEmail(null);
-        setIsAdminVerified(false);
-      } finally {
-        if (!cancelled) setIsCheckingAccess(false);
-      }
-    };
-    void checkAccess();
-    return () => { cancelled = true; };
-  }, []);
-
-  const refreshAll = useCallback(async () => {
-    if (!isAdminVerified) return;
+  const refreshAll = useCallback(async (verified = isAdminVerified) => {
+    if (!verified) return;
     setLoading(true);
     try {
       // Không nuốt lỗi 401/403 để tránh hiển thị dashboard với dữ liệu giả trống.
@@ -127,7 +112,28 @@ export default function AdminPage() {
     }
   }, [showToast, isAdminVerified]);
 
-  useEffect(() => { void refreshAll(); }, [refreshAll]);
+  // FIX 10: server kiểm chứng quyền bằng JWT + role trong CSDL.
+  // Email trong payload JWT/localStorage tuyệt đối KHÔNG chứng minh quyền Admin.
+  useEffect(() => {
+    let cancelled = false;
+    const checkAccess = async () => {
+      try {
+        const session = await adminApi.getSession();
+        if (cancelled) return;
+        setCurrentUserEmail(session.email);
+        setIsAdminVerified(true);
+        await refreshAll(true);
+      } catch {
+        if (cancelled) return;
+        setCurrentUserEmail(null);
+        setIsAdminVerified(false);
+      } finally {
+        if (!cancelled) setIsCheckingAccess(false);
+      }
+    };
+    void checkAccess();
+    return () => { cancelled = true; };
+  }, [refreshAll]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -365,7 +371,7 @@ export default function AdminPage() {
 
             {/* Refresh Button */}
             <button
-              onClick={refreshAll}
+              onClick={() => { void refreshAll(); }}
               disabled={loading}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-300 text-xs font-semibold border border-stone-800 transition shadow"
               title="Tải lại toàn bộ dữ liệu CSDL"
@@ -412,7 +418,7 @@ export default function AdminPage() {
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id as AdminTab)}
               className={`flex items-center gap-2 py-3.5 px-4 text-xs sm:text-sm font-bold whitespace-nowrap transition-all border-b-2 ${
                 activeTab === tab.id
                   ? 'border-amber-400 text-amber-300 bg-amber-950/30'
@@ -1033,7 +1039,7 @@ export default function AdminPage() {
                 />
                 <select
                   value={stockFilter}
-                  onChange={(e) => setStockFilter(e.target.value as any)}
+                  onChange={(e) => setStockFilter(e.target.value as StockFilter)}
                   className="bg-stone-950 border border-stone-700/80 rounded-xl px-3 py-2 text-xs text-stone-300 focus:outline-none focus:border-amber-500"
                 >
                   <option value="ALL">Mọi mức tồn kho</option>
