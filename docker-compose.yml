@@ -17,8 +17,6 @@ services:
 
   backend:
     build: ./backend
-    env_file:
-      - ./backend/.env
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-brew}:${POSTGRES_PASSWORD:-brew}@db:5432/${POSTGRES_DB:-brewlite}
       JWT_SECRET: ${JWT_SECRET:-local-only-change-me-before-deploy}
