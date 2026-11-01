@@ -47,6 +47,19 @@ test('unknown result keeps same order and payment idempotency keys on reload', (
   clearCheckoutSession();
 });
 
+test('VNPay attempt survives reload so retry keeps the original order', () => {
+  const s = session();
+  s.orderId = 1570;
+  s.orderTotal = 40000;
+  s.pointsRedeemed = 0;
+  s.attempt = { key:'vnpay-payment-key-1', method:'VNPAY', demoDecline:false };
+  saveCheckoutSession(s);
+  const restored = loadCheckoutSession(alice);
+  assert.equal(restored?.orderId, 1570);
+  assert.deepEqual(restored?.attempt, s.attempt);
+  clearCheckoutSession();
+});
+
 test('paid is only true for paid or subsequent processing states', () => {
   for (const status of ['PAID','PREPARING','READY','COMPLETED']) assert.equal(isPaidOrderStatus(status), true);
   for (const status of ['PENDING','PAYMENT_FAILED','CANCELLED']) assert.equal(isPaidOrderStatus(status), false);

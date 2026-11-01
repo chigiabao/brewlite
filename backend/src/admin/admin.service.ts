@@ -255,7 +255,10 @@ export class AdminService {
         select: { userId: true, status: true },
       });
       if (!order) throw new NotFoundException(`Không tìm thấy đơn hàng #${orderId}`);
-      if (![OrderStatus.PENDING, OrderStatus.PAYMENT_FAILED].includes(order.status)) {
+      if (
+        order.status !== OrderStatus.PENDING &&
+        order.status !== OrderStatus.PAYMENT_FAILED
+      ) {
         throw new ConflictException(
           'Chỉ được hủy đơn chưa thanh toán. Đơn đã thanh toán cần quy trình hoàn tiền thực.',
         );

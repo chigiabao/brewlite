@@ -99,6 +99,26 @@ export function getRateLimitPerMinute(): number {
   return Math.max(10, Math.min(limit, 10_000));
 }
 
+export interface VnpayConfig {
+  tmnCode: string;
+  hashSecret: string;
+  url: string;
+  returnUrl: string;
+  ipnUrl: string;
+}
+
+export function getVnpayConfig(): VnpayConfig {
+  const tmnCode = process.env.VNPAY_TMN_CODE?.trim() || '2QXUI4B4';
+  const hashSecret = process.env.VNPAY_HASH_SECRET?.trim() || 'RA3KNOEAW2MYGQG30C3L0B5O1W86Q78W';
+  const url = process.env.VNPAY_URL?.trim() || 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html';
+  const frontendUrl = getFrontendUrl();
+  const returnUrl = process.env.VNPAY_RETURN_URL?.trim() || `${frontendUrl}/orders/vnpay-return`;
+  const backendUrl = `http://localhost:${process.env.PORT ?? '3001'}`;
+  const ipnUrl = process.env.VNPAY_IPN_URL?.trim() || `${backendUrl}/payments/vnpay/ipn`;
+
+  return { tmnCode, hashSecret, url, returnUrl, ipnUrl };
+}
+
 export function validateEnvironment(): void {
   const errors: string[] = [];
   const required = [

@@ -17,16 +17,13 @@ services:
 
   backend:
     build: ./backend
+    env_file:
+      - ./backend/.env
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-brew}:${POSTGRES_PASSWORD:-brew}@db:5432/${POSTGRES_DB:-brewlite}
       JWT_SECRET: ${JWT_SECRET:-local-only-change-me-before-deploy}
       FRONTEND_URL: http://localhost:3000
       PORT: 3001
-      # FIX 11: mặc định demo offline không cần Stripe; đổi thành STRIPE khi có key thật.
-      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-MOCK}
-      MOCK_GATEWAY_TEST_MODE: ${MOCK_GATEWAY_TEST_MODE:-true}
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
     depends_on:
       db:
         condition: service_healthy
@@ -37,7 +34,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:3001/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+          "fetch('http://127.0.0.1:3001/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
         ]
       interval: 5s
       timeout: 3s
@@ -49,7 +46,6 @@ services:
       context: ./frontend
       args:
         NEXT_PUBLIC_API_URL: http://localhost:3001
-        NEXT_PUBLIC_PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-MOCK}
     depends_on:
       backend:
         condition: service_healthy

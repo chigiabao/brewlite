@@ -76,8 +76,10 @@ export class MockPaymentService {
         }
         if (existing.status === PaymentStatus.SUCCEEDED || existing.status === PaymentStatus.FAILED) {
           if (existing.status === PaymentStatus.SUCCEEDED &&
-              ![OrderStatus.PAID, OrderStatus.PREPARING, OrderStatus.READY,
-                OrderStatus.COMPLETED].includes(order.status)) {
+              order.status !== OrderStatus.PAID &&
+              order.status !== OrderStatus.PREPARING &&
+              order.status !== OrderStatus.READY &&
+              order.status !== OrderStatus.COMPLETED) {
             throw new PaymentError(PaymentErrorCode.ORDER_NOT_PAYABLE,
               'Đơn đã thay đổi trạng thái sau lần thanh toán thành công', 409);
           }

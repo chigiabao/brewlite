@@ -31,6 +31,12 @@ enum OrderStatus {
 enum PaymentMethod {
   WALLET
   CARD
+  VNPAY
+}
+
+enum PaymentGateway {
+  STRIPE
+  VNPAY
 }
 
 enum PaymentStatus {
@@ -119,10 +125,18 @@ model Payment {
   requestHash    String // Cùng key, khác payload => 409
   amount         Int
   method         PaymentMethod
+  gateway        PaymentGateway @default(STRIPE)
   status         PaymentStatus @default(PENDING)
   transactionId  String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+
+  // VNPay fields
+  vnpTxnRef              String?   @unique
+  vnpTransactionNo       String?
+  vnpBankCode            String?
+  vnpCardType            String?
+  vnpPayDate             DateTime?
 
   // Stripe fields
   stripeSessionId        String?   @unique // Checkout Session id (cs_...)
