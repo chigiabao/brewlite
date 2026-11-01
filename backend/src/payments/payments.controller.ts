@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -16,9 +17,10 @@ import type { Request } from 'express';
 import type { Response } from 'express';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { CurrentUser, JwtAuthGuard, type AuthUser } from '../auth/public.js';
-import { getFrontendUrl } from '../config/app-config.js';
-import { PayDto } from './payments.dto.js';
+import { getFrontendUrl, getPaymentProvider } from '../config/app-config.js';
+import { MockPayDto, PayDto } from './payments.dto.js';
 import { PaymentsService } from './payments.service.js';
+import { MockPaymentService } from './mock-payment.service.js';
 import type {
   CreateCheckoutResult,
   StripeWebhookResult,
@@ -28,7 +30,31 @@ import type { VnpayIpnQuery } from './vnpay/vnpay.service.js';
 
 @Controller('payments')
 export class PaymentsController {
-  constructor(private readonly payments: PaymentsService) {}
+  constructor(
+    private readonly payments: PaymentsService,
+    private readonly mockPayments: MockPaymentService,
+  ) {}
+
+  @UseGuards(JwtAuthGuard)
+  @Post()
+  @HttpCode(HttpStatus.OK)
+  createMockPayment(
+    @CurrentUser() user: AuthUser,
+    @Headers('idempotency-key') key: string | undefined,
+    @Body() dto: MockPayDto,
+  ) {
+    if (getPaymentProvider() !== 'MOCK') {
+      throw new BadRequestException('Mock payment is disabled; use Stripe checkout');
+    }
+
+    return this.mockPayments.pay({
+      userId: user.userId,
+      orderId: dto.orderId,
+      method: dto.method,
+      idempotencyKey: key,
+      demoDecline: dto.demoDecline === true,
+    });
+  }
 
   @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
@@ -58,6 +84,9 @@ export class PaymentsController {
   @Post(['webhook', 'webhook/stripe'])
   @HttpCode(HttpStatus.OK)
   stripeWebhook(@Req() req: RawBodyRequest<Request>): Promise<StripeWebhookResult> {
+    if (getPaymentProvider() !== 'STRIPE') {
+      throw new BadRequestException('Stripe payment is disabled; use mock payment');
+    }
     const header = req.headers['stripe-signature'];
     const signature = Array.isArray(header) ? header[0] : header;
     return this.payments.handleStripeWebhook(req.rawBody, signature);
