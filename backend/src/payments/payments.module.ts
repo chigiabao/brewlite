@@ -4,6 +4,7 @@ import { RewardsModule } from '../rewards/public.js';
 import { MockOrdersPaymentAdapter, ORDERS_PAYMENT_PORT } from './orders-payment.port.js';
 import { PaymentsController } from './payments.controller.js';
 import { PaymentsService } from './payments.service.js';
+import { MockPaymentService } from './mock-payment.service.js';
 import { stripeProvider } from './stripe.provider.js';
 import { VnpayService } from './vnpay/vnpay.service.js';
 
@@ -15,6 +16,7 @@ import { VnpayService } from './vnpay/vnpay.service.js';
   controllers: [PaymentsController],
   providers: [
     PaymentsService,
+    MockPaymentService,
     VnpayService,
     stripeProvider,
     MockOrdersPaymentAdapter,

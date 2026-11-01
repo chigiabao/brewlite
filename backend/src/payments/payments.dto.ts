@@ -1,4 +1,4 @@
-import { IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 export const PAYMENT_METHODS = ['WALLET', 'CARD', 'VNPAY'] as const;
 export type PaymentMethodInput = (typeof PAYMENT_METHODS)[number];
@@ -14,4 +14,10 @@ export class PayDto {
   @IsOptional()
   @IsString()
   bankCode?: string;
+}
+
+export class MockPayDto extends PayDto {
+  @IsOptional()
+  @IsBoolean()
+  demoDecline?: boolean;
 }
