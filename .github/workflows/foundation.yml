@@ -1,4 +1,4 @@
-name: BrewLite Release Gates (FIX 05)
+name: BrewLite Release Gates (FIX 12)
 
 on:
   push:
@@ -17,6 +17,8 @@ jobs:
           node-version: 24
       - name: Verify Foundation & Shared Contract Lock
         run: node scripts/verify-foundation.mjs
+      - name: FIX 12 release invariants (dependency-free checks)
+        run: node --test scripts/fix12-contract.test.mjs
 
   backend:
     name: Backend (Prisma + Seed x2 + Lint + Build + Unit + E2E)
@@ -101,6 +103,8 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Install dependencies
         run: npm ci
+      - name: Frontend unit tests
+        run: node --experimental-strip-types --test tests/*.test.mjs
       - name: Frontend lint
         run: npm run lint
       - name: Frontend build
@@ -111,7 +115,8 @@ jobs:
     needs: [contract, backend, frontend]
     runs-on: ubuntu-latest
     env:
-      MOCK_GATEWAY_TEST_MODE: 'false'
+      # CI uses a fresh DB; enable the deterministic declined Mock scenario.
+      MOCK_GATEWAY_TEST_MODE: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -139,6 +144,10 @@ jobs:
         run: docker compose exec -T backend node scripts/seed-fingerprint.mjs --compare /tmp/seed-f05-before.json --write /tmp/seed-f05-after.json | tee .ci-artifacts/docker-seed-after.txt
       - name: HTTP + JWT boundary smoke
         run: node scripts/smoke-http.mjs | tee .ci-artifacts/http-smoke.json
+      - name: FIX 12 Mock payment E2E (fresh CI database only)
+        env:
+          BREWLITE_ALLOW_TEST_WRITES: '1'
+        run: node scripts/smoke-e2e.mjs | tee .ci-artifacts/fix12-smoke-e2e.json
       - name: Upload Docker/HTTP verification evidence
         if: always()
         uses: actions/upload-artifact@v4

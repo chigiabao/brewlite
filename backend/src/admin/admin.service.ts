@@ -5,12 +5,15 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { OrderStatus, PaymentStatus } from '../generated/prisma/enums.js';
-import { assertTransition } from '../orders/public.js';
+import { OrderStatus } from '../generated/prisma/enums.js';
+import { OrdersService } from '../orders/public.js';
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly orders: OrdersService,
+  ) {}
 
   // ================= 1. DASHBOARD & STATS =================
   async getDashboardStats() {
@@ -233,91 +236,45 @@ export class AdminService {
     });
   }
 
+  /**
+   * FIX 12 — Admin không được ghi trạng thái tài chính bằng một UPDATE đơn giản.
+   * Pha chế: dùng CAS của OrdersService, tránh ghi đè khi hai nhân viên thao tác đồng thời.
+   * Hủy đơn chưa thanh toán: dùng transaction hoàn kho/coupon/điểm của OrdersService.
+   * Hoàn tiền: bắt buộc đi qua nhà cung cấp và webhook xác minh, không tự đánh dấu REFUNDED.
+   */
   async updateOrderStatus(orderId: number, targetStatus: OrderStatus) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      include: { items: true },
-    });
-
-    if (!order) {
-      throw new NotFoundException(`Không tìm thấy đơn hàng #${orderId}`);
+    if (targetStatus === OrderStatus.REFUNDED) {
+      throw new ConflictException(
+        'Không thể hoàn tiền bằng đổi trạng thái. Dùng quy trình Stripe Refund và webhook xác nhận.',
+      );
     }
 
-    // Kiểm tra tính hợp lệ của luồng chuyển trạng thái theo máy trạng thái
-    assertTransition(order.status, targetStatus);
-
-    return this.prisma.$transaction(async (tx) => {
-      // 1. Nếu hủy đơn hàng (CANCELLED) hoặc hoàn tiền (REFUNDED)
-      if (targetStatus === OrderStatus.CANCELLED || targetStatus === OrderStatus.REFUNDED) {
-        // Hoàn trả tồn kho cho từng sản phẩm
-        for (const item of order.items) {
-          await tx.product.update({
-            where: { id: item.productId },
-            data: {
-              stock: { increment: item.qty },
-              version: { increment: 1 },
-            },
-          });
-        }
-
-        // Cập nhật các giao dịch pending thành FAILED hoặc REFUNDED
-        await tx.payment.updateMany({
-          where: { orderId, status: PaymentStatus.PENDING },
-          data: { status: PaymentStatus.FAILED },
-        });
-
-        if (targetStatus === OrderStatus.REFUNDED) {
-          await tx.payment.updateMany({
-            where: { orderId, status: PaymentStatus.SUCCEEDED },
-            data: { status: PaymentStatus.REFUNDED },
-          });
-        }
-
-        // Hoàn lại lượt dùng voucher nếu có
-        if (order.couponCode) {
-          const coupon = await tx.coupon.findUnique({ where: { code: order.couponCode } });
-          if (coupon && coupon.usedCount > 0) {
-            await tx.coupon.update({
-              where: { code: order.couponCode },
-              data: { usedCount: { decrement: 1 } },
-            });
-          }
-        }
-
-        // Hoàn trả điểm thưởng đã dùng cho khách hàng
-        if (order.pointsRedeemed > 0) {
-          await tx.user.update({
-            where: { id: order.userId },
-            data: { loyaltyPoints: { increment: order.pointsRedeemed } },
-          });
-        }
-
-        // Nếu hoàn tiền (REFUNDED), thu hồi lại số điểm đã tích lũy khi mua đơn
-        if (targetStatus === OrderStatus.REFUNDED) {
-          const earnEntry = await tx.loyaltyEntry.findFirst({
-            where: { orderId, kind: 'EARN' },
-          });
-          if (earnEntry && earnEntry.points > 0) {
-            await tx.user.update({
-              where: { id: order.userId },
-              data: { loyaltyPoints: { decrement: earnEntry.points } },
-            });
-          }
-        }
-      }
-
-      return tx.order.update({
+    if (targetStatus === OrderStatus.CANCELLED) {
+      const order = await this.prisma.order.findUnique({
         where: { id: orderId },
-        data: { status: targetStatus },
-        include: {
-          user: { select: { id: true, email: true } },
-          items: {
-            include: { product: { select: { id: true, name: true, imageUrl: true } } },
-          },
-          payments: true,
-        },
+        select: { userId: true, status: true },
       });
-    });
+      if (!order) throw new NotFoundException(`Không tìm thấy đơn hàng #${orderId}`);
+      if (![OrderStatus.PENDING, OrderStatus.PAYMENT_FAILED].includes(order.status)) {
+        throw new ConflictException(
+          'Chỉ được hủy đơn chưa thanh toán. Đơn đã thanh toán cần quy trình hoàn tiền thực.',
+        );
+      }
+      // Phương thức cancel() sẽ khóa hàng Order và từ chối nếu Payment còn PENDING.
+      return this.orders.cancel(order.userId, orderId);
+    }
+
+    if (
+      targetStatus === OrderStatus.PREPARING ||
+      targetStatus === OrderStatus.READY ||
+      targetStatus === OrderStatus.COMPLETED
+    ) {
+      return this.orders.advancePreparation(orderId, targetStatus);
+    }
+
+    throw new ConflictException(
+      'Admin chỉ chuyển bước pha chế hoặc hủy đơn chưa thanh toán; trạng thái thanh toán do payment xử lý.',
+    );
   }
 
   // ================= 3. QUẢN LÝ SẢN PHẨM & KHO HÀNG =================
@@ -379,26 +336,35 @@ export class AdminService {
     });
   }
 
+  /** FIX 12 — tăng/giảm kho nguyên tử, không read-modify-write gây mất cập nhật. */
   async updateStock(id: number, deltaOrStock: { stock?: number; delta?: number }) {
+    if ((deltaOrStock.stock === undefined) === (deltaOrStock.delta === undefined)) {
+      throw new BadRequestException('Phải truyền đúng một trong hai trường stock hoặc delta');
+    }
     const existing = await this.prisma.product.findUnique({ where: { id } });
-    if (!existing) {
-      throw new NotFoundException(`Không tìm thấy sản phẩm #${id}`);
-    }
+    if (!existing) throw new NotFoundException(`Không tìm thấy sản phẩm #${id}`);
 
-    let nextStock = existing.stock;
-    if (typeof deltaOrStock.stock === 'number') {
-      nextStock = Math.max(0, Math.round(deltaOrStock.stock));
-    } else if (typeof deltaOrStock.delta === 'number') {
-      nextStock = Math.max(0, existing.stock + Math.round(deltaOrStock.delta));
+    if (deltaOrStock.stock !== undefined) {
+      // Gán tuyệt đối phải so phiên bản để không ghi đè lượt đặt đơn vừa trừ tồn kho.
+      const changed = await this.prisma.product.updateMany({
+        where: { id, version: existing.version },
+        data: { stock: deltaOrStock.stock, version: { increment: 1 } },
+      });
+      if (changed.count !== 1) throw new ConflictException('STOCK_CHANGED_RETRY');
+    } else {
+      const delta = deltaOrStock.delta!;
+      // Dùng increment trong SQL để hai yêu cầu nhập/xuất kho không ghi đè nhau.
+      // CAS + stock >= -delta ngăn số âm khi đặt hàng và nhập/xuất đồng thời.
+      const changed = await this.prisma.product.updateMany({
+        where: {
+          id, version: existing.version,
+          ...(delta < 0 ? { stock: { gte: -delta } } : {}),
+        },
+        data: { stock: { increment: delta }, version: { increment: 1 } },
+      });
+      if (changed.count !== 1) throw new ConflictException('STOCK_CHANGED_OR_INSUFFICIENT');
     }
-
-    return this.prisma.product.update({
-      where: { id },
-      data: {
-        stock: nextStock,
-        version: { increment: 1 },
-      },
-    });
+    return this.prisma.product.findUnique({ where: { id } });
   }
 
   async deleteProduct(id: number) {

@@ -922,17 +922,20 @@ export default function AdminPage() {
                             </div>
                           </td>
                           <td className="py-3.5 px-4 text-stone-400">
-                            {order.couponCode ? (
-                              <span className="px-2 py-0.5 rounded bg-amber-950/80 text-amber-300 border border-amber-800/60 text-[10px] font-bold">
-                                {order.couponCode} (-{formatVND(order.discountTotal)})
-                              </span>
-                            ) : order.pointsRedeemed > 0 ? (
-                              <span className="text-[10px] text-purple-300">
-                                -{order.pointsRedeemed} pts (-{formatVND(order.pointsRedeemed * 1000)})
-                              </span>
-                            ) : (
-                              <span className="text-stone-600">—</span>
-                            )}
+                            {/* FIX 12: hiển thị đồng thời coupon và điểm, không bỏ sót khi dùng cả hai. */}
+                            <div className="space-y-1">
+                              {order.couponCode && (
+                                <span className="block px-2 py-0.5 rounded bg-amber-950/80 text-amber-300 border border-amber-800/60 text-[10px] font-bold">
+                                  {order.couponCode} (-{formatVND(Math.max(0, order.discountTotal - order.pointsRedeemed))})
+                                </span>
+                              )}
+                              {order.pointsRedeemed > 0 && (
+                                <span className="block text-[10px] text-purple-300">
+                                  -{order.pointsRedeemed} pts (-{formatVND(order.pointsRedeemed)})
+                                </span>
+                              )}
+                              {!order.couponCode && order.pointsRedeemed === 0 && <span className="text-stone-600">—</span>}
+                            </div>
                           </td>
                           <td className="py-3.5 px-4 font-black text-stone-100 whitespace-nowrap text-sm">
                             {formatVND(order.total)}
@@ -955,16 +958,6 @@ export default function AdminPage() {
                                   >
                                     ☕ Bắt đầu pha
                                   </button>
-                                  <button
-                                    onClick={() => {
-                                      if (confirm(`Xác nhận HỦY đơn hàng #${order.id}? Tồn kho sẽ được hoàn lại.`)) {
-                                        handleUpdateOrderStatus(order.id, 'CANCELLED');
-                                      }
-                                    }}
-                                    className="px-2 py-1 rounded-lg bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-800 text-[11px] font-semibold transition"
-                                  >
-                                    Hủy
-                                  </button>
                                 </>
                               )}
                               {order.status === 'PREPARING' && (
@@ -984,26 +977,17 @@ export default function AdminPage() {
                                 </button>
                               )}
 
-                              {/* Refund Action */}
-                              {(order.status === 'PAID' ||
-                                order.status === 'PREPARING' ||
-                                order.status === 'READY' ||
-                                order.status === 'COMPLETED') && (
+                              {/* FIX 12: không cho chỉnh REFUNDED khi chưa xác nhận hoàn tiền thật.
+                                  PENDING/PAYMENT_FAILED có thể hủy qua OrdersService.cancel(). */}
+                              {(order.status === 'PENDING' || order.status === 'PAYMENT_FAILED') && (
                                 <button
                                   onClick={() => {
-                                    if (
-                                      confirm(
-                                        `Xác nhận HOÀN TIỀN (REFUND) cho đơn hàng #${order.id}? Tồn kho và điểm sẽ được hoàn lại an toàn.`,
-                                      )
-                                    ) {
-                                      handleUpdateOrderStatus(order.id, 'REFUNDED');
+                                    if (confirm(`Hủy đơn chưa thanh toán #${order.id}? Kho và điểm giữ chỗ sẽ được hoàn lại.`)) {
+                                      void handleUpdateOrderStatus(order.id, 'CANCELLED');
                                     }
                                   }}
-                                  className="px-2 py-1 rounded-lg bg-purple-950/60 hover:bg-purple-900 text-purple-300 border border-purple-800 text-[11px] font-semibold transition"
-                                  title="Hoàn tiền đơn hàng"
-                                >
-                                  ↩️ Hoàn tiền
-                                </button>
+                                  className="px-2 py-1 rounded-lg bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-800 text-[11px] font-semibold"
+                                >Hủy đơn chưa trả</button>
                               )}
 
                               <button
@@ -1477,16 +1461,16 @@ export default function AdminPage() {
                 <span>Tạm tính (Subtotal):</span>
                 <span>{formatVND(selectedOrder.subtotal)}</span>
               </div>
-              {selectedOrder.discountTotal > 0 && (
+              {Boolean(selectedOrder.couponCode) && selectedOrder.discountTotal > selectedOrder.pointsRedeemed && (
                 <div className="flex justify-between text-emerald-400">
                   <span>Giảm giá voucher ({selectedOrder.couponCode}):</span>
-                  <span>-{formatVND(selectedOrder.discountTotal)}</span>
+                  <span>-{formatVND(Math.max(0, selectedOrder.discountTotal - selectedOrder.pointsRedeemed))}</span>
                 </div>
               )}
               {selectedOrder.pointsRedeemed > 0 && (
                 <div className="flex justify-between text-purple-400">
                   <span>Đổi điểm tích lũy ({selectedOrder.pointsRedeemed} pts):</span>
-                  <span>-{formatVND(selectedOrder.pointsRedeemed * 1000)}</span>
+                  <span>-{formatVND(selectedOrder.pointsRedeemed)}</span>
                 </div>
               )}
               <div className="pt-2 border-t border-stone-800 flex justify-between text-sm font-black text-amber-300">
@@ -1546,20 +1530,20 @@ export default function AdminPage() {
                   ✅ Hoàn tất & Giao khách
                 </button>
               )}
-              {(selectedOrder.status === 'PAID' ||
-                selectedOrder.status === 'PREPARING' ||
-                selectedOrder.status === 'READY' ||
-                selectedOrder.status === 'COMPLETED') && (
+              {(selectedOrder.status === 'PENDING' || selectedOrder.status === 'PAYMENT_FAILED') && (
                 <button
                   onClick={() => {
-                    if (confirm(`Xác nhận hoàn tiền cho đơn hàng #${selectedOrder.id}?`)) {
-                      handleUpdateOrderStatus(selectedOrder.id, 'REFUNDED');
+                    if (confirm(`Hủy đơn chưa thanh toán #${selectedOrder.id}?`)) {
+                      void handleUpdateOrderStatus(selectedOrder.id, 'CANCELLED');
                     }
                   }}
-                  className="px-4 py-2 rounded-xl bg-purple-950/80 hover:bg-purple-900 text-purple-200 border border-purple-800 font-bold text-xs transition"
-                >
-                  ↩️ Hoàn tiền (Refund)
-                </button>
+                  className="px-4 py-2 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-200 border border-rose-800 font-bold text-xs"
+                >Hủy đơn chưa trả</button>
+              )}
+              {['PAID', 'PREPARING', 'READY', 'COMPLETED'].includes(selectedOrder.status) && (
+                <p className="text-xs text-stone-400 max-w-sm">
+                  Hoàn tiền phải được xác nhận từ Stripe; không thể tự đổi trạng thái đơn sang REFUNDED.
+                </p>
               )}
               <button
                 onClick={() => setSelectedOrder(null)}

@@ -6,6 +6,7 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 describe('AdminService', () => {
   let service: AdminService;
   let mockPrisma: any;
+  let mockOrders: any;
 
   beforeEach(() => {
     mockPrisma = {
@@ -19,6 +20,7 @@ describe('AdminService', () => {
         findUnique: vi.fn(),
         create: vi.fn(),
         update: vi.fn(),
+        updateMany: vi.fn(),
         delete: vi.fn(),
         count: vi.fn(),
       },
@@ -36,6 +38,7 @@ describe('AdminService', () => {
         findUnique: vi.fn(),
         create: vi.fn(),
         update: vi.fn(),
+        updateMany: vi.fn(),
         delete: vi.fn(),
       },
       payment: {
@@ -47,7 +50,11 @@ describe('AdminService', () => {
       $transaction: vi.fn((callback) => callback(mockPrisma)),
     };
 
-    service = new AdminService(mockPrisma);
+    mockOrders = {
+      advancePreparation: vi.fn(),
+      cancel: vi.fn(),
+    };
+    service = new AdminService(mockPrisma, mockOrders);
   });
 
   it('calculates dashboard stats correctly', async () => {
@@ -79,27 +86,81 @@ describe('AdminService', () => {
     expect(stats.totalLoyaltyPoints).toBe(70);
   });
 
-  it('updates order status following state machine', async () => {
-    mockPrisma.order.findUnique.mockResolvedValueOnce({
-      id: 10,
-      status: OrderStatus.PAID,
-      items: [],
-    });
-
-    mockPrisma.order.update.mockResolvedValueOnce({
-      id: 10,
-      status: OrderStatus.PREPARING,
-    });
-
+  it('giao bước pha chế cho OrdersService CAS thay vì ghi status trực tiếp', async () => {
+    mockOrders.advancePreparation.mockResolvedValueOnce({ id: 10, status: OrderStatus.PREPARING });
     const result = await service.updateOrderStatus(10, OrderStatus.PREPARING);
     expect(result.status).toBe(OrderStatus.PREPARING);
+    expect(mockOrders.advancePreparation).toHaveBeenCalledWith(10, OrderStatus.PREPARING);
+    expect(mockPrisma.order.update).not.toHaveBeenCalled();
   });
 
-  it('throws NotFoundException when order does not exist', async () => {
+  it('REFUNDED không được tạo giả khi chưa nhận webhook Stripe', async () => {
+    await expect(service.updateOrderStatus(10, OrderStatus.REFUNDED)).rejects.toThrow(
+      ConflictException,
+    );
+    expect(mockOrders.cancel).not.toHaveBeenCalled();
+    expect(mockOrders.advancePreparation).not.toHaveBeenCalled();
+    expect(mockPrisma.order.update).not.toHaveBeenCalled();
+    expect(mockPrisma.payment.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('từ chối admin tự gán PAID vì phải xử lý qua payment', async () => {
+    await expect(service.updateOrderStatus(10, OrderStatus.PAID)).rejects.toThrow(
+      ConflictException,
+    );
+  });
+
+  it('hủy PENDING qua transaction hoàn stock/coupon/points của OrdersService', async () => {
+    mockPrisma.order.findUnique.mockResolvedValueOnce({ userId: 5, status: OrderStatus.PENDING });
+    mockOrders.cancel.mockResolvedValueOnce({ id: 10, status: OrderStatus.CANCELLED });
+    const result = await service.updateOrderStatus(10, OrderStatus.CANCELLED);
+    expect(result.status).toBe(OrderStatus.CANCELLED);
+    expect(mockOrders.cancel).toHaveBeenCalledWith(5, 10);
+    expect(mockPrisma.order.update).not.toHaveBeenCalled();
+  });
+
+  it('chặn hủy PAID để tránh mất dấu hoàn tiền thật', async () => {
+    mockPrisma.order.findUnique.mockResolvedValueOnce({ userId: 5, status: OrderStatus.PAID });
+    await expect(service.updateOrderStatus(10, OrderStatus.CANCELLED)).rejects.toThrow(
+      ConflictException,
+    );
+    expect(mockOrders.cancel).not.toHaveBeenCalled();
+  });
+
+  it('không tìm thấy đơn cần hủy', async () => {
     mockPrisma.order.findUnique.mockResolvedValueOnce(null);
-    await expect(service.updateOrderStatus(999, OrderStatus.PREPARING)).rejects.toThrow(
+    await expect(service.updateOrderStatus(999, OrderStatus.CANCELLED)).rejects.toThrow(
       NotFoundException,
     );
+  });
+
+  it('nhập kho dùng CAS theo version và increment nguyên tử', async () => {
+    mockPrisma.product.findUnique
+      .mockResolvedValueOnce({ id: 7, stock: 4, version: 3 })
+      .mockResolvedValueOnce({ id: 7, stock: 9, version: 4 });
+    mockPrisma.product.updateMany.mockResolvedValueOnce({ count: 1 });
+    const result = await service.updateStock(7, { delta: 5 });
+    expect(result.stock).toBe(9);
+    expect(mockPrisma.product.updateMany).toHaveBeenCalledWith({
+      where: { id: 7, version: 3 },
+      data: { stock: { increment: 5 }, version: { increment: 1 } },
+    });
+  });
+
+  it('không xuất kho âm hoặc âm thầm ép thành 0 khi thiếu hàng', async () => {
+    mockPrisma.product.findUnique.mockResolvedValueOnce({ id: 7, stock: 2, version: 3 });
+    mockPrisma.product.updateMany.mockResolvedValueOnce({ count: 0 });
+    await expect(service.updateStock(7, { delta: -5 })).rejects.toThrow(ConflictException);
+    expect(mockPrisma.product.updateMany).toHaveBeenCalledWith({
+      where: { id: 7, version: 3, stock: { gte: 5 } },
+      data: { stock: { increment: -5 }, version: { increment: 1 } },
+    });
+  });
+
+  it('không cho stock và delta cùng tồn tại, hoặc không có trường nào', async () => {
+    await expect(service.updateStock(7, { stock: 3, delta: 5 })).rejects.toThrow();
+    await expect(service.updateStock(7, {})).rejects.toThrow();
+    expect(mockPrisma.product.updateMany).not.toHaveBeenCalled();
   });
 
   it('prevents duplicate coupon creation with ConflictException', async () => {
