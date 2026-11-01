@@ -13,6 +13,7 @@ async function check(label, url, expected, init) {
 
 try {
   await check('Backend root', `${backend}/`, 200);
+  await check('Database readiness', `${backend}/health/ready`, 200);
   const menuResponse = await check('GET /products', `${backend}/products`, 200);
   const menu = await menuResponse.json();
   if (!Array.isArray(menu) || !menu.length || typeof menu[0].id !== 'number') {
@@ -22,6 +23,11 @@ try {
   await check('GET /products/:id', `${backend}/products/${menu[0].id}`, 200);
   await check('GET /orders/me without JWT', `${backend}/orders/me`, 401);
   await check('GET /rewards/me without JWT', `${backend}/rewards/me`, 401);
+  await check('POST /payments without JWT', `${backend}/payments`, 401, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ orderId: 1, method: 'WALLET' }),
+  });
+  await check('GET /admin/stats without JWT', `${backend}/admin/stats`, 401);
   await check('POST /payments/checkout without JWT', `${backend}/payments/checkout`, 401, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ orderId: 1, method: 'WALLET' }),

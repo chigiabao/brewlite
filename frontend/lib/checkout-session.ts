@@ -18,6 +18,7 @@ export type CheckoutAttempt = {
 };
 export type CheckoutSession = {
   version: 1;
+  provider?: 'MOCK' | 'STRIPE';
   subject: string;
   cartKey: string;
   orderKey: string;
@@ -54,7 +55,7 @@ export function loadCheckoutSession(token: string | null): CheckoutSession | nul
     if (!raw) return null;
     const obj = JSON.parse(raw) as Partial<CheckoutSession>;
     if (obj.subject !== subject) return null; // không mở đơn của user khác
-    if (obj.version !== 1 || typeof obj.cartKey !== 'string' ||
+    if (obj.version !== 1 || (obj.provider !== undefined && !['MOCK', 'STRIPE'].includes(obj.provider)) || typeof obj.cartKey !== 'string' ||
         typeof obj.orderKey !== 'string' || !obj.orderKey || !obj.orderRequest ||
         !Array.isArray(obj.orderRequest.items) || (!Number.isSafeInteger(obj.orderRequest.pointsToRedeem) || obj.orderRequest.pointsToRedeem < 0) ||
         (obj.orderId !== null && (!Number.isSafeInteger(obj.orderId) || (obj.orderId ?? 0) <= 0)) ||

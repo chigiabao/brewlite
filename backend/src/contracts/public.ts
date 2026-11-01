@@ -13,7 +13,8 @@ export type OrderStatusV1 =
   | 'PREPARING'
   | 'READY'
   | 'COMPLETED'
-  | 'CANCELLED';
+  | 'CANCELLED'
+  | 'REFUNDED';
 
 export type OrderLineRequest = {
   productId: number;

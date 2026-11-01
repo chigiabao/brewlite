@@ -81,6 +81,7 @@ export function AuthHeader() {
             {email}
           </span>
         )}
+
       </Link>
       <button
         onClick={handleLogout}

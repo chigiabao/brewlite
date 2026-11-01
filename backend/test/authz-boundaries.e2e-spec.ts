@@ -14,11 +14,13 @@ import { OrdersController } from '../src/orders/orders.controller.js';
 import { OrdersService } from '../src/orders/orders.service.js';
 import { PaymentsController } from '../src/payments/payments.controller.js';
 import { PaymentsService } from '../src/payments/payments.service.js';
+import { MockPaymentService } from '../src/payments/mock-payment.service.js';
 import { PrismaModule } from '../src/prisma/prisma.module.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 import { RewardsController } from '../src/rewards/rewards.controller.js';
 import { RewardsService } from '../src/rewards/rewards.service.js';
 
+const mockPaymentService = { pay: vi.fn(async (input: { orderId: number }) => ({ orderId: input.orderId, status: 'SUCCEEDED', orderStatus: 'PAID' })) };
 const paymentService = {
   createCheckout: vi.fn(async (input: { orderId: number }) => ({
     orderId: input.orderId,
@@ -48,6 +50,8 @@ describe('Actual Payments / Orders JWT authorization boundary (HTTP)', () => {
   let previousSecret: string | undefined;
 
   beforeAll(async () => {
+    // FIX 11: test cũ kiểm Stripe, không chạy nhầm chế độ Mock của Docker.
+    process.env.PAYMENT_PROVIDER = 'STRIPE';
     previousSecret = process.env.JWT_SECRET;
     process.env.JWT_SECRET = 'brewlite-authz-http-regression-secret-long-enough';
     const fixture = await Test.createTestingModule({
@@ -55,6 +59,7 @@ describe('Actual Payments / Orders JWT authorization boundary (HTTP)', () => {
       controllers: [PaymentsController, OrdersController, RewardsController],
       providers: [
         { provide: PaymentsService, useValue: paymentService },
+        { provide: MockPaymentService, useValue: mockPaymentService },
         { provide: OrdersService, useValue: ordersService },
         { provide: RewardsService, useValue: rewardsService },
       ],
@@ -86,6 +91,7 @@ describe('Actual Payments / Orders JWT authorization boundary (HTTP)', () => {
 
   function expectNoBusinessCalls() {
     expect(paymentService.createCheckout).not.toHaveBeenCalled();
+    expect(mockPaymentService.pay).not.toHaveBeenCalled();
     expect(ordersService.create).not.toHaveBeenCalled();
     expect(ordersService.findMine).not.toHaveBeenCalled();
     expect(ordersService.findOne).not.toHaveBeenCalled();
@@ -168,6 +174,28 @@ describe('Actual Payments / Orders JWT authorization boundary (HTTP)', () => {
     expect(paymentService.createCheckout).toHaveBeenLastCalledWith({
       userId: 63, orderId: 123, method: 'WALLET', idempotencyKey: 'good-auth-63',
     });
+  });
+
+  it('FIX11: Mock POST /payments luôn cần JWT, lấy userId từ JWT chứ không lấy body', async () => {
+    process.env.PAYMENT_PROVIDER = 'MOCK';
+    try {
+      await request(app.getHttpServer()).post('/payments').set('Idempotency-Key', 'mock-no-auth')
+        .send(paymentBody).expect(401);
+      expect(mockPaymentService.pay).not.toHaveBeenCalled();
+      await request(app.getHttpServer()).post('/payments')
+        .set('Authorization', `Bearer ${token(51)}`)
+        .set('Idempotency-Key', 'mock-with-jwt')
+        .send({ ...paymentBody, demoDecline: true, userId: 999 }).expect(400);
+      expect(mockPaymentService.pay).not.toHaveBeenCalled();
+      await request(app.getHttpServer()).post('/payments')
+        .set('Authorization', `Bearer ${token(51)}`)
+        .set('Idempotency-Key', 'mock-with-jwt')
+        .send({ ...paymentBody, demoDecline: true }).expect(200);
+      expect(mockPaymentService.pay).toHaveBeenCalledWith({
+        userId: 51, orderId: 123, method: 'WALLET', demoDecline: true,
+        idempotencyKey: 'mock-with-jwt',
+      });
+    } finally { process.env.PAYMENT_PROVIDER = 'STRIPE'; }
   });
 
   it('rejects all actual Orders routes with 401 if JWT is absent', async () => {

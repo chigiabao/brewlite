@@ -13,6 +13,7 @@ import { PaymentsModule } from './payments/payments.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { ProductsModule } from './products/products.module.js';
 import { RewardsModule } from './rewards/rewards.module.js';
+import { AdminModule } from './admin/admin.module.js';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { RewardsModule } from './rewards/rewards.module.js';
     RewardsModule,
     HealthModule,
     MetricsModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [

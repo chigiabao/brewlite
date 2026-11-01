@@ -48,6 +48,8 @@ describe('FIX04: actual order -> payment -> rewards checkout (PostgreSQL E2E)', 
   }
 
   beforeAll(async () => {
+    // FIX 11: test cũ kiểm Stripe, không chạy nhầm chế độ Mock của Docker.
+    process.env.PAYMENT_PROVIDER = 'STRIPE';
     previousJwtSecret = process.env.JWT_SECRET;
     process.env.JWT_SECRET = 'fix04-actual-postgresql-e2e-jwt-secret';
 

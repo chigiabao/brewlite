@@ -75,6 +75,7 @@ brewlite/
 ├── frontend/                   # Next.js Web Application
 │   ├── app/
 │   │   ├── page.tsx            # Trang chủ & Menu hiển thị sản phẩm theo danh mục
+│   │   ├── admin/page.tsx      # Bảng điều khiển Quản trị viên (Executive Admin Console)
 │   │   ├── products/[id]/      # Trang chi tiết sản phẩm (chọn size S/M/L, chọn topping)
 │   │   ├── cart/               # Trang giỏ hàng (LocalStorage Zustand)
 │   │   ├── checkout/           # Trang thanh toán (Mã giảm giá, Điểm thưởng, Cổng thanh toán)
@@ -132,6 +133,9 @@ Toàn bộ 10 nhiệm vụ của dự án đã được hoàn thiện 100%:
 | **8** | Thanh toán & Idempotency Key | ✅ Hoàn thành | `backend/src/payments/`, `frontend/app/checkout/page.tsx` |
 | **9** | Xác nhận đơn hàng, Lịch sử & Bàn giao | ✅ Hoàn thành | `frontend/app/orders/[id]/confirmed/`, `docker-compose.yml` |
 | **10** | Nghiệp vụ nâng cao (State Machine, Concurrency) | ✅ Hoàn thành | `backend/src/orders/order-state.ts`, `stock.service.ts` |
+| **Plus** | Bảng điều khiển Quản trị viên (Admin Suite) | ✅ Hoàn thành | `backend/src/admin/`, `frontend/app/admin/page.tsx` |
+
+> 👑 **Trang Quản trị viên (Admin Console):** Truy cập tại [http://localhost:3000/admin](http://localhost:3000/admin). Giao diện Dark Luxury cao cấp, đầy đủ 5 phân hệ: **Tổng quan KPIs & Biểu đồ doanh thu**, **Quản lý đơn hàng & Chuyển trạng thái State Machine**, **Quản lý Thực đơn & Nhập kho nhanh**, **Quản lý Voucher Khuyến mãi**, và **Quản lý Khách hàng & Tặng điểm thưởng**.
 
 ---
 

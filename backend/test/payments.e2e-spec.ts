@@ -19,6 +19,8 @@ describe('Payments HTTP (e2e, fixture order, fake Stripe)', () => {
   let token: string;
 
   beforeAll(async () => {
+    // FIX 11: test cũ kiểm Stripe, không chạy nhầm chế độ Mock của Docker.
+    process.env.PAYMENT_PROVIDER = 'STRIPE';
     process.env.STRIPE_WEBHOOK_SECRET = WEBHOOK_SECRET;
     stripe = new FakeStripe();
 
