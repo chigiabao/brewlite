@@ -1,0 +1,52 @@
+@startuml
+!theme plain
+skinparam defaultFontName "Segoe UI", Arial, sans-serif
+skinparam defaultFontSize 12
+skinparam roundcorner 6
+skinparam shadowing true
+autonumber
+
+title SƠ ĐỒ TUẦN TỰ — UC-02.1: ĐĂNG KÝ TÀI KHOẢN (REGISTER)
+
+actor "Khách (Client)\n<<SPA / App>>" as client
+participant "ValidationPipe\n<<NestJS Pipe>>" as pipe
+participant "AuthController\n<<Controller>>" as ctrl
+participant "AuthService\n<<Injectable>>" as svc
+participant "bcryptjs\n<<Crypto>>" as bcrypt
+database "PostgreSQL\n<<Prisma ORM>>" as db
+
+client -> pipe : POST /auth/register\n{ email, password }
+activate pipe
+
+alt #FFF5F5 1. DTO Validation Error (Email không đúng / Password < 6 ký tự)
+    pipe --> client : 400 Bad Request\n{ statusCode: 400, message: [...] }
+else #FAFAFA 2. else: DTO hợp lệ
+    pipe -> ctrl : validated AuthDto
+    deactivate pipe
+    activate ctrl
+    
+    ctrl -> svc : register(dto)
+    activate svc
+    
+    svc -> bcrypt : hash(password, 12 rounds)
+    activate bcrypt
+    bcrypt --> svc : passwordHash
+    deactivate bcrypt
+    
+    svc -> db : prisma.user.create({\n  data: { email, passwordHash }\n})
+    activate db
+    
+    alt #FFF5F5 2.1. Trùng Email - P2002 Unique Constraint Violation
+        db --> svc : throw PrismaClientKnownRequestError(P2002)
+        svc --> ctrl : throw ConflictException("Email đã được đăng ký")
+        ctrl --> client : 409 Conflict\n{ statusCode: 409, message: "Email đã được đăng ký" }
+    else #FAFAFA 2.2. Thành công - Bản ghi mới được tạo an toàn
+        db --> svc : userRecord (id: 1, email, passwordHash)
+        deactivate db
+        svc --> ctrl : { id: 1, email } (passwordHash excluded)
+        deactivate svc
+        ctrl --> client : 201 Created\n{ id: 1, email }
+        deactivate ctrl
+    end
+end
+@enduml

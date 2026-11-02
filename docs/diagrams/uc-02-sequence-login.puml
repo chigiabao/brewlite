@@ -1,0 +1,61 @@
+@startuml
+!theme plain
+skinparam defaultFontName "Segoe UI", Arial, sans-serif
+skinparam defaultFontSize 12
+skinparam roundcorner 6
+skinparam shadowing true
+autonumber
+
+title SƠ ĐỒ TUẦN TỰ — UC-02.2: ĐĂNG NHẬP & CẤP JWT (LOGIN)
+
+actor "Người dùng (Client)\n<<SPA / App>>" as client
+participant "ValidationPipe\n<<NestJS Pipe>>" as pipe
+participant "AuthController\n<<Controller>>" as ctrl
+participant "AuthService\n<<Injectable>>" as svc
+participant "bcryptjs\n<<Crypto>>" as bcrypt
+participant "JwtService\n<<@nestjs/jwt>>" as jwt
+database "PostgreSQL\n<<Prisma ORM>>" as db
+
+client -> pipe : POST /auth/login\n{ email, password }
+activate pipe
+
+alt #FFF5F5 1. DTO Validation Error
+    pipe --> client : 400 Bad Request
+else #FAFAFA 2. else: DTO hợp lệ
+    pipe -> ctrl : validated AuthDto
+    deactivate pipe
+    activate ctrl
+    
+    ctrl -> svc : login(dto)
+    activate svc
+    
+    svc -> db : prisma.user.findUnique({\n  where: { email }\n})
+    activate db
+    db --> svc : user / null
+    deactivate db
+    
+    alt #FFF5F5 2.1. Email không tồn tại (Anti User Enumeration)
+        svc --> ctrl : throw UnauthorizedException("Sai thông tin đăng nhập")
+        ctrl --> client : 401 Unauthorized
+    else #FAFAFA 2.2. Email tồn tại
+        svc -> bcrypt : compare(password, user.passwordHash)
+        activate bcrypt
+        bcrypt --> svc : isValid (boolean)
+        deactivate bcrypt
+        
+        alt #FFF5F5 2.2.1. Mật khẩu không khớp
+            svc --> ctrl : throw UnauthorizedException("Sai thông tin đăng nhập")
+            ctrl --> client : 401 Unauthorized
+        else #FAFAFA 2.2.2. Mật khẩu hợp lệ
+            svc -> jwt : signAsync({ sub: user.id, email: user.email })
+            activate jwt
+            jwt --> svc : accessToken (expiresIn: 1d)
+            deactivate jwt
+            svc --> ctrl : { accessToken }
+            deactivate svc
+            ctrl --> client : 200/201 OK\n{ accessToken }
+            deactivate ctrl
+        end
+    end
+end
+@enduml

@@ -1,0 +1,79 @@
+@startuml
+!theme plain
+skinparam defaultFontName "Segoe UI", Arial, sans-serif
+skinparam defaultFontSize 11
+skinparam classAttributeIconSize 0
+skinparam roundcorner 6
+skinparam shadowing true
+
+title SƠ ĐỒ LỚP KIẾN TRÚC — UC-02: IDENTITY & ACCESS MANAGEMENT
+
+package "Module D: Identity & Access Management (Owner: D)" as modD {
+  class AuthController <<NestJS Controller>> {
+    - authService: AuthService
+    + register(dto: AuthDto): Promise<{ id: number, email: string }>
+    + login(dto: AuthDto): Promise<{ accessToken: string }>
+  }
+
+  class AuthService <<Injectable Service>> {
+    - prisma: PrismaService
+    - jwt: JwtService
+    + register(dto: AuthDto): Promise<SafeUser>
+    + login(dto: AuthDto): Promise<{ accessToken: string }>
+    + validateUser(email: string, pass: string): Promise<User | null>
+  }
+
+  class AuthDto <<DTO / Validation>> {
+    + email: string {IsEmail}
+    + password: string {MinLength(6)}
+  }
+
+  class JwtStrategy <<PassportStrategy>> {
+    + validate(payload: JwtPayload): Promise<JwtPayload>
+  }
+
+  class User <<Prisma Entity>> {
+    + id: Int [PK, AUTO]
+    + email: String [UNIQUE]
+    + passwordHash: String
+    + createdAt: DateTime
+  }
+}
+
+package "Facade Layer (backend/src/auth/public.ts)" as facade {
+  class JwtAuthGuard <<CanActivate Guard>> {
+    + canActivate(context: ExecutionContext): boolean
+  }
+  
+  annotation CurrentUser <<Custom Param Decorator>> {
+    + createParamDecorator(): (data, ctx) => req.user
+  }
+}
+
+package "Consumer Modules (Module E: Orders & Module F: Payments)" as consumers {
+  class OrdersController <<Module E>> {
+    + getMyOrders(@CurrentUser user): Promise<Order[]>
+    + createOrder(@CurrentUser user, dto): Promise<Order>
+  }
+  
+  class PaymentsController <<Module F>> {
+    + createPayment(@CurrentUser user, dto): Promise<Payment>
+  }
+}
+
+' Relationships
+AuthController ..> AuthService : <<inject>>
+AuthController ..> AuthDto : <<validate>>
+AuthService ..> User : <<CRUD via Prisma>>
+AuthService ..> AuthDto : <<use>>
+
+JwtAuthGuard ..> JwtStrategy : delegates check
+
+OrdersController ..> JwtAuthGuard : <<import from public.ts>>
+OrdersController ..> CurrentUser : <<use @CurrentUser>>
+PaymentsController ..> JwtAuthGuard : <<import from public.ts>>
+PaymentsController ..> CurrentUser : <<use @CurrentUser>>
+
+User "1" -- "0..*" consumers.OrdersController : owns orders >
+
+@enduml

@@ -1,0 +1,47 @@
+@startuml
+!theme plain
+skinparam defaultFontName "Segoe UI", Arial, sans-serif
+skinparam defaultFontSize 12
+skinparam roundcorner 6
+skinparam shadowing true
+autonumber
+
+title SƠ ĐỒ TUẦN TỰ — UC-02.3: XÁC THỰC TRUY CẬP API BẢO VỆ (JWT GUARD)
+
+actor "Khách hàng (Client)\n<<Customer>>" as client
+participant "JwtAuthGuard\n<<public.ts | Owner: D>>" as guard
+participant "JwtStrategy\n<<PassportStrategy>>" as strat
+participant "OrdersController\n<<Module E | Consumer>>" as orders
+database "PostgreSQL\n<<Database>>" as db
+
+client -> guard : GET /orders/me\nHeader: Authorization: Bearer <token>
+activate guard
+
+alt #FFF5F5 1. Thiếu Header Authorization hoặc sai Bearer prefix
+    guard --> client : 401 Unauthorized\n{ statusCode: 401, message: "Unauthorized" }
+else #FAFAFA 2. Header Bearer hợp lệ
+    guard -> strat : validate(payload)
+    activate strat
+    
+    alt #FFF5F5 2.1. Token sai Secret / Hết hạn / Malformed
+        strat --> guard : throw UnauthorizedException
+        guard --> client : 401 Unauthorized
+    else #FAFAFA 2.2. Token hợp lệ
+        strat --> guard : payload { sub: 1, email: "user@example.com" }
+        deactivate strat
+        guard -> guard : req.user = payload\n(Tiêm @CurrentUser)
+        
+        guard -> orders : handle GET /orders/me (@CurrentUser user)
+        deactivate guard
+        activate orders
+        
+        orders -> db : findMany({ where: { userId: user.sub } })
+        activate db
+        db --> orders : ordersList (Đơn hàng thuộc user 1)
+        deactivate db
+        
+        orders --> client : 200 OK\n[ { id: 101, userId: 1, ... } ]
+        deactivate orders
+    end
+end
+@enduml

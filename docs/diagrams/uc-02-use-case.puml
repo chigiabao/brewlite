@@ -1,0 +1,73 @@
+@startuml
+!theme plain
+left to right direction
+skinparam defaultFontName "Segoe UI", Arial, sans-serif
+skinparam defaultFontSize 12
+skinparam roundcorner 8
+skinparam shadowing true
+
+skinparam actor {
+  BackgroundColor #E0F2FE
+  BorderColor #0284C7
+  FontColor #0F172A
+  FontSize 12
+  FontStyle bold
+}
+
+skinparam usecase {
+  BackgroundColor #F8FAFC
+  BorderColor #0284C7
+  BorderThickness 1.2
+  FontColor #0F172A
+  FontSize 12
+  ArrowColor #0284C7
+  ArrowFontColor #475569
+  ArrowFontSize 11
+}
+
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #64748B
+  BorderThickness 1.5
+  FontColor #0F172A
+  FontSize 13
+  FontStyle bold
+}
+
+skinparam arrow {
+  Color #0284C7
+  FontColor #475569
+  FontSize 11
+}
+
+actor "Khách (Guest)\n//<size:10>Chưa đăng nhập</size>//" as guest
+actor "Khách hàng (Customer)\n//<size:10>Đã có tài khoản</size>//" as customer
+
+rectangle "Hệ thống Xác thực BrewLite (UC-02 | Owner: D)" {
+  usecase "<b>UC-02.1: Đăng ký tài khoản</b>\n--\n<size:10>POST /auth/register</size>\n__extension points__\n<size:9>point: DuplicateEmail</size>" as UC_Reg #EFF6FF;line:2563EB
+  usecase "<b>UC-02.2: Đăng nhập hệ thống</b>\n--\n<size:10>POST /auth/login</size>\n__extension points__\n<size:9>point: BadCredentials</size>" as UC_Login #EFF6FF;line:2563EB
+  usecase "<b>UC-02.3: Xác thực truy cập API bảo vệ</b>\n--\n<size:10>JwtAuthGuard</size>\n__extension points__\n<size:9>point: InvalidToken</size>" as UC_Prot #ECFDF5;line:059669
+
+  usecase "Validate AuthDto\n--\n<size:10>Email, Password >= 6</size>" as UC_Val #F1F5F9;line:64748B
+  usecase "Xử lý trùng Email\n--\n<size:10>409 ConflictException</size>" as UC_Dup #FFF1F2;line:E11D48
+  usecase "Xử lý sai thông tin\n--\n<size:10>401 Unauthorized</size>" as UC_Cred #FFF1F2;line:E11D48
+  usecase "Chặn thiếu/sai Token\n--\n<size:10>401 Unauthorized</size>" as UC_Tok #FFF1F2;line:E11D48
+
+  UC_Reg ..> UC_Val : <<include>>
+  UC_Login ..> UC_Val : <<include>>
+
+  UC_Dup .> UC_Reg : <<extend>>
+  UC_Cred .> UC_Login : <<extend>>
+  UC_Tok .> UC_Prot : <<extend>>
+}
+
+actor "Module E & F\n//<size:10>Ordering / Payments</size>//" as moduleEF <<Secondary System>> #FEF3C7;line:D97706
+
+guest --> UC_Reg
+guest --> UC_Login
+customer --> UC_Login
+customer --> UC_Prot
+
+UC_Prot <-- moduleEF : <<use>>
+
+@enduml

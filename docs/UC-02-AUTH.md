@@ -59,8 +59,9 @@ Tài liệu và mã nguồn này triển khai phần nền tảng xác thực ng
 ## 5. Các Sơ đồ Kiến trúc & Tuần tự (Diagrams)
 
 ### 5.1. Sơ đồ Use Case Hệ thống (Use Case Diagram)
-- **Bản xuất SVG:** [docs/diagrams/uc-02-use-case.svg](file:///c:/Users/Admin/Documents/brewlite/docs/diagrams/uc-02-use-case.svg)
-- **Mã nguồn Mermaid:**
+- **Bản xuất SVG (PlantUML Rendered):** [docs/diagrams/uc-02-use-case.svg](file:///c:/Users/Admin/Documents/brewlite/docs/diagrams/uc-02-use-case.svg)
+- **Mã nguồn PlantUML:** [docs/diagrams/uc-02-use-case.puml](file:///c:/Users/Admin/Documents/brewlite/docs/diagrams/uc-02-use-case.puml)
+- **Mã nguồn Mermaid (dự phòng):**
 
 ```mermaid
 flowchart LR
@@ -89,12 +90,12 @@ flowchart LR
   Customer --> UC_Protect
 
   UC_Register -.->|&lt;&lt;include&gt;&gt;| UC_ValDto
-  UC_Register -.->|&lt;&lt;extend&gt;&gt;| UC_ErrDup
+  UC_ErrDup -.->|&lt;&lt;extend&gt;&gt;| UC_Register
 
   UC_Login -.->|&lt;&lt;include&gt;&gt;| UC_ValDto
-  UC_Login -.->|&lt;&lt;extend&gt;&gt;| UC_ErrCred
+  UC_ErrCred -.->|&lt;&lt;extend&gt;&gt;| UC_Login
 
-  UC_Protect -.->|&lt;&lt;extend&gt;&gt;| UC_ErrToken
+  UC_ErrToken -.->|&lt;&lt;extend&gt;&gt;| UC_Protect
   ModuleEF -.->|"Áp dụng @UseGuards"| UC_Protect
 
   classDef errUc fill:#4c0519,stroke:#f43f5e,stroke-width:1.5px,color:#fecdd3;
@@ -105,8 +106,9 @@ flowchart LR
 ---
 
 ### 5.2. Sơ đồ Tuần tự: UC-02.1 Đăng ký tài khoản (Register)
-- **Bản xuất SVG:** [docs/diagrams/uc-02-sequence-register.svg](file:///c:/Users/Admin/Documents/brewlite/docs/diagrams/uc-02-sequence-register.svg)
-- **Mã nguồn Mermaid:**
+- **Bản xuất SVG (PlantUML Rendered):** [docs/diagrams/uc-02-sequence-register.svg](file:///c:/Users/Admin/Documents/brewlite/docs/diagrams/uc-02-sequence-register.svg)
+- **Mã nguồn PlantUML:** [docs/diagrams/uc-02-sequence-register.puml](file:///c:/Users/Admin/Documents/brewlite/docs/diagrams/uc-02-sequence-register.puml)
+- **Mã nguồn Mermaid (dự phòng):**
 
 ```mermaid
 sequenceDiagram
@@ -145,8 +147,9 @@ sequenceDiagram
 ---
 
 ### 5.3. Sơ đồ Tuần tự: UC-02.2 Đăng nhập & Cấp phát JWT (Login)
-- **Bản xuất SVG:** [docs/diagrams/uc-02-sequence-login.svg](file:///c:/Users/Admin/Documents/brewlite/docs/diagrams/uc-02-sequence-login.svg)
-- **Mã nguồn Mermaid:**
+- **Bản xuất SVG (PlantUML Rendered):** [docs/diagrams/uc-02-sequence-login.svg](file:///c:/Users/Admin/Documents/brewlite/docs/diagrams/uc-02-sequence-login.svg)
+- **Mã nguồn PlantUML:** [docs/diagrams/uc-02-sequence-login.puml](file:///c:/Users/Admin/Documents/brewlite/docs/diagrams/uc-02-sequence-login.puml)
+- **Mã nguồn Mermaid (dự phòng):**
 
 ```mermaid
 sequenceDiagram
@@ -190,8 +193,9 @@ sequenceDiagram
 ---
 
 ### 5.4. Sơ đồ Tuần tự: UC-02.3 Xác thực Truy cập API Bảo vệ (Protected Route)
-- **Bản xuất SVG:** [docs/diagrams/uc-02-sequence-protected-access.svg](file:///c:/Users/Admin/Documents/brewlite/docs/diagrams/uc-02-sequence-protected-access.svg)
-- **Mã nguồn Mermaid:**
+- **Bản xuất SVG (PlantUML Rendered):** [docs/diagrams/uc-02-sequence-protected-access.svg](file:///c:/Users/Admin/Documents/brewlite/docs/diagrams/uc-02-sequence-protected-access.svg)
+- **Mã nguồn PlantUML:** [docs/diagrams/uc-02-sequence-protected-access.puml](file:///c:/Users/Admin/Documents/brewlite/docs/diagrams/uc-02-sequence-protected-access.puml)
+- **Mã nguồn Mermaid (dự phòng):**
 
 ```mermaid
 sequenceDiagram
@@ -228,8 +232,9 @@ sequenceDiagram
 ---
 
 ### 5.5. Sơ đồ Class & Ranh giới Module (Architecture & Boundaries)
-- **Bản xuất SVG:** [docs/diagrams/uc-02-class-architecture.svg](file:///c:/Users/Admin/Documents/brewlite/docs/diagrams/uc-02-class-architecture.svg)
-- **Mã nguồn Mermaid:**
+- **Bản xuất SVG (PlantUML Rendered):** [docs/diagrams/uc-02-class-architecture.svg](file:///c:/Users/Admin/Documents/brewlite/docs/diagrams/uc-02-class-architecture.svg)
+- **Mã nguồn PlantUML:** [docs/diagrams/uc-02-class-architecture.puml](file:///c:/Users/Admin/Documents/brewlite/docs/diagrams/uc-02-class-architecture.puml)
+- **Mã nguồn Mermaid (dự phòng):**
 
 ```mermaid
 classDiagram
