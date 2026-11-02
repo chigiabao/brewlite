@@ -1,0 +1,249 @@
+<mxfile host="app.diagrams.net" agent="Codex">
+  <diagram id="flow04-coupon-loyalty" name="FLOW-04">
+    <mxGraphModel dx="1609" dy="886" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1900" pageHeight="1240" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=28;fontColor=#14334a;" value="&lt;b&gt;FLOW-04 · Xác thực Coupon + Giữ/Chốt Loyalty&lt;/b&gt;&lt;div&gt;&lt;br/&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="64" width="1250" x="40" y="18" as="geometry" />
+        </mxCell>
+        <mxCell id="legend" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d1dde6;" value="&lt;table border=&#39;0&#39; cellpadding=&#39;4&#39; cellspacing=&#39;0&#39; style=&#39;font-family:Segoe UI;font-size:12px;color:#3d5b70&#39;&gt;&lt;tr&gt;&lt;td&gt;&lt;font color=&#39;#26736c&#39;&gt;&lt;b&gt;E&lt;/b&gt;&lt;/font&gt; Ordering&lt;/td&gt;&lt;td&gt;&lt;font color=&#39;#5e4d8f&#39;&gt;&lt;b&gt;F&lt;/b&gt;&lt;/font&gt; Payments&lt;/td&gt;&lt;td&gt;&lt;font color=&#39;#b46b25&#39;&gt;&lt;b&gt;G&lt;/b&gt;&lt;/font&gt; Rewards&lt;/td&gt;&lt;td&gt;&lt;font color=&#39;#315a78&#39;&gt;&lt;b&gt;A&lt;/b&gt;&lt;/font&gt; Platform&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td colspan=&#39;4&#39;&gt;Nét đứt = side-effect free / nhánh lỗi&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;" vertex="1">
+          <mxGeometry height="58" width="420" x="1420" y="24" as="geometry" />
+        </mxCell>
+        <mxCell id="band_preview" parent="1" style="swimlane;html=1;rounded=1;startSize=34;fillColor=#eef6f8;swimlaneFillColor=#dcecf0;strokeColor=#9fc5d0;fontColor=#164c5b;fontSize=14;horizontal=1;whiteSpace=wrap;" value="&lt;b&gt;1 · PREVIEW COUPON — SIDE-EFFECT FREE&lt;/b&gt; · chỉ đọc Coupon, không tăng quota/điểm, không tạo Order" vertex="1">
+          <mxGeometry height="300" width="1000" x="40" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="band_reserve" parent="1" style="swimlane;html=1;rounded=1;startSize=34;fillColor=#f2f7f3;swimlaneFillColor=#dceee7;strokeColor=#9bc9b8;fontColor=#195b4e;fontSize=14;horizontal=1;whiteSpace=wrap;" value="&lt;b&gt;2 · TẠO ORDER — RESERVE TRONG TRANSACTION&lt;/b&gt; · E tạo transaction; G giữ quota + điểm; lỗi thì rollback toàn bộ" vertex="1">
+          <mxGeometry height="740" width="1000" x="30" y="450" as="geometry" />
+        </mxCell>
+        <mxCell id="band_finalize" parent="1" style="swimlane;html=1;rounded=1;startSize=34;fillColor=#f6f3fb;swimlaneFillColor=#e8e0f5;strokeColor=#b9a9d7;fontColor=#4c3b78;fontSize=14;horizontal=1;whiteSpace=wrap;" value="&lt;b&gt;3 · PAYMENT PAID — FINALIZE ĐÚNG MỘT LẦN&lt;/b&gt; · F trigger; G xác minh và ghi ledger trong cùng transaction" vertex="1">
+          <mxGeometry height="720" width="760" x="1080" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="f_ledger" parent="band_finalize" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff6e8;strokeColor=#d5a25e;fontSize=12;align=center;verticalAlign=middle;" value="&lt;b&gt;Ledger exactly-once&lt;/b&gt;&lt;br&gt;REDEEM nếu pointsRedeemed &gt; 0 — createMany skipDuplicates&lt;br&gt;EARN — unique(orderId,kind); nếu insert count=1 mới increment User.loyaltyPoints&lt;br&gt;total=0 → không EARN" vertex="1">
+          <mxGeometry height="130" width="380" x="300" y="350" as="geometry" />
+        </mxCell>
+        <mxCell id="f_replay" parent="band_finalize" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eef6f8;strokeColor=#8bb9c5;fontSize=12;align=center;verticalAlign=middle;" value="&lt;b&gt;PAID replay&lt;/b&gt;&lt;br&gt;same key + same hash → trả kết quả cũ&lt;br&gt;không charge / không EARN / không REDEEM thêm&lt;br&gt;unique(orderId, kind) chặn ledger trùng" vertex="1">
+          <mxGeometry height="125" width="250" x="15" y="510" as="geometry" />
+        </mxCell>
+        <mxCell id="band_outcome" parent="1" style="swimlane;html=1;rounded=1;startSize=34;fillColor=#fffaf2;swimlaneFillColor=#f7e8c9;strokeColor=#dccb9c;fontColor=#76521e;fontSize=14;horizontal=1;whiteSpace=wrap;" value="&lt;b&gt;4 · LỖI / RETRY / CANCEL&lt;/b&gt; · không ghi EARN khi payment chưa PAID" vertex="1">
+          <mxGeometry height="300" width="760" x="1080" y="870" as="geometry" />
+        </mxCell>
+        <mxCell id="p_start" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#8bb9c5;fontSize=14;align=center;verticalAlign=middle;" value="&lt;b&gt;Client / UI&lt;/b&gt;&lt;br&gt;code + orderTotal" vertex="1">
+          <mxGeometry height="70" width="180" x="78" y="220" as="geometry" />
+        </mxCell>
+        <mxCell id="p_validate" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff6e8;strokeColor=#d5a25e;fontSize=14;align=center;verticalAlign=middle;" value="&lt;b&gt;G · validateCoupon()&lt;/b&gt;&lt;br&gt;normalize code" vertex="1">
+          <mxGeometry height="90" width="220" x="300" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="p_read" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#8bb9c5;fontSize=13;align=center;verticalAlign=middle;" value="&lt;b&gt;findUnique Coupon&lt;/b&gt;&lt;br&gt;check active / expiry / minOrderValue / quota&lt;br&gt;calculate discount" vertex="1">
+          <mxGeometry height="130" width="230" x="560" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="p_decide" parent="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fffdf8;strokeColor=#d5a25e;fontSize=14;align=center;verticalAlign=middle;" value="Hợp lệ?" vertex="1">
+          <mxGeometry height="80" width="120" x="830" y="215" as="geometry" />
+        </mxCell>
+        <mxCell id="p_quote" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eaf7ef;strokeColor=#84be9d;fontSize=13;align=center;verticalAlign=middle;" value="&lt;b&gt;200 OK&lt;/b&gt;&lt;br&gt;return valid + discount&lt;br&gt;&lt;font color=&#39;#55798a&#39;&gt;không ghi DB&lt;/font&gt;" vertex="1">
+          <mxGeometry height="65" width="200" x="790" y="325" as="geometry" />
+        </mxCell>
+        <mxCell id="p_error" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff0ed;strokeColor=#dc9b8e;fontSize=12;align=center;verticalAlign=middle;" value="&lt;b&gt;400 / 404&lt;/b&gt;&lt;br&gt;inactive · expired · min value · quota exhausted&lt;br&gt;&lt;font color=&#39;#8b4d35&#39;&gt;không mutation&lt;/font&gt;" vertex="1">
+          <mxGeometry height="55" width="215" x="545" y="335" as="geometry" />
+        </mxCell>
+        <mxCell id="p_note" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#8bb9c5;fontSize=12;align=left;verticalAlign=middle;spacingLeft=10;" value="&lt;b&gt;Invariant:&lt;/b&gt; preview không increment Coupon.usedCount, không decrement User.loyaltyPoints, không tạo Order/LoyaltyEntry/stock write." vertex="1">
+          <mxGeometry height="55" width="430" x="78" y="330" as="geometry" />
+        </mxCell>
+        <mxCell id="r_begin" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#78ad9f;fontSize=13;align=center;verticalAlign=middle;" value="&lt;b&gt;E · OrdersService.create()&lt;/b&gt;&lt;br&gt;BEGIN transaction" vertex="1">
+          <mxGeometry height="70" width="220" x="78" y="520" as="geometry" />
+        </mxCell>
+        <mxCell id="r_subtotal" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#78ad9f;fontSize=13;align=center;verticalAlign=middle;" value="&lt;b&gt;Đọc Product&lt;/b&gt;&lt;br&gt;tính unitPrice / lineTotal / subtotal&lt;br&gt;giữ snapshot item" vertex="1">
+          <mxGeometry height="90" width="220" x="350" y="510" as="geometry" />
+        </mxCell>
+        <mxCell id="r_reserve" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff6e8;strokeColor=#d5a25e;fontSize=13;align=center;verticalAlign=middle;" value="&lt;b&gt;G · reserveCouponAndPoints()&lt;/b&gt;&lt;br&gt;trong cùng tx của E" vertex="1">
+          <mxGeometry height="70" width="230" x="620" y="520" as="geometry" />
+        </mxCell>
+        <mxCell id="r_coupon" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff6e8;strokeColor=#d5a25e;fontSize=12;align=center;verticalAlign=middle;" value="&lt;b&gt;Coupon có mã?&lt;/b&gt;&lt;br&gt;findUnique + eligibility&lt;br&gt;conditional usedCount++ nếu quota còn" vertex="1">
+          <mxGeometry height="90" width="250" x="390" y="650" as="geometry" />
+        </mxCell>
+        <mxCell id="r_points" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff6e8;strokeColor=#d5a25e;fontSize=12;align=center;verticalAlign=middle;" value="&lt;b&gt;Reserve points&lt;/b&gt;&lt;br&gt;coupon trước → cap points ở phần còn lại&lt;br&gt;UPDATE User WHERE loyaltyPoints ≥ pointsDiscount; decrement" vertex="1">
+          <mxGeometry height="90" width="290" x="690" y="650" as="geometry" />
+        </mxCell>
+        <mxCell id="r_quota_fail" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff0ed;strokeColor=#dc9b8e;fontSize=12;align=center;verticalAlign=middle;" value="&lt;b&gt;Quota race / invalid&lt;/b&gt;&lt;br&gt;count = 0 → 409/400&lt;br&gt;ROLLBACK quota + order + stock + points" vertex="1">
+          <mxGeometry height="85" width="245" x="78" y="790" as="geometry" />
+        </mxCell>
+        <mxCell id="r_points_fail" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff0ed;strokeColor=#dc9b8e;fontSize=12;align=center;verticalAlign=middle;" value="&lt;b&gt;Thiếu điểm / race&lt;/b&gt;&lt;br&gt;400/409 → ROLLBACK conditional quota update và toàn tx" vertex="1">
+          <mxGeometry height="85" width="245" x="390" y="790" as="geometry" />
+        </mxCell>
+        <mxCell id="r_stock" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#78ad9f;fontSize=13;align=center;verticalAlign=middle;" value="&lt;b&gt;Reserve stock&lt;/b&gt;&lt;br&gt;conditional decrement + version++&lt;br&gt;nếu fail → ROLLBACK rewards" vertex="1">
+          <mxGeometry height="85" width="245" x="690" y="790" as="geometry" />
+        </mxCell>
+        <mxCell id="r_order" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#78ad9f;fontSize=12;align=center;verticalAlign=middle;" value="&lt;b&gt;Create Order&lt;/b&gt;&lt;br&gt;PENDING + couponCode&lt;br&gt;subtotal / discountTotal / pointsRedeemed / total + OrderItem snapshots" vertex="1">
+          <mxGeometry height="100" width="270" x="390" y="930" as="geometry" />
+        </mxCell>
+        <mxCell id="r_commit" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eaf7ef;strokeColor=#84be9d;fontSize=13;align=center;verticalAlign=middle;" value="&lt;b&gt;COMMIT&lt;/b&gt;&lt;br&gt;Order PENDING; quota + balance đã giữ&lt;br&gt;&lt;font color=&#39;#55798a&#39;&gt;chưa ghi REDEEM ở PENDING&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="270" x="710" y="930" as="geometry" />
+        </mxCell>
+        <mxCell id="r_policy" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9bc9b8;fontSize=12;align=left;verticalAlign=middle;spacingLeft=10;" value="&lt;b&gt;Reservation policy&lt;/b&gt;&lt;br&gt;Coupon quota + User.loyaltyPoints + stock nằm trong cùng transaction tạo Order. Mọi lỗi trước commit đều rollback." vertex="1">
+          <mxGeometry height="75" width="560" x="78" y="1070" as="geometry" />
+        </mxCell>
+        <mxCell id="f_pay" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f1fb;strokeColor=#ae9bcf;fontSize=13;align=center;verticalAlign=middle;" value="&lt;b&gt;F · PaymentService.pay()&lt;/b&gt;&lt;br&gt;Idempotency-Key + requestHash&lt;br&gt;charge mock gateway" vertex="1">
+          <mxGeometry height="85" width="220" x="1120" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="f_gateway" parent="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fffdf8;strokeColor=#ae9bcf;fontSize=13;align=center;verticalAlign=middle;" value="Gateway result" vertex="1">
+          <mxGeometry height="82" width="150" x="1400" y="202" as="geometry" />
+        </mxCell>
+        <mxCell id="f_success" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eaf7ef;strokeColor=#84be9d;fontSize=12;align=center;verticalAlign=middle;" value="&lt;b&gt;Success transaction&lt;/b&gt;&lt;br&gt;Payment → SUCCEEDED&lt;br&gt;OrdersPaymentPort.markPaid() → Order PAID" vertex="1">
+          <mxGeometry height="115" width="230" x="1580" y="185" as="geometry" />
+        </mxCell>
+        <mxCell id="f_verify" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff6e8;strokeColor=#d5a25e;fontSize=13;align=center;verticalAlign=middle;" value="&lt;b&gt;G · finalizeRewardsOnPaid()&lt;/b&gt;&lt;br&gt;verify user + status=PAID + total snapshot" vertex="1">
+          <mxGeometry height="80" width="290" x="1370" y="360" as="geometry" />
+        </mxCell>
+        <mxCell id="f_commit" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eaf7ef;strokeColor=#84be9d;fontSize=13;align=center;verticalAlign=middle;" value="&lt;b&gt;COMMIT PAID&lt;/b&gt;&lt;br&gt;Payment + Order + REDEEM/EARN + balance cùng transaction" vertex="1">
+          <mxGeometry height="75" width="290" x="1370" y="680" as="geometry" />
+        </mxCell>
+        <mxCell id="o_decline" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff0ed;strokeColor=#dc9b8e;fontSize=12;align=center;verticalAlign=middle;" value="&lt;b&gt;Gateway decline&lt;/b&gt;&lt;br&gt;Payment FAILED; Order PAYMENT_FAILED&lt;br&gt;không EARN/REDEEM mới; reservation giữ lại cho retry key mới" vertex="1">
+          <mxGeometry height="105" width="290" x="1120" y="950" as="geometry" />
+        </mxCell>
+        <mxCell id="o_unknown" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff0ed;strokeColor=#dc9b8e;fontSize=12;align=center;verticalAlign=middle;" value="&lt;b&gt;Timeout / settlement error&lt;/b&gt;&lt;br&gt;Payment PENDING + lease; Order chưa PAID&lt;br&gt;giữ cùng key để đối soát; không EARN" vertex="1">
+          <mxGeometry height="105" width="300" x="1440" y="950" as="geometry" />
+        </mxCell>
+        <mxCell id="o_cancel" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff6e8;strokeColor=#d5a25e;fontSize=12;align=center;verticalAlign=middle;" value="&lt;b&gt;Cancel PENDING / PAYMENT_FAILED&lt;/b&gt;&lt;br&gt;CAS → CANCELLED; releaseOnCancel()" vertex="1">
+          <mxGeometry height="65" width="290" x="1120" y="1080" as="geometry" />
+        </mxCell>
+        <mxCell id="o_release" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eaf7ef;strokeColor=#84be9d;fontSize=12;align=center;verticalAlign=middle;" value="&lt;b&gt;Release atomically&lt;/b&gt;&lt;br&gt;User.loyaltyPoints += pointsRedeemed&lt;br&gt;Coupon.usedCount -= 1&lt;br&gt;stock += qty · không ghi ledger" vertex="1">
+          <mxGeometry height="75" width="300" x="1440" y="1075" as="geometry" />
+        </mxCell>
+        <mxCell id="e_p1" edge="1" parent="1" source="p_start" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#58768d;strokeWidth=1.5;endArrow=block;endFill=1;" target="p_validate" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_p2" edge="1" parent="1" source="p_validate" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#58768d;strokeWidth=1.5;endArrow=block;endFill=1;" target="p_read" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_p3" edge="1" parent="1" source="p_read" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#58768d;strokeWidth=1.5;endArrow=block;endFill=1;" target="p_decide" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_p_yes" edge="1" parent="1" source="p_decide" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#5b9b75;strokeWidth=1.5;endArrow=block;endFill=1;" target="p_quote" value="Có">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="15" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_p_no" edge="1" parent="1" source="p_decide" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#c17f69;strokeWidth=1.5;dashed=1;endArrow=block;endFill=1;exitX=0;exitY=1;exitDx=0;exitDy=0;" value="Không">
+          <mxGeometry relative="1" x="-0.6216" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="860" y="280" />
+              <mxPoint x="850" y="280" />
+              <mxPoint x="850" y="320" />
+              <mxPoint x="780" y="320" />
+              <mxPoint x="780" y="360" />
+            </Array>
+            <mxPoint x="950" y="280" as="sourcePoint" />
+            <mxPoint x="760" y="360" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_r1" edge="1" parent="1" source="r_begin" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#58768d;strokeWidth=1.5;endArrow=block;endFill=1;" target="r_subtotal" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_r2" edge="1" parent="1" source="r_subtotal" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#58768d;strokeWidth=1.5;endArrow=block;endFill=1;" target="r_reserve" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_r_coupon" edge="1" parent="1" source="r_reserve" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d5a25e;strokeWidth=1.5;endArrow=block;endFill=1;" target="r_coupon" value="coupon có mã">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_r_points" edge="1" parent="1" source="r_reserve" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d5a25e;strokeWidth=1.5;endArrow=block;endFill=1;" target="r_points" value="quota OK / không coupon">
+          <mxGeometry relative="1" x="0.625" y="25" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_r_qfail" edge="1" parent="1" source="r_coupon" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#c17f69;strokeWidth=1.5;dashed=1;endArrow=block;endFill=1;" target="r_quota_fail" value="count = 0">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_r_to_points" edge="1" parent="1" source="r_coupon" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#5b9b75;strokeWidth=1.5;endArrow=block;endFill=1;" target="r_points" value="OK">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_r_pfail" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#c17f69;strokeWidth=1.5;dashed=1;endArrow=block;endFill=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="r_points_fail" value="count = 0">
+          <mxGeometry relative="1" x="0.0688" as="geometry">
+            <Array as="points">
+              <mxPoint x="690" y="760" />
+              <mxPoint x="512.5" y="760" />
+            </Array>
+            <mxPoint x="690.0000000000002" y="713" as="sourcePoint" />
+            <mxPoint x="512.5" y="808" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_r_stock" edge="1" parent="1" source="r_points" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#5b9b75;strokeWidth=1.5;endArrow=block;endFill=1;" target="r_stock" value="points OK">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_r_order" edge="1" parent="1" source="r_stock" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#5b9b75;strokeWidth=1.5;endArrow=block;endFill=1;exitX=0.38;exitY=1.032;exitDx=0;exitDy=0;exitPerimeter=0;" value="stock OK">
+          <mxGeometry relative="1" x="-0.1747" as="geometry">
+            <Array as="points">
+              <mxPoint x="783.1" y="890" />
+              <mxPoint x="619" y="890" />
+            </Array>
+            <mxPoint x="784.0000000000002" y="840" as="sourcePoint" />
+            <mxPoint x="619" y="937.5" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_r_commit" edge="1" parent="1" source="r_order" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#5b9b75;strokeWidth=1.5;endArrow=block;endFill=1;" target="r_commit" value="create OK">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_r_rollback1" edge="1" parent="1" source="r_quota_fail" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#c17f69;strokeWidth=1.5;dashed=1;endArrow=block;endFill=1;" target="r_policy" value="mọi lỗi trước commit">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_r_rollback2" edge="1" parent="1" source="r_points_fail" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#c17f69;strokeWidth=1.5;dashed=1;endArrow=block;endFill=1;" target="r_policy" value="mọi lỗi trước commit">
+          <mxGeometry relative="1" x="-0.3506" y="10" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="380" y="832.5" />
+              <mxPoint x="380" y="972.5" />
+              <mxPoint x="358" y="972.5" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_f1" edge="1" parent="1" source="f_pay" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#58768d;strokeWidth=1.5;endArrow=block;endFill=1;" target="f_gateway" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_f_success" edge="1" parent="1" source="f_gateway" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#5b9b75;strokeWidth=1.5;endArrow=block;endFill=1;" target="f_success" value="success">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_f_verify" edge="1" parent="1" source="f_success" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#5b9b75;strokeWidth=1.5;endArrow=block;endFill=1;" target="f_verify" value="PAID + cùng tx">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_f_ledger" edge="1" parent="1" source="f_verify" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d5a25e;strokeWidth=1.5;endArrow=block;endFill=1;" target="f_ledger" value="verify OK">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_f_commit" edge="1" parent="1" source="f_ledger" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#5b9b75;strokeWidth=1.5;endArrow=block;endFill=1;" target="f_commit" value="ledger OK">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_f_replay" edge="1" parent="1" source="f_pay" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#8a9eae;strokeWidth=1.5;dashed=1;endArrow=block;endFill=1;" target="f_replay" value="same key + hash / callback replay">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_f_decline" edge="1" parent="1" source="f_gateway" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#c17f69;strokeWidth=1.5;dashed=1;endArrow=block;endFill=1;" target="o_decline" value="decline">
+          <mxGeometry relative="1" x="0.1084" as="geometry">
+            <Array as="points">
+              <mxPoint x="1370" y="270" />
+              <mxPoint x="1370" y="617" />
+              <mxPoint x="1360" y="617" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_o_cancel" edge="1" parent="1" source="o_decline" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d5a25e;strokeWidth=1.5;endArrow=block;endFill=1;" target="o_cancel" value="user cancel">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_o_release" edge="1" parent="1" source="o_cancel" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#5b9b75;strokeWidth=1.5;endArrow=block;endFill=1;" target="o_release" value="CANCELLED">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_f_unknown" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=light-dark(#C17F69,#99FF99);strokeWidth=1.5;dashed=1;endArrow=block;endFill=1;" value="timeout / DB error">
+          <mxGeometry relative="1" x="-0.0833" as="geometry">
+            <Array as="points">
+              <mxPoint x="1740" y="323.5" />
+              <mxPoint x="1770" y="323.5" />
+              <mxPoint x="1770" y="697.5" />
+              <mxPoint x="1710" y="697.5" />
+              <mxPoint x="1710" y="930" />
+              <mxPoint x="1610" y="930" />
+            </Array>
+            <mxPoint x="1740" y="300" as="sourcePoint" />
+            <mxPoint x="1610" y="950" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

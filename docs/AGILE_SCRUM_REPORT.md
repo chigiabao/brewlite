@@ -5,6 +5,8 @@
 
 ---
 
+> **Cập nhật kiểm chứng FIX 05 — 30/10/2026:** Bảng burndown 20 story points và các số liệu “Actual” bên dưới là **minh họa quy trình**, không phải log tiến độ thực đo. Các khẳng định “PASS 100% / 112 test cases” trong nội dung trước đây **chưa được kiểm chứng lại** sau FIX 01–05. Trạng thái nghiệm thu hiện hành phải căn cứ `docs/FIX05-RELEASE-ACCEPTANCE.md`, log của `scripts/verify-fix05.ps1` và GitHub Actions của đúng commit. **Không báo hoàn thành Sprint 3 nếu chưa qua G2–G4.**
+
 ## 1. TỔNG QUAN DỰ ÁN & PRODUCT VISION
 
 ### 1.1. Product Vision (Tầm nhìn sản phẩm)
@@ -131,7 +133,7 @@ Story Points
 - **Yêu cầu 2 - Thanh toán Idempotent:** Header `Idempotency-Key` cùng request replay trả về đúng kết quả cũ, chống double-charge/trừ tiền 2 lần.
 - **Yêu cầu 3 - Kiểm soát tồn kho đồng thời (Concurrency):** Transaction + Optimistic Locking (`version` increment) đảm bảo khi nhiều khách đặt cùng lúc không bao giờ bán vượt tồn kho (`stock >= 0`).
 - **Yêu cầu 4 - Khuyến mãi & Loyalty points:** Áp dụng mã giảm giá (`GIAM10`, `BREW10`) hợp lệ và tự động tích lũy 1% điểm thưởng loyalty cho khách sau khi đơn thành công (`PAID`).
-- **Chứng minh kiểm thử (Unit / Integration Tests):** Toàn bộ 15 test files (112 test cases) đều **PASS 100%** (không có test nào bị skip hay `it.todo`).
+- **Chứng minh kiểm thử (Unit / Integration Tests):** **Đang chờ nghiệm thu lại** trên bản FIX01–FIX05; số test và tỷ lệ PASS chính xác lấy từ log thực thi mới, không dùng lại 112 test cases của snapshot trước.
 
 ---
 

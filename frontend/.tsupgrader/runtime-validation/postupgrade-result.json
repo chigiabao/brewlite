@@ -1,0 +1,245 @@
+{
+  "planHash": "94f530167f8235e97f5f392a405dca819074645d4fca138ea6766ec40f7d7eb3",
+  "phase": "postupgrade",
+  "recordedAtUtc": "2026-11-01T08:36:15.4983720Z",
+  "retryCount": 1,
+  "resetBaseline": false,
+  "complete": true,
+  "result": {
+    "setupSucceeded": true,
+    "setupDurationMs": 6244,
+    "setupFailureOutput": null,
+    "assertions": [
+      {
+        "name": "typescript-no-emit",
+        "kind": "process",
+        "verificationMethod": "exit-code",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "",
+        "durationMs": 783
+      },
+      {
+        "name": "lint-pass",
+        "kind": "process",
+        "verificationMethod": "exit-code",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "npm warn Unknown env config \u0022scripts-prepend-node-path\u0022. This will stop working in the next major version of npm. See \u0060npm help npmrc\u0060 for supported config options.\n\n\u003E frontend@0.1.0 lint\n\u003E eslint\n\n\n/Users/nguyenanhhuy/Desktop/brewlite/frontend/app/page.tsx\n  132:17  warning  Using \u0060\u003Cimg\u003E\u0060 could result in slower LCP and higher bandwidth. Consider using \u0060\u003CImage /\u003E\u0060 from \u0060next/image\u0060 or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element\n  353:21  warning  Using \u0060\u003Cimg\u003E\u0060 could result in slower LCP and higher bandwidth. Consider using \u0060\u003CImage /\u003E\u0060 from \u0060next/image\u0060 or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element\n  455:13  warning  Using \u0060\u003Cimg\u003E\u0060 could result in slower LCP and higher bandwidth. Consider using \u0060\u003CImage /\u003E\u0060 from \u0060next/image\u0060 or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element\n\n/Users/nguyenanhhuy/Desktop/brewlite/frontend/app/products/[id]/page.tsx\n  133:11  warning  Using \u0060\u003Cimg\u003E\u0060 could result in slower LCP and higher bandwidth. Consider using \u0060\u003CImage /\u003E\u0060 from \u0060next/image\u0060 or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element\n\n\u2716 4 problems (0 errors, 4 warnings)\n\n",
+        "durationMs": 1489
+      },
+      {
+        "name": "checkout-session-regression-tests",
+        "kind": "process",
+        "verificationMethod": "exit-code",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "(node:71971) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/nguyenanhhuy/Desktop/brewlite/frontend/lib/checkout-session.ts is not specified and it doesn\u0027t parse as CommonJS.\nReparsing as ES module because module syntax was detected. This incurs a performance overhead.\nTo eliminate this warning, add \u0022type\u0022: \u0022module\u0022 to /Users/nguyenanhhuy/Desktop/brewlite/frontend/package.json.\n(Use \u0060node --trace-warnings ...\u0060 to show where the warning was created)\n\u2714 session survives reload and never stores JWT (0.98375ms)\n\u2714 unknown result keeps same order and payment idempotency keys on reload (0.08875ms)\n\u2714 VNPay attempt survives reload so retry keeps the original order (0.065ms)\n\u2714 paid is only true for paid or subsequent processing states (0.070208ms)\n\u2714 known decline/timeout allow a NEW key; uncertain errors keep old key (0.054459ms)\n\u2714 bad, missing, and unrelated identity cannot restore session (0.064667ms)\n\u2139 tests 6\n\u2139 suites 0\n\u2139 pass 6\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 71.33425\n",
+        "durationMs": 119
+      },
+      {
+        "name": "home-route-serves",
+        "kind": "http-probe",
+        "verificationMethod": "http-status",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": null,
+        "outputSample": "HTTP 200\n\u003C!DOCTYPE html\u003E\u003Chtml lang=\u0022vi\u0022 class=\u0022scroll-smooth\u0022\u003E\u003Chead\u003E\u003Cmeta charSet=\u0022utf-8\u0022/\u003E\u003Cmeta name=\u0022viewport\u0022 content=\u0022width=device-width, initial-scale=1\u0022/\u003E\u003Clink rel=\u0022stylesheet\u0022 href=\u0022/_next/static/chunks/app_globals_css_20o3uo5wggppq.css\u0022 data-precedence=\u0022next_static/chunks/app_globals_css_20o3uo5wggppq.css\u0022/\u003E\u003Clink rel=\u0022preload\u0022 as=\u0022script\u0022 fetchPriority=\u0022low\u0022 href=\u0022/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_03l4kld1mrwfx._.js\u0022/\u003E\u003Cscript src=\u0022/_next/static/chunks/node_modules_next_dist_compiled_next-devtools_index_090k2jmam7qwg.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/1daa_next_dist_compiled_react-dom_cjs_react-dom-client_development_0mp0cp_t-ezj9.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/1q96_modules_next_dist_compiled_react-dom_cjs_react-dom_development_1sqry0_53krp4.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/node_modules_next_dist_compiled_react-dom_0grqycjrj6mju._.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_164kp-67asdr9._.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/node_modules_next_dist_compiled_1amofcmz--cdp._.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/node_modules_next_dist_client_14zvornz047l2._.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/node_modules_next_dist_1bjkg68unqmjx._.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/node_modules_%40swc_helpers_cjs_1r9vbqwj2323d._.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/_1anvha4rlo79g._.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/turbopack-_00pkkjbg3g3xr._.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/_219uq1sj0q91c._.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/node_modules_0nr_7dubg503x._.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/_0ttyep1k7k766._.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/_0qzquq7whb8fh._.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/node_modules_%40tanstack_1ey78futddfbk._.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Ctitle\u003EBrewLite Coffee | H\u01B0\u01A1ng V\u1ECB C\u00E0 Ph\u00EA M\u1ED9c Nguy\u00EAn B\u1EA3n\u003C/title\u003E\u003Cmeta name=\u0022description\u0022 content=\u0022Th\u01B0\u01A1ng hi\u1EC7u c\u00E0 ph\u00EA m\u1ED9c th\u1EE7 c\u00F4ng cao c\u1EA5p. \u0110\u1EB7t m\u00F3n nhanh ch\u00F3ng, giao t\u1EADn n\u01A1i, thanh to\u00E1n kh\u00F4ng d\u00F9ng ti\u1EC1n m\u1EB7t.\u0022/\u003E\u003Clink rel=\u0022icon\u0022 href=\u0022/favicon.ico?favicon.117ezoe8m31dk.ico\u0022 sizes=\u002248x48\u0022 type=\u0022image/x-icon\u0022/\u003E\u003Cscript src=\u0022/_next/static/chunks/node_modules_next_dist_build_polyfills_polyfill-nomodule.js\u0022 noModule=\u0022\u0022\u003E\u003C/script\u003E\u003C/head\u003E\u003Cbody class=\u0022min-h-screen flex flex-col bg-[#FAF9F6] text-stone-900 selection:bg-amber-800 selection:text-white\u0022\u003E\u003Cdiv hidden=\u0022\u0022\u003E\u003C!--$--\u003E\u003C!--/$--\u003E\u003C/div\u003E\u003Cdiv class=\u0022bg-gradient-to-r from-amber-950 via-stone-900 to-amber-950 text-amber-200/90 text-xs py-2 px-4 text-center font-medium border-b border-amber-900/40 flex items-center justify-center gap-2\u0022\u003E\u003Cspan class=\u0022inline-block animate-pulse\u0022\u003E\u2728\u003C/span\u003E\u003Cspan\u003E\u01AFU \u0110\u00C3I TU\u1EA6N N\u00C0Y: \u003Cstrong\u003EMI\u1EC4N PH\u00CD GIAO H\u00C0NG\u003C/strong\u003E CHO \u0110\u01A0N T\u1EEA 99K \u2022 NH\u1EACP M\u00C3 \u003Cstrong\u003EBREWNEW\u003C/strong\u003E GI\u1EA2M 15%\u003C/span\u003E\u003C/div\u003E\u003Cheader class=\u0022sticky top-0 z-50 backdrop-blur-md bg-stone-950/95 border-b border-amber-900/30 text-white shadow-lg shadow-black/10\u0022\u003E\u003Cdiv class=\u0022max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between\u0022\u003E\u003Ca class=\u0022flex items-center gap-3 group\u0022 href=\u0022/\u0022\u003E\u003Cdiv class=\u0022w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-700 via-amber-500 to-amber-300 p-0.5 shadow-md shadow-amber-950/50 group-hover:scale-105 transition-all duration-300\u0022\u003E\u003Cdiv class=\u0022w-full h-full bg-stone-950 rounded-[10px] flex items-center justify-center\u0022\u003E\u003Cspan class=\u0022text-xl\u0022\u003E\u2615\u003C/span\u003E\u003C/div\u003E\u003C/div\u003E\u003Cdiv class=\u0022flex flex-col\u0022\u003E\u003Cspan class=\u0022text-2xl font-black tracking-tight bg-gradient-to-r from-amber-100 via-amber-300 to-amber-100 bg-clip-text text-transparent\u0022\u003EBrewLite\u003C/span\u003E\u003Cspan class=\u0022text-[10px] uppercase tracking-widest text-amber-400/80 font-bold -mt-1\u0022\u003EArtisan Roastery\u003C/span\u003E\u003C/div\u003E\u003C/a\u003E\u003Cnav class=\u0022hidden md:flex items-center gap-8 text-sm font-semibold text-stone-300\u0022\u003E\u003Ca class=\u0022hover:text-amber-400 transition-colors\u0022 href=\u0022/\u0022\u003ETrang ch\u1EE7\u003C/a\u003E\u003Ca class=\u0022hover:text-ambe\n\u2026[truncated]",
+        "durationMs": 110
+      },
+      {
+        "name": "orders-route-serves",
+        "kind": "http-probe",
+        "verificationMethod": "http-status",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": null,
+        "outputSample": "HTTP 200\n\u003C!DOCTYPE html\u003E\u003Chtml lang=\u0022vi\u0022 class=\u0022scroll-smooth\u0022\u003E\u003Chead\u003E\u003Cmeta charSet=\u0022utf-8\u0022/\u003E\u003Cmeta name=\u0022viewport\u0022 content=\u0022width=device-width, initial-scale=1\u0022/\u003E\u003Clink rel=\u0022stylesheet\u0022 href=\u0022/_next/static/chunks/app_globals_css_20o3uo5wggppq.css\u0022 data-precedence=\u0022next_static/chunks/app_globals_css_20o3uo5wggppq.css\u0022/\u003E\u003Clink rel=\u0022preload\u0022 as=\u0022script\u0022 fetchPriority=\u0022low\u0022 href=\u0022/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_03l4kld1mrwfx._.js\u0022/\u003E\u003Cscript src=\u0022/_next/static/chunks/node_modules_next_dist_compiled_next-devtools_index_090k2jmam7qwg.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/1daa_next_dist_compiled_react-dom_cjs_react-dom-client_development_0mp0cp_t-ezj9.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/1q96_modules_next_dist_compiled_react-dom_cjs_react-dom_development_1sqry0_53krp4.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/node_modules_next_dist_compiled_react-dom_0grqycjrj6mju._.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_164kp-67asdr9._.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/node_modules_next_dist_compiled_1amofcmz--cdp._.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/node_modules_next_dist_client_14zvornz047l2._.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/node_modules_next_dist_1bjkg68unqmjx._.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/node_modules_%40swc_helpers_cjs_1r9vbqwj2323d._.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/_1anvha4rlo79g._.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/turbopack-_00pkkjbg3g3xr._.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/_1-h_9fzfhbxrm._.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/node_modules_0nr_7dubg503x._.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/_0ttyep1k7k766._.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/_0zg5c8v-pcjlb._.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Ctitle\u003EBrewLite Coffee | H\u01B0\u01A1ng V\u1ECB C\u00E0 Ph\u00EA M\u1ED9c Nguy\u00EAn B\u1EA3n\u003C/title\u003E\u003Cmeta name=\u0022description\u0022 content=\u0022Th\u01B0\u01A1ng hi\u1EC7u c\u00E0 ph\u00EA m\u1ED9c th\u1EE7 c\u00F4ng cao c\u1EA5p. \u0110\u1EB7t m\u00F3n nhanh ch\u00F3ng, giao t\u1EADn n\u01A1i, thanh to\u00E1n kh\u00F4ng d\u00F9ng ti\u1EC1n m\u1EB7t.\u0022/\u003E\u003Clink rel=\u0022icon\u0022 href=\u0022/favicon.ico?favicon.117ezoe8m31dk.ico\u0022 sizes=\u002248x48\u0022 type=\u0022image/x-icon\u0022/\u003E\u003Cscript src=\u0022/_next/static/chunks/node_modules_next_dist_build_polyfills_polyfill-nomodule.js\u0022 noModule=\u0022\u0022\u003E\u003C/script\u003E\u003C/head\u003E\u003Cbody class=\u0022min-h-screen flex flex-col bg-[#FAF9F6] text-stone-900 selection:bg-amber-800 selection:text-white\u0022\u003E\u003Cdiv hidden=\u0022\u0022\u003E\u003C!--$--\u003E\u003C!--/$--\u003E\u003C/div\u003E\u003Cdiv class=\u0022bg-gradient-to-r from-amber-950 via-stone-900 to-amber-950 text-amber-200/90 text-xs py-2 px-4 text-center font-medium border-b border-amber-900/40 flex items-center justify-center gap-2\u0022\u003E\u003Cspan class=\u0022inline-block animate-pulse\u0022\u003E\u2728\u003C/span\u003E\u003Cspan\u003E\u01AFU \u0110\u00C3I TU\u1EA6N N\u00C0Y: \u003Cstrong\u003EMI\u1EC4N PH\u00CD GIAO H\u00C0NG\u003C/strong\u003E CHO \u0110\u01A0N T\u1EEA 99K \u2022 NH\u1EACP M\u00C3 \u003Cstrong\u003EBREWNEW\u003C/strong\u003E GI\u1EA2M 15%\u003C/span\u003E\u003C/div\u003E\u003Cheader class=\u0022sticky top-0 z-50 backdrop-blur-md bg-stone-950/95 border-b border-amber-900/30 text-white shadow-lg shadow-black/10\u0022\u003E\u003Cdiv class=\u0022max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between\u0022\u003E\u003Ca class=\u0022flex items-center gap-3 group\u0022 href=\u0022/\u0022\u003E\u003Cdiv class=\u0022w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-700 via-amber-500 to-amber-300 p-0.5 shadow-md shadow-amber-950/50 group-hover:scale-105 transition-all duration-300\u0022\u003E\u003Cdiv class=\u0022w-full h-full bg-stone-950 rounded-[10px] flex items-center justify-center\u0022\u003E\u003Cspan class=\u0022text-xl\u0022\u003E\u2615\u003C/span\u003E\u003C/div\u003E\u003C/div\u003E\u003Cdiv class=\u0022flex flex-col\u0022\u003E\u003Cspan class=\u0022text-2xl font-black tracking-tight bg-gradient-to-r from-amber-100 via-amber-300 to-amber-100 bg-clip-text text-transparent\u0022\u003EBrewLite\u003C/span\u003E\u003Cspan class=\u0022text-[10px] uppercase tracking-widest text-amber-400/80 font-bold -mt-1\u0022\u003EArtisan Roastery\u003C/span\u003E\u003C/div\u003E\u003C/a\u003E\u003Cnav class=\u0022hidden md:flex items-center gap-8 text-sm font-semibold text-stone-300\u0022\u003E\u003Ca class=\u0022hover:text-amber-400 transition-colors\u0022 href=\u0022/\u0022\u003ETrang ch\u1EE7\u003C/a\u003E\u003Ca class=\u0022hover:text-amber-400 transition-colors\u0022 href=\u0022/#menu\u0022\u003ETh\u1EF1c \u0111\u01A1n\u003C/a\u003E\u003Ca class=\u0022hover:text-amber-400 transition-colo\n\u2026[truncated]",
+        "durationMs": 172
+      }
+    ],
+    "executions": [
+      {
+        "source": "setup[0]",
+        "resolvedExecutable": "/opt/homebrew/bin/npm",
+        "args": [
+          "ci"
+        ],
+        "cwd": "/Users/nguyenanhhuy/Desktop/brewlite/frontend",
+        "env": {},
+        "prependPath": [],
+        "platform": "darwin",
+        "nodeExecutable": "/opt/homebrew/bin/node",
+        "nodeVersion": "v26.7.0",
+        "packageManager": "npm",
+        "packageManagerExecutable": "/opt/homebrew/bin/npm",
+        "packageManagerVersion": "11.19.0",
+        "cleanup": {
+          "RootProcessId": 71601,
+          "Completed": true,
+          "ProcessesObserved": 1,
+          "ProcessesTerminated": 0,
+          "Failure": null
+        }
+      },
+      {
+        "source": "devServer",
+        "resolvedExecutable": "/opt/homebrew/bin/npm",
+        "args": [
+          "run",
+          "dev"
+        ],
+        "cwd": "/Users/nguyenanhhuy/Desktop/brewlite/frontend",
+        "env": {},
+        "prependPath": [],
+        "platform": "darwin",
+        "nodeExecutable": "/opt/homebrew/bin/node",
+        "nodeVersion": "v26.7.0",
+        "packageManager": "npm",
+        "packageManagerExecutable": "/opt/homebrew/bin/npm",
+        "packageManagerVersion": "11.19.0",
+        "cleanup": {
+          "RootProcessId": 71729,
+          "Completed": true,
+          "ProcessesObserved": 1,
+          "ProcessesTerminated": 1,
+          "Failure": null
+        }
+      },
+      {
+        "source": "typescript-no-emit",
+        "resolvedExecutable": "/opt/homebrew/bin/npx",
+        "args": [
+          "tsc",
+          "--noEmit"
+        ],
+        "cwd": "/Users/nguyenanhhuy/Desktop/brewlite/frontend",
+        "env": {},
+        "prependPath": [],
+        "platform": "darwin",
+        "nodeExecutable": null,
+        "nodeVersion": null,
+        "packageManager": null,
+        "packageManagerExecutable": null,
+        "packageManagerVersion": null,
+        "cleanup": {
+          "RootProcessId": 71786,
+          "Completed": true,
+          "ProcessesObserved": 1,
+          "ProcessesTerminated": 0,
+          "Failure": null
+        }
+      },
+      {
+        "source": "lint-pass",
+        "resolvedExecutable": "/opt/homebrew/bin/npm",
+        "args": [
+          "run",
+          "lint"
+        ],
+        "cwd": "/Users/nguyenanhhuy/Desktop/brewlite/frontend",
+        "env": {},
+        "prependPath": [],
+        "platform": "darwin",
+        "nodeExecutable": "/opt/homebrew/bin/node",
+        "nodeVersion": "v26.7.0",
+        "packageManager": "npm",
+        "packageManagerExecutable": "/opt/homebrew/bin/npm",
+        "packageManagerVersion": "11.19.0",
+        "cleanup": {
+          "RootProcessId": 71919,
+          "Completed": true,
+          "ProcessesObserved": 1,
+          "ProcessesTerminated": 0,
+          "Failure": null
+        }
+      },
+      {
+        "source": "checkout-session-regression-tests",
+        "resolvedExecutable": "/opt/homebrew/bin/node",
+        "args": [
+          "--experimental-strip-types",
+          "--test",
+          "tests/checkout-session.test.mjs"
+        ],
+        "cwd": "/Users/nguyenanhhuy/Desktop/brewlite/frontend",
+        "env": {},
+        "prependPath": [],
+        "platform": "darwin",
+        "nodeExecutable": null,
+        "nodeVersion": null,
+        "packageManager": null,
+        "packageManagerExecutable": null,
+        "packageManagerVersion": null,
+        "cleanup": {
+          "RootProcessId": 71970,
+          "Completed": true,
+          "ProcessesObserved": 1,
+          "ProcessesTerminated": 0,
+          "Failure": null
+        }
+      },
+      {
+        "source": "home-route-serves",
+        "resolvedExecutable": "/opt/homebrew/bin/npm",
+        "args": [
+          "run",
+          "dev"
+        ],
+        "cwd": "/Users/nguyenanhhuy/Desktop/brewlite/frontend",
+        "env": {},
+        "prependPath": [],
+        "platform": "darwin",
+        "nodeExecutable": "/opt/homebrew/bin/node",
+        "nodeVersion": "v26.7.0",
+        "packageManager": "npm",
+        "packageManagerExecutable": "/opt/homebrew/bin/npm",
+        "packageManagerVersion": "11.19.0",
+        "cleanup": {
+          "RootProcessId": 71972,
+          "Completed": true,
+          "ProcessesObserved": 1,
+          "ProcessesTerminated": 1,
+          "Failure": null
+        }
+      },
+      {
+        "source": "orders-route-serves",
+        "resolvedExecutable": "/opt/homebrew/bin/npm",
+        "args": [
+          "run",
+          "dev"
+        ],
+        "cwd": "/Users/nguyenanhhuy/Desktop/brewlite/frontend",
+        "env": {},
+        "prependPath": [],
+        "platform": "darwin",
+        "nodeExecutable": "/opt/homebrew/bin/node",
+        "nodeVersion": "v26.7.0",
+        "packageManager": "npm",
+        "packageManagerExecutable": "/opt/homebrew/bin/npm",
+        "packageManagerVersion": "11.19.0",
+        "cleanup": {
+          "RootProcessId": 71973,
+          "Completed": true,
+          "ProcessesObserved": 1,
+          "ProcessesTerminated": 1,
+          "Failure": null
+        }
+      }
+    ]
+  }
+}

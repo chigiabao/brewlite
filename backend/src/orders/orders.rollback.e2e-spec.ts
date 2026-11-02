@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 dotenv.config({ path: '../.env' });
 
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { OrdersService } from './orders.service.js';
 import { StockService } from './stock.service.js';
@@ -9,6 +9,7 @@ import { StockService } from './stock.service.js';
 describe('Orders rollback and stock concurrency (real PostgreSQL)', () => {
   let prisma: PrismaService;
   let ordersService: OrdersService;
+  let stockService: StockService;
 
   const productIds: number[] = [];
   const userIds: number[] = [];
@@ -17,7 +18,8 @@ describe('Orders rollback and stock concurrency (real PostgreSQL)', () => {
     prisma = new PrismaService();
     await prisma.$connect();
 
-    ordersService = new OrdersService(prisma, new StockService());
+    stockService = new StockService();
+    ordersService = new OrdersService(prisma, stockService);
   });
 
   afterEach(async () => {
@@ -115,10 +117,21 @@ describe('Orders rollback and stock concurrency (real PostgreSQL)', () => {
     // ID này không tồn tại: tạo Order sẽ lỗi khóa ngoại
     // sau khi stock.reserve() đã chạy trong transaction.
     const nonexistentUserId = -999999999;
+    const reserveSpy = vi.spyOn(stockService, 'reserve');
 
-    await expect(
-      ordersService.create(nonexistentUserId, orderDto(product.id)),
-    ).rejects.toThrow();
+    try {
+      await expect(
+        ordersService.create(nonexistentUserId, orderDto(product.id), 'fix04-rollback-after-stock'),
+      ).rejects.toThrow();
+
+      // Phải reserve thật trước khi cố tạo Order với userId sai FK.
+      // Nếu request bị chặn từ validation/idempotency trước transaction, test sẽ đỏ.
+      expect(reserveSpy).toHaveBeenCalledOnce();
+      expect(reserveSpy.mock.results[0]?.type).toBe('return');
+      await expect(reserveSpy.mock.results[0]?.value).resolves.toBeUndefined();
+    } finally {
+      reserveSpy.mockRestore();
+    }
 
     const after = await prisma.product.findUniqueOrThrow({
       where: { id: product.id },

@@ -1,5 +1,7 @@
 FROM node:24-bookworm-slim
 WORKDIR /app
+ARG DATABASE_URL="postgresql://brew:brew@db:5432/brewlite"
+ENV DATABASE_URL=${DATABASE_URL}
 COPY package*.json ./
 RUN npm ci
 COPY . .

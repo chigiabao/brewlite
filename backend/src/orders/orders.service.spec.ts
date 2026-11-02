@@ -2,6 +2,7 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OrdersService } from './orders.service.js';
 import { StockService } from './stock.service.js';
+import type { RewardsPort } from '../rewards/public.js';
 import { createHash } from 'node:crypto';
 import type { CreateOrderDto } from './orders.dto.js';
 
@@ -151,6 +152,7 @@ describe('OrdersService', () => {
         pointsRedeemed: 0,
         total: 40000,
         couponCode: null,
+        cancelAfter: expect.any(Date),
         items: {
           create: [
             {
@@ -273,12 +275,18 @@ describe('OrdersService', () => {
 
   it('hủy đơn PENDING và hoàn kho trong transaction', async () => {
     const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
       order: {
         findFirst: vi.fn().mockResolvedValue({
           id: 10,
+          userId: 7,
           status: 'PENDING',
         }),
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+      payment: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
       },
       orderItem: {
         findMany: vi.fn().mockResolvedValue([{ productId: 1, qty: 2 }]),
@@ -297,8 +305,8 @@ describe('OrdersService', () => {
     });
 
     expect(tx.order.updateMany).toHaveBeenCalledWith({
-      where: { id: 10, userId: 7, status: 'PENDING' },
-      data: { status: 'CANCELLED' },
+      where: { id: 10, status: 'PENDING' },
+      data: { status: 'CANCELLED', cancelAfter: null },
     });
 
     expect(stock.release).toHaveBeenCalledWith(tx, [{ productId: 1, qty: 2 }]);
@@ -306,7 +314,12 @@ describe('OrdersService', () => {
 
   it('báo ORDER_NOT_FOUND nếu đơn không thuộc user hoặc không tồn tại', async () => {
     const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
       order: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        updateMany: vi.fn(),
+      },
+      payment: {
         findFirst: vi.fn().mockResolvedValue(null),
         updateMany: vi.fn(),
       },
@@ -329,11 +342,17 @@ describe('OrdersService', () => {
 
   it('không hủy đơn đã thanh toán', async () => {
     const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
       order: {
         findFirst: vi.fn().mockResolvedValue({
           id: 10,
+          userId: 7,
           status: 'PAID',
         }),
+        updateMany: vi.fn(),
+      },
+      payment: {
+        findFirst: vi.fn().mockResolvedValue(null),
         updateMany: vi.fn(),
       },
       orderItem: {
@@ -355,12 +374,18 @@ describe('OrdersService', () => {
 
   it('hủy đơn PAYMENT_FAILED và hoàn kho', async () => {
     const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
       order: {
         findFirst: vi.fn().mockResolvedValue({
           id: 10,
+          userId: 7,
           status: 'PAYMENT_FAILED',
         }),
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+      payment: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
       },
       orderItem: {
         findMany: vi.fn().mockResolvedValue([{ productId: 1, qty: 2 }]),
@@ -381,10 +406,9 @@ describe('OrdersService', () => {
     expect(tx.order.updateMany).toHaveBeenCalledWith({
       where: {
         id: 10,
-        userId: 7,
         status: 'PAYMENT_FAILED',
       },
-      data: { status: 'CANCELLED' },
+      data: { status: 'CANCELLED', cancelAfter: null },
     });
 
     expect(stock.release).toHaveBeenCalledWith(tx, [{ productId: 1, qty: 2 }]);
@@ -422,3 +446,153 @@ describe('OrdersService', () => {
   });
 });
 
+
+
+// ─── FIX 03: kiểm tra wiring E ↔ G (không thể chỉ test Rewards cô lập) ──
+
+describe('FIX03 Orders: quote snapshot và hoàn reservation', () => {
+  const prisma = {
+    $transaction: vi.fn(),
+    order: { findFirst: vi.fn() },
+  };
+  const stock = { reserve: vi.fn(), release: vi.fn() };
+  const rewards = {
+    reserveCouponAndPoints: vi.fn(),
+    releaseReservedOnCancel: vi.fn(),
+    finalizeRewardsOnPaid: vi.fn(),
+  };
+  let service: OrdersService;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    service = new OrdersService(prisma as never, stock as never, rewards as unknown as RewardsPort);
+    prisma.order.findFirst.mockResolvedValue(null);
+    stock.reserve.mockResolvedValue(undefined);
+    stock.release.mockResolvedValue(undefined);
+    rewards.releaseReservedOnCancel.mockResolvedValue(undefined);
+  });
+
+  it('tạo đơn lưu pointsRedeemed theo quote thực, không theo số user yêu cầu', async () => {
+    const orderCreated = { id: 42, status: 'PENDING', subtotal: 57_000, discountTotal: 57_000, pointsRedeemed: 27_000, total: 0 };
+    const tx = {
+      order: { findFirst: vi.fn().mockResolvedValue(null), create: vi.fn().mockResolvedValue(orderCreated) },
+      product: { findMany: vi.fn().mockResolvedValue([{
+        id: 1, price: 57_000, stock: 8, version: 0,
+      }]) },
+    };
+    prisma.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn(tx));
+    rewards.reserveCouponAndPoints.mockResolvedValue({
+      couponDiscount: 30_000, pointsDiscount: 27_000, totalDiscount: 57_000, total: 0,
+    });
+
+    const result = await service.create(7, {
+      items: [{ productId: 1, size: 'S', toppings: [], qty: 1 }],
+      couponCode: '  giAm10  ', pointsToRedeem: 30_000,
+    }, 'fix03-capped');
+    expect(result).toEqual(orderCreated);
+    expect(rewards.reserveCouponAndPoints).toHaveBeenCalledWith({
+      userId: 7, subtotal: 57_000, couponCode: 'GIAM10', pointsToRedeem: 30_000,
+    }, tx);
+    expect(tx.order.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        pointsRedeemed: 27_000, couponCode: 'GIAM10', discountTotal: 57_000,
+      }),
+    }));
+    // PENDING chưa ghi REDEEM; chỉ giữ điểm và snapshot số điểm được giảm.
+    expect(rewards.reserveCouponAndPoints).toHaveBeenCalledOnce();
+  });
+
+  it('hủy PENDING: chuyển trạng thái bằng CAS, hoàn stock và reserve G trong cùng tx', async () => {
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      order: {
+        findFirst: vi.fn().mockResolvedValue({ id: 42, userId: 7, status: 'PENDING', couponCode: 'GIAM10', pointsRedeemed: 27_000 }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+      payment: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      },
+      orderItem: { findMany: vi.fn().mockResolvedValue([{ productId: 1, qty: 2 }]) },
+    };
+    prisma.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn(tx));
+    await expect(service.cancel(7, 42)).resolves.toEqual({ id: 42, status: 'CANCELLED' });
+    expect(tx.order.updateMany).toHaveBeenCalledWith({
+      where: { id: 42, status: 'PENDING' },
+      data: { status: 'CANCELLED', cancelAfter: null },
+    });
+    expect(stock.release).toHaveBeenCalledWith(tx, [{ productId: 1, qty: 2 }]);
+    expect(rewards.releaseReservedOnCancel).toHaveBeenCalledTimes(1);
+    expect(rewards.releaseReservedOnCancel).toHaveBeenCalledWith({
+      orderId: 42, userId: 7, couponCode: 'GIAM10', pointsRedeemed: 27_000,
+    }, tx);
+  });
+
+  it('hủy PAYMENT_FAILED: hoàn lại reservation', async () => {
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      order: { findFirst: vi.fn().mockResolvedValue({ id: 42, userId: 7, status: 'PAYMENT_FAILED', couponCode: null, pointsRedeemed: 10_000 }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      payment: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      },
+      orderItem: { findMany: vi.fn().mockResolvedValue([]) },
+    };
+    prisma.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn(tx));
+    await service.cancel(7, 42);
+    expect(rewards.releaseReservedOnCancel).toHaveBeenCalledWith({
+      orderId: 42, userId: 7, couponCode: null, pointsRedeemed: 10_000,
+    }, tx);
+  });
+
+  it('race hai cancel: CAS thua => không release stock, quota, points', async () => {
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      order: { findFirst: vi.fn().mockResolvedValue({ id: 42, userId: 7, status: 'PENDING', couponCode: 'GIAM10', pointsRedeemed: 10_000 }),
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      payment: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      },
+      orderItem: { findMany: vi.fn() },
+    };
+    prisma.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn(tx));
+    await expect(service.cancel(7, 42)).rejects.toBeInstanceOf(ConflictException);
+    expect(stock.release).not.toHaveBeenCalled();
+    expect(rewards.releaseReservedOnCancel).not.toHaveBeenCalled();
+  });
+
+  it('G báo lỗi => lỗi nổi lên ngoài transaction, không được trả CANCELLED giả', async () => {
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      order: { findFirst: vi.fn().mockResolvedValue({ id: 42, userId: 7, status: 'PENDING', couponCode: 'GIAM10', pointsRedeemed: 10_000 }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      payment: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      },
+      orderItem: { findMany: vi.fn().mockResolvedValue([{ productId: 1, qty: 2 }]) },
+    };
+    prisma.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn(tx));
+    rewards.releaseReservedOnCancel.mockRejectedValue(new Error('COUPON_RELEASE_FAILED'));
+    await expect(service.cancel(7, 42)).rejects.toThrow('COUPON_RELEASE_FAILED');
+    expect(stock.release).toHaveBeenCalledOnce();
+  });
+
+  it('không thể hủy đơn đã PAID để nhận lại điểm (không có chính sách refund)', async () => {
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      order: { findFirst: vi.fn().mockResolvedValue({ id: 42, userId: 7, status: 'PAID', couponCode: 'GIAM10', pointsRedeemed: 10_000 }),
+        updateMany: vi.fn() },
+      payment: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      },
+      orderItem: { findMany: vi.fn() },
+    };
+    prisma.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn(tx));
+    await expect(service.cancel(7, 42)).rejects.toBeInstanceOf(ConflictException);
+    expect(rewards.releaseReservedOnCancel).not.toHaveBeenCalled();
+  });
+});

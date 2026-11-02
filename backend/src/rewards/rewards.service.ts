@@ -13,6 +13,7 @@ import {
   calculateRewardsQuote,
   checkCouponEligibility,
   normalizeCouponCode,
+  assertNonNegativeInteger,
   type CouponInvalidReason,
 } from './reward-rules.js';
 import type { ValidateCouponDto } from './rewards.dto.js';
@@ -87,6 +88,8 @@ export class RewardsService {
     tx: RewardsTx,
   ): Promise<ReserveResult> {
     const { userId, subtotal, couponCode, pointsToRedeem = 0 } = params;
+    assertNonNegativeInteger(subtotal, 'subtotal');
+    assertNonNegativeInteger(pointsToRedeem, 'pointsToRedeem');
 
     // --- Coupon ---
     let couponDiscount = 0;
@@ -124,97 +127,178 @@ export class RewardsService {
       this.logger.log(`coupon.reserved code=${code} userId=${userId}`);
     }
 
-    // --- Points redeem ---
-    let pointsDiscount = 0;
-    if (pointsToRedeem > 0) {
-      // Đọc số điểm hiện tại; dùng updateMany để atomically kiểm tra và trừ.
+    // Tính số điểm THỰC được sử dụng trước khi trừ balance.
+    // Ví dụ còn 27.000đ, yêu cầu 30.000 điểm -> chỉ reserve 27.000.
+    const quote = calculateRewardsQuote(subtotal, couponDiscount, pointsToRedeem);
+    if (quote.pointsDiscount > 0) {
       const updated = await tx.user.updateMany({
-        where: { id: userId, loyaltyPoints: { gte: pointsToRedeem } },
-        data: { loyaltyPoints: { decrement: pointsToRedeem } },
+        where: { id: userId, loyaltyPoints: { gte: quote.pointsDiscount } },
+        data: { loyaltyPoints: { decrement: quote.pointsDiscount } },
       });
-
-      if (updated.count === 0) {
+      if (updated.count !== 1) {
         throw new BadRequestException('Không đủ điểm loyalty để đổi');
       }
-
-      // Tạo LoyaltyEntry REDEEM; unique([orderId, kind]) sẽ được enforce sau khi Order được tạo.
-      // Tại bước reserve, chưa có orderId nên entry này được tạo sau khi Order insert bởi E.
-      // G chỉ trừ điểm user ở đây; E sẽ tạo LoyaltyEntry REDEEM sau khi có orderId.
-      pointsDiscount = pointsToRedeem;
-      this.logger.log(`points.reserved userId=${userId} points=${pointsToRedeem}`);
+      this.logger.log(`points.reserved userId=${userId} points=${quote.pointsDiscount}`);
     }
-
-    const quote = calculateRewardsQuote(subtotal, couponDiscount, pointsDiscount);
     return quote;
   }
 
   /**
-   * Tạo LoyaltyEntry REDEEM cho order vừa tạo.
-   * E gọi method này sau khi insert Order (đã có orderId) trong cùng transaction.
-   * Chỉ gọi nếu pointsRedeemed > 0.
+   * Hoàn lại nguồn lực khi E chuyển PENDING/PAYMENT_FAILED -> CANCELLED.
+   * Chỉ được gọi sau CAS đổi trạng thái thành công, trong CÙNG transaction
+   * hủy đơn + hoàn stock. CAS là hàng rào exactly-once; method này không
+   * được gọi trực tiếp từ controller hay khi đơn đã PAID.
+   *
+   * Đơn PENDING/PAYMENT_FAILED chưa có REDEEM; với dữ liệu cũ trước FIX06,
+   * xóa REDEEM ghi sớm khi cancel để giữ sổ chỉ ghi đơn PAID.
    */
-  async createRedeemEntry(
-    params: { orderId: number; userId: number; points: number },
+  async releaseReservedOnCancel(
+    params: { orderId: number; userId: number; couponCode: string | null; pointsRedeemed: number },
     tx: RewardsTx,
   ): Promise<void> {
-    if (params.points <= 0) return;
-    await tx.loyaltyEntry.create({
-      data: {
-        userId: params.userId,
-        orderId: params.orderId,
-        kind: LoyaltyKind.REDEEM,
-        points: params.points,
-      },
-    });
-    this.logger.log(
-      `loyalty.redeem.entry orderId=${params.orderId} userId=${params.userId} points=${params.points}`,
-    );
+    const { orderId, userId, couponCode, pointsRedeemed } = params;
+    assertNonNegativeInteger(pointsRedeemed, 'pointsRedeemed');
+
+    if (couponCode?.trim()) {
+      const code = normalizeCouponCode(couponCode);
+      const released = await tx.coupon.updateMany({
+        where: { code, usedCount: { gt: 0 } },
+        data: { usedCount: { decrement: 1 } },
+      });
+      if (released.count !== 1) {
+        throw new ConflictException('COUPON_RESERVATION_NOT_FOUND');
+      }
+      this.logger.log(`coupon.released orderId=${orderId} code=${code}`);
+    }
+
+    if (pointsRedeemed > 0) {
+      const refunded = await tx.user.updateMany({
+        where: { id: userId },
+        data: { loyaltyPoints: { increment: pointsRedeemed } },
+      });
+      if (refunded.count !== 1) {
+        throw new ConflictException('REWARDS_USER_NOT_FOUND');
+      }
+      // Cleanup tương thích với đơn cũ từng ghi REDEEM ngay lúc tạo đơn.
+      await tx.loyaltyEntry.deleteMany({
+        where: { orderId, kind: LoyaltyKind.REDEEM },
+      });
+      this.logger.log(`points.released orderId=${orderId} userId=${userId} points=${pointsRedeemed}`);
+    }
   }
 
   /**
-   * Cộng điểm loyalty sau khi Order PAID — chính xác 1 lần nhờ unique constraint.
-   * F phải gọi trong cùng transaction markPaid.
-   *
-   * Idempotent: LoyaltyEntry unique([orderId, kind=EARN]) chặn double-earn.
-   * Nếu đã tồn tại (idempotent replay), method này return sớm mà không throw.
+   * Chỉ được F gọi SAU markPaid, CÙNG DB transaction với Payment/Order.
+   * PENDING chỉ reserve balance; không có LoyaltyEntry REDEEM/EARN.
+   * Unique (orderId, kind) hỗ trợ exactly-once khi payment replay.
+   * Nếu checkout cũ (trước FIX06) đã ghi REDEEM ở PENDING,
+   * kiểm tra snapshot và không ghi trùng.
    */
   async finalizeRewardsOnPaid(
-    params: { orderId: number; userId: number; totalPaid: number },
+    params: { orderId: number; userId: number; totalPaid: number; pointsRedeemed: number },
     tx: RewardsTx,
   ): Promise<{ pointsEarned: number }> {
-    const { orderId, userId, totalPaid } = params;
-    const pointsEarned = calculateEarnedPoints(totalPaid);
+    const { orderId, userId, totalPaid, pointsRedeemed } = params;
+    assertNonNegativeInteger(pointsRedeemed, 'pointsRedeemed');
+    assertNonNegativeInteger(totalPaid, 'totalPaid');
 
-    if (pointsEarned <= 0) {
-      return { pointsEarned: 0 };
+    if (pointsRedeemed > 0) {
+      const existingRedeem = await tx.loyaltyEntry.findUnique({
+        where: { orderId_kind: { orderId, kind: LoyaltyKind.REDEEM } },
+      });
+      if (existingRedeem) {
+        if (existingRedeem.points !== pointsRedeemed || existingRedeem.userId !== userId) {
+          throw new ConflictException('REDEEM_LEDGER_MISMATCH');
+        }
+      } else {
+        await tx.loyaltyEntry.create({
+          data: { userId, orderId, kind: LoyaltyKind.REDEEM, points: pointsRedeemed },
+        });
+      }
+      this.logger.log(`loyalty.redeem.finalized orderId=${orderId} points=${pointsRedeemed}`);
     }
 
-    // Kiểm tra đã EARN chưa (idempotency guard thủ công để tránh throw P2002 ra ngoài).
-    const existing = await tx.loyaltyEntry.findUnique({
+    const pointsEarned = calculateEarnedPoints(totalPaid);
+    if (pointsEarned === 0) return { pointsEarned: 0 };
+
+    const existingEarn = await tx.loyaltyEntry.findUnique({
       where: { orderId_kind: { orderId, kind: LoyaltyKind.EARN } },
     });
-    if (existing) {
+    if (existingEarn) {
+      if (existingEarn.points !== pointsEarned || existingEarn.userId !== userId) {
+        throw new ConflictException('EARN_LEDGER_MISMATCH');
+      }
       this.logger.warn(`loyalty.earn.duplicate orderId=${orderId} — skipped`);
-      return { pointsEarned: existing.points };
+      return { pointsEarned: existingEarn.points };
     }
+
+    await tx.loyaltyEntry.create({
+      data: { userId, orderId, kind: LoyaltyKind.EARN, points: pointsEarned },
+    });
+    await tx.user.update({
+      where: { id: userId },
+      data: { loyaltyPoints: { increment: pointsEarned } },
+    });
+    this.logger.log(`loyalty.earn orderId=${orderId} points=${pointsEarned}`);
+    return { pointsEarned };
+  }
+
+  /**
+   * Full-refund reversal. The unique (orderId, kind=REFUND) ledger row is the
+   * idempotency barrier, so replaying Stripe webhooks cannot move points twice.
+   */
+  async refundRewardsOnRefund(
+    params: {
+      orderId: number;
+      userId: number;
+      pointsRedeemed: number;
+      restoreRedeemedPoints: boolean;
+    },
+    tx: RewardsTx,
+  ): Promise<{ pointsDelta: number; alreadyProcessed: boolean }> {
+    const { orderId, userId, pointsRedeemed, restoreRedeemedPoints } = params;
+    assertNonNegativeInteger(pointsRedeemed, 'pointsRedeemed');
+
+    const existingRefund = await tx.loyaltyEntry.findUnique({
+      where: { orderId_kind: { orderId, kind: LoyaltyKind.REFUND } },
+    });
+    if (existingRefund) {
+      this.logger.warn(`loyalty.refund.duplicate orderId=${orderId} — skipped`);
+      return { pointsDelta: existingRefund.points, alreadyProcessed: true };
+    }
+
+    const earnEntry = await tx.loyaltyEntry.findUnique({
+      where: { orderId_kind: { orderId, kind: LoyaltyKind.EARN } },
+    });
+    const earnedPoints = earnEntry?.points ?? 0;
+    const restoredPoints = restoreRedeemedPoints ? pointsRedeemed : 0;
+    const pointsDelta = restoredPoints - earnedPoints;
 
     await tx.loyaltyEntry.create({
       data: {
         userId,
         orderId,
-        kind: LoyaltyKind.EARN,
-        points: pointsEarned,
+        kind: LoyaltyKind.REFUND,
+        points: pointsDelta,
       },
     });
 
-    await tx.user.update({
-      where: { id: userId },
-      data: { loyaltyPoints: { increment: pointsEarned } },
-    });
+    if (pointsDelta !== 0) {
+      const user = await tx.user.update({
+        where: { id: userId },
+        data: { loyaltyPoints: { increment: pointsDelta } },
+        select: { loyaltyPoints: true },
+      });
+      if (user.loyaltyPoints < 0) {
+        this.logger.warn(
+          `loyalty.refund.negative_balance orderId=${orderId} userId=${userId} balance=${user.loyaltyPoints}`,
+        );
+      }
+    }
 
     this.logger.log(
-      `loyalty.earn orderId=${orderId} userId=${userId} points=${pointsEarned}`,
+      `loyalty.refund orderId=${orderId} userId=${userId} delta=${pointsDelta} restored=${restoredPoints} reversed=${earnedPoints}`,
     );
-    return { pointsEarned };
+    return { pointsDelta, alreadyProcessed: false };
   }
 }

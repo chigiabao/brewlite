@@ -1,0 +1,60 @@
+{
+  "projectType": "webapp",
+  "devServer": {
+    "command": "npm",
+    "args": ["run", "dev"],
+    "url": "http://localhost:3000/"
+  },
+  "setup": [
+    { "command": "npm", "args": ["ci"] }
+  ],
+  "assertions": [
+    {
+      "name": "typescript-no-emit",
+      "kind": "process",
+      "command": "npx",
+      "args": ["tsc", "--noEmit"],
+      "verificationMethod": "exit-code",
+      "expected": "0",
+      "timeoutSeconds": 180
+    },
+    {
+      "name": "lint-pass",
+      "kind": "process",
+      "command": "npm",
+      "args": ["run", "lint"],
+      "verificationMethod": "exit-code",
+      "expected": "0",
+      "timeoutSeconds": 180
+    },
+    {
+      "name": "checkout-session-regression-tests",
+      "kind": "process",
+      "command": "node",
+      "args": ["--experimental-strip-types", "--test", "tests/checkout-session.test.mjs"],
+      "verificationMethod": "exit-code",
+      "expected": "0",
+      "timeoutSeconds": 60
+    },
+    {
+      "name": "home-route-serves",
+      "kind": "http-probe",
+      "startCommand": "npm",
+      "startArgs": ["run", "dev"],
+      "url": "http://localhost:3000/",
+      "verificationMethod": "http-status",
+      "expected": "200",
+      "timeoutSeconds": 120
+    },
+    {
+      "name": "orders-route-serves",
+      "kind": "http-probe",
+      "startCommand": "npm",
+      "startArgs": ["run", "dev"],
+      "url": "http://localhost:3000/orders",
+      "verificationMethod": "http-status",
+      "expected": "200",
+      "timeoutSeconds": 120
+    }
+  ]
+}

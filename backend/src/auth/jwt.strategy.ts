@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import type { AuthUser } from './current-user.decorator.js';
@@ -24,6 +24,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   validate(payload: JwtPayload): AuthUser {
+    if (
+      !payload ||
+      !Number.isSafeInteger(payload.sub) ||
+      payload.sub <= 0 ||
+      typeof payload.email !== 'string' ||
+      !payload.email.trim()
+    ) {
+      throw new UnauthorizedException();
+    }
     return { userId: payload.sub, email: payload.email };
   }
 }

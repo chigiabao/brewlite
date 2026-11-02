@@ -1,16 +1,26 @@
 // Trang giỏ hàng. Người phụ trách: C (Task 5).
 'use client';
 import Link from 'next/link';
+import { useSyncExternalStore } from 'react';
 import { useCart } from '@/store/cart';
+import { cartLineKey, MAX_CART_QTY } from '@/store/cart-rules';
+
+// Chờ Zustand đọc xong localStorage để tránh chớp giao diện 'Giỏ trống' khi refresh.
+const onHydrated = (callback: () => void) => useCart.persist.onFinishHydration(callback);
+const isHydrated = () => useCart.persist.hasHydrated();
+const isHydratedOnServer = () => false;
 
 export default function CartPage() {
+  const hydrated = useSyncExternalStore(onHydrated, isHydrated, isHydratedOnServer);
   const items = useCart((s) => s.items);
   const total = useCart((s) => s.total());
   const setQty = useCart((s) => s.setQty);
   const remove = useCart((s) => s.remove);
 
-  const keyOf = (i: (typeof items)[0]) =>
-    `${i.productId}-${i.size}-${[...i.toppings].sort().join(',')}`;
+
+  if (!hydrated) {
+    return <div className="max-w-xl mx-auto py-16 text-center text-stone-600">Đang tải giỏ hàng...</div>;
+  }
 
   if (!items.length) {
     return (
@@ -53,7 +63,7 @@ export default function CartPage() {
 
         <ul className="divide-y divide-stone-100 mt-2">
           {items.map((item) => {
-            const k = keyOf(item);
+            const k = cartLineKey(item);
             return (
               <li key={k} className="py-4 flex justify-between items-center gap-4">
                 <div className="space-y-0.5">
@@ -84,7 +94,7 @@ export default function CartPage() {
                     <button
                       type="button"
                       onClick={() => setQty(k, item.qty + 1)}
-                      disabled={item.qty >= 99}
+                      disabled={item.qty >= MAX_CART_QTY}
                       className="w-8 h-8 flex items-center justify-center hover:bg-stone-200 disabled:opacity-30 disabled:cursor-not-allowed text-stone-700 font-bold transition"
                       aria-label="Tăng số lượng"
                     >

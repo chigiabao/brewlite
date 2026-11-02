@@ -4,11 +4,10 @@ import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { getProduct } from '@/lib/products-api';
+import { getProduct, ProductNotFoundError } from '@/lib/products-api';
 import { Size, calculateUnitPrice } from '@/lib/pricing';
 import { useCart } from '@/store/cart';
-
-const ALLOWED_TOPPINGS = ['Trân châu', 'Kem'] as const;
+import { ALLOWED_CART_TOPPINGS } from '@/store/cart-rules';
 
 const PLACEHOLDER_IMG =
   "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300' fill='%23F3F4F6'><rect width='400' height='300' fill='%23F3F4F6'/><path d='M160 110h80v70a40 40 0 0 1-40 40 40 40 0 0 1-40-40v-70Z' stroke='%239CA3AF' stroke-width='6' fill='%23E5E7EB'/><path d='M240 130h16a16 16 0 0 1 16 16v8a16 16 0 0 1-16 16h-16' stroke='%239CA3AF' stroke-width='6' fill='none'/><path d='M175 85c0-10 10-15 10-25M200 85c0-10 10-15 10-25M225 85c0-10 10-15 10-25' stroke='%23D1D5DB' stroke-width='4' stroke-linecap='round'/><text x='50%25' y='260' text-anchor='middle' font-family='sans-serif' font-size='14' fill='%239CA3AF' font-weight='600'>BrewLite Coffee</text></svg>";
@@ -21,6 +20,7 @@ export default function ProductDetailPage() {
     data: product,
     isPending,
     isError,
+    error: productError,
     refetch,
   } = useQuery({
     queryKey: ['products', id],
@@ -31,6 +31,7 @@ export default function ProductDetailPage() {
   const [size, setSize] = useState<Size>('S');
   const [toppings, setToppings] = useState<string[]>([]);
   const [showToast, setShowToast] = useState(false);
+  const [cartError, setCartError] = useState('');
 
   const add = useCart((state) => state.add);
 
@@ -50,7 +51,7 @@ export default function ProductDetailPage() {
   if (isError || !product) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
-        <p className="text-red-600 font-semibold mb-4">Không tải được thông tin sản phẩm</p>
+        <p className="text-red-600 font-semibold mb-4">{productError instanceof ProductNotFoundError ? 'Sản phẩm không tồn tại' : 'Không tải được thông tin sản phẩm'}</p>
         <button
           type="button"
           onClick={() => refetch()}
@@ -74,15 +75,25 @@ export default function ProductDetailPage() {
   const handleAddToCart = () => {
     if (product.stock <= 0) return;
 
-    add({
-      productId: product.id,
-      name: product.name,
-      size,
-      toppings,
-      unitPrice,
-      qty: 1,
-    });
-
+    try {
+      const added = add({
+        productId: product.id,
+        name: product.name,
+        size,
+        toppings,
+        unitPrice,
+        qty: 1,
+      });
+      if (!added) {
+        setCartError('Món này đã đạt giới hạn 99 ly trong giỏ hàng.');
+        setShowToast(false);
+        return;
+      }
+    } catch {
+      setCartError('Không thể thêm món vào giỏ. Hãy kiểm tra dữ liệu sản phẩm.');
+      return;
+    }
+    setCartError('');
     setShowToast(true);
     setTimeout(() => {
       setShowToast(false);
@@ -190,7 +201,7 @@ export default function ProductDetailPage() {
             <span className="text-xs text-amber-700 font-semibold">+5.000đ/loại</span>
           </div>
           <div className="flex gap-2.5 flex-wrap">
-            {ALLOWED_TOPPINGS.map((topping) => {
+            {ALLOWED_CART_TOPPINGS.map((topping) => {
               const selected = toppings.includes(topping);
               return (
                 <button
@@ -210,6 +221,8 @@ export default function ProductDetailPage() {
             })}
           </div>
         </div>
+
+        {cartError && <p role="alert" className="mt-5 text-sm font-semibold text-red-700">{cartError}</p>}
 
         {/* Nút Thêm vào giỏ */}
         <button

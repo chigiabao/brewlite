@@ -28,6 +28,11 @@ export interface OrdersPaymentPort {
     paymentId: number,
     tx?: PaymentTx,
   ): Promise<void>;
+  markRefunded(
+    orderId: number,
+    paymentId: number,
+    tx?: PaymentTx,
+  ): Promise<void>;
 }
 
 @Injectable()
@@ -60,6 +65,14 @@ export class MockOrdersPaymentAdapter implements OrdersPaymentPort {
     tx?: PaymentTx,
   ): Promise<void> {
     return this.transition(orderId, OrderStatus.PAYMENT_FAILED, paymentId, tx);
+  }
+
+  markRefunded(
+    orderId: number,
+    paymentId: number,
+    tx?: PaymentTx,
+  ): Promise<void> {
+    return this.transition(orderId, OrderStatus.REFUNDED, paymentId, tx);
   }
 
   private async transition(

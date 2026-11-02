@@ -1,19 +1,32 @@
-import type { OrderStatus, PaymentMethod, PaymentStatus } from '../generated/prisma/enums.js';
+export type PaymentStatusValue = 'PENDING' | 'SUCCEEDED' | 'FAILED' | 'REFUNDED';
 
 export type PayInput = {
   userId: number;
   orderId: number;
-  method: PaymentMethod;
+  method: 'WALLET' | 'CARD' | 'VNPAY';
   idempotencyKey: string | undefined;
+  ipAddr?: string;
+  bankCode?: string;
 };
 
-export type PaymentResult = {
+export type VnpayIpnResponse = {
+  RspCode: string;
+  Message: string;
+};
+
+
+export type CreateCheckoutResult = {
   orderId: number;
   paymentId: number;
-  status: PaymentStatus;
-  orderStatus: OrderStatus;
-  method: PaymentMethod;
-  amount: number;
-  transactionId: string | null;
+  status: PaymentStatusValue;
+  checkoutUrl: string;
   idempotentReplay: boolean;
+};
+
+export type StripeWebhookResult = {
+  received: true;
+  type?: string;
+  orderId?: number;
+  ignored?: string;
+  replay?: boolean;
 };

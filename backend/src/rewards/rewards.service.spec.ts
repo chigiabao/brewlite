@@ -41,6 +41,7 @@ function makeBaseTx() {
     loyaltyEntry: {
       findUnique: vi.fn(),
       create: vi.fn(),
+      deleteMany: vi.fn(),
     },
   };
 }
@@ -244,78 +245,202 @@ describe('RewardsService.reserveCouponAndPoints', () => {
   });
 });
 
-// ─── Suite 3: finalizeRewardsOnPaid (G-02) ────────────────────────────────
+// ─── FIX 06: REDEEM + EARN chỉ finalize sau PAID ────────────────────────────
 
 describe('RewardsService.finalizeRewardsOnPaid', () => {
-  const prisma = {} as unknown as PrismaService;
-  const service = new RewardsService(prisma);
-
-  it('PAID lần đầu → tạo LoyaltyEntry EARN + increment loyaltyPoints', async () => {
-    const tx = makeTx() as unknown as Parameters<typeof service.finalizeRewardsOnPaid>[1];
-    const txMock = tx as unknown as ReturnType<typeof makeBaseTx>;
-    txMock.loyaltyEntry.findUnique.mockResolvedValue(null);
-    txMock.loyaltyEntry.create.mockResolvedValue({ id: 1 });
-    txMock.user.update.mockResolvedValue({});
-
-    // totalPaid=85000 → floor(85000/100)=850 points
-    const result = await service.finalizeRewardsOnPaid(
-      { orderId: 10, userId: 1, totalPaid: 85_000 },
-      tx,
+  const service = new RewardsService({} as PrismaService);
+  const finalize = (tx: ReturnType<typeof makeBaseTx>, pointsRedeemed: number, totalPaid = 85_000) =>
+    service.finalizeRewardsOnPaid(
+      { orderId: 10, userId: 1, totalPaid, pointsRedeemed },
+      tx as never,
     );
+
+  it('đơn PAID có đổi điểm: ghi REDEEM và EARN đúng số điểm, chỉ cộng EARN vào balance', async () => {
+    const tx = makeBaseTx();
+    tx.loyaltyEntry.findUnique.mockResolvedValue(null);
+    tx.loyaltyEntry.create.mockResolvedValue({ id: 9 });
+    tx.user.update.mockResolvedValue({});
+    const result = await finalize(tx, 15_000);
     expect(result).toEqual({ pointsEarned: 850 });
-
-    expect(txMock.loyaltyEntry.create).toHaveBeenCalledWith({
-      data: {
-        userId: 1,
-        orderId: 10,
-        kind: LoyaltyKind.EARN,
-        points: 850,
-      },
+    expect(tx.loyaltyEntry.create).toHaveBeenCalledTimes(2);
+    expect(tx.loyaltyEntry.create).toHaveBeenCalledWith({
+      data: { orderId: 10, userId: 1, kind: LoyaltyKind.REDEEM, points: 15_000 },
     });
-    expect(txMock.user.update).toHaveBeenCalledWith({
-      where: { id: 1 },
-      data: { loyaltyPoints: { increment: 850 } },
+    expect(tx.loyaltyEntry.create).toHaveBeenCalledWith({
+      data: { orderId: 10, userId: 1, kind: LoyaltyKind.EARN, points: 850 },
+    });
+    expect(tx.user.update).toHaveBeenCalledWith({
+      where: { id: 1 }, data: { loyaltyPoints: { increment: 850 } },
+    });
+    expect(tx.user.updateMany).not.toHaveBeenCalled(); // đã reserve ngay khi tạo đơn
+  });
+
+  it('retry/replay: có cả REDEEM và EARN -> không ghi/cộng trùng', async () => {
+    const tx = makeBaseTx();
+    tx.loyaltyEntry.findUnique.mockImplementation(async ({ where }: any) =>
+      where.orderId_kind.kind === LoyaltyKind.REDEEM
+        ? { userId: 1, points: 15_000 }
+        : { userId: 1, points: 850 });
+    expect(await finalize(tx, 15_000)).toEqual({ pointsEarned: 850 });
+    expect(tx.loyaltyEntry.create).not.toHaveBeenCalled();
+    expect(tx.user.update).not.toHaveBeenCalled();
+  });
+
+  it('đơn cũ từ FIX03 đã có REDEEM lúc PENDING -> không ghi trùng khi PAID', async () => {
+    const tx = makeBaseTx();
+    tx.loyaltyEntry.findUnique.mockImplementation(async ({ where }: any) =>
+      where.orderId_kind.kind === LoyaltyKind.REDEEM
+        ? { userId: 1, points: 15_000 } : null);
+    tx.loyaltyEntry.create.mockResolvedValue({});
+    tx.user.update.mockResolvedValue({});
+    await finalize(tx, 15_000);
+    expect(tx.loyaltyEntry.create).toHaveBeenCalledTimes(1);
+    expect(tx.loyaltyEntry.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ kind: LoyaltyKind.EARN }),
     });
   });
 
-  it('exactly-once: entry EARN đã tồn tại → skip, không cộng thêm điểm', async () => {
-    const tx = makeTx() as unknown as Parameters<typeof service.finalizeRewardsOnPaid>[1];
-    const txMock = tx as unknown as ReturnType<typeof makeBaseTx>;
-    // Simula idempotency replay: entry đã có
-    txMock.loyaltyEntry.findUnique.mockResolvedValue({ id: 5, points: 850 });
-
-    const result = await service.finalizeRewardsOnPaid(
-      { orderId: 10, userId: 1, totalPaid: 85_000 },
-      tx,
-    );
-    expect(result).toEqual({ pointsEarned: 850 });
-    expect(txMock.loyaltyEntry.create).not.toHaveBeenCalled();
-    expect(txMock.user.update).not.toHaveBeenCalled();
+  it('REDEEM cũ không khớp snapshot -> fail closed (transaction phải rollback)', async () => {
+    const tx = makeBaseTx();
+    tx.loyaltyEntry.findUnique.mockResolvedValue({ userId: 1, points: 16_000 });
+    await expect(finalize(tx, 15_000)).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.user.update).not.toHaveBeenCalled();
   });
 
-  it('totalPaid < 100 → 0 points earned, không tạo entry', async () => {
-    const tx = makeTx() as unknown as Parameters<typeof service.finalizeRewardsOnPaid>[1];
-    const txMock = tx as unknown as ReturnType<typeof makeBaseTx>;
-
-    const result = await service.finalizeRewardsOnPaid(
-      { orderId: 10, userId: 1, totalPaid: 50 },
-      tx,
-    );
-    expect(result).toEqual({ pointsEarned: 0 });
-    expect(txMock.loyaltyEntry.findUnique).not.toHaveBeenCalled();
-    expect(txMock.loyaltyEntry.create).not.toHaveBeenCalled();
-    expect(txMock.user.update).not.toHaveBeenCalled();
+  it('totalPaid <100 nhưng có redeem vẫn cần REDEEM entry, không có EARN', async () => {
+    const tx = makeBaseTx();
+    tx.loyaltyEntry.findUnique.mockResolvedValue(null);
+    tx.loyaltyEntry.create.mockResolvedValue({});
+    expect(await finalize(tx, 50, 50)).toEqual({ pointsEarned: 0 });
+    expect(tx.loyaltyEntry.create).toHaveBeenCalledTimes(1);
+    expect(tx.loyaltyEntry.create).toHaveBeenCalledWith({
+      data: { userId: 1, orderId: 10, kind: LoyaltyKind.REDEEM, points: 50 },
+    });
+    expect(tx.user.update).not.toHaveBeenCalled();
   });
 
-  it('totalPaid=0 (order free) → 0 points, không tạo entry', async () => {
-    const tx = makeTx() as unknown as Parameters<typeof service.finalizeRewardsOnPaid>[1];
-    const txMock = tx as unknown as ReturnType<typeof makeBaseTx>;
+  it('totalPaid=0, pointsRedeemed=0 -> không ghi entry nào', async () => {
+    const tx = makeBaseTx();
+    expect(await finalize(tx, 0, 0)).toEqual({ pointsEarned: 0 });
+    expect(tx.loyaltyEntry.create).not.toHaveBeenCalled();
+  });
 
-    const result = await service.finalizeRewardsOnPaid(
-      { orderId: 10, userId: 1, totalPaid: 0 },
-      tx,
+  it.each([-1, 1.5, NaN])('reject pointsRedeemed=%s trước mọi ghi DB', async (points) => {
+    const tx = makeBaseTx();
+    await expect(finalize(tx, points)).rejects.toThrow('pointsRedeemed');
+    expect(tx.loyaltyEntry.create).not.toHaveBeenCalled();
+  });
+});
+
+// ─── FIX 03: redeem đúng số điểm giảm và hoàn khi cancel ──────────────────
+
+describe('FIX03 Rewards: capped redeem và release reservation', () => {
+  const service = new RewardsService({} as PrismaService);
+
+  it('coupon giảm 30k từ 57k, yêu cầu 30k điểm: chỉ trừ và lưu 27k', async () => {
+    const txMock = makeBaseTx();
+    txMock.coupon.findUnique.mockResolvedValue(
+      makeCoupon({ discountPercent: null, discountAmount: 30_000 }),
     );
-    expect(result).toEqual({ pointsEarned: 0 });
-    expect(txMock.loyaltyEntry.create).not.toHaveBeenCalled();
+    txMock.coupon.updateMany.mockResolvedValue({ count: 1 });
+    txMock.user.updateMany.mockResolvedValue({ count: 1 });
+
+    const quote = await service.reserveCouponAndPoints(
+      { userId: 7, subtotal: 57_000, couponCode: 'GIAM10', pointsToRedeem: 30_000 },
+      txMock as never,
+    );
+    expect(quote).toEqual({
+      couponDiscount: 30_000, pointsDiscount: 27_000,
+      totalDiscount: 57_000, total: 0,
+    });
+    expect(txMock.user.updateMany).toHaveBeenCalledWith({
+      where: { id: 7, loyaltyPoints: { gte: 27_000 } },
+      data: { loyaltyPoints: { decrement: 27_000 } },
+    });
+  });
+
+  it('coupon giảm hết tiền: không trừ 1 điểm nào dù khách yêu cầu', async () => {
+    const txMock = makeBaseTx();
+    txMock.coupon.findUnique.mockResolvedValue(
+      makeCoupon({ discountPercent: null, discountAmount: 100_000 }),
+    );
+    txMock.coupon.updateMany.mockResolvedValue({ count: 1 });
+    const quote = await service.reserveCouponAndPoints(
+      { userId: 7, subtotal: 57_000, couponCode: 'GIAM10', pointsToRedeem: 30_000 },
+      txMock as never,
+    );
+    expect(quote.pointsDiscount).toBe(0);
+    expect(quote.total).toBe(0);
+    expect(txMock.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it.each([-1, 1.5, NaN, Infinity])('reject pointsToRedeem=%s trước mọi DB update', async (requested) => {
+    const txMock = makeBaseTx();
+    await expect(service.reserveCouponAndPoints(
+      { userId: 7, subtotal: 57_000, couponCode: 'GIAM10', pointsToRedeem: requested },
+      txMock as never,
+    )).rejects.toThrow('pointsToRedeem');
+    expect(txMock.coupon.updateMany).not.toHaveBeenCalled();
+    expect(txMock.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('cancel hoàn quota + điểm đúng giá trị đã dùng trong cùng transaction', async () => {
+    const txMock = makeBaseTx();
+    txMock.coupon.updateMany.mockResolvedValue({ count: 1 });
+    txMock.user.updateMany.mockResolvedValue({ count: 1 });
+    await service.releaseReservedOnCancel(
+      { orderId: 4, userId: 7, couponCode: ' giAm10 ', pointsRedeemed: 27_000 },
+      txMock as never,
+    );
+    expect(txMock.coupon.updateMany).toHaveBeenCalledWith({
+      where: { code: 'GIAM10', usedCount: { gt: 0 } },
+      data: { usedCount: { decrement: 1 } },
+    });
+    expect(txMock.user.updateMany).toHaveBeenCalledWith({
+      where: { id: 7 },
+      data: { loyaltyPoints: { increment: 27_000 } },
+    });
+    expect(txMock.loyaltyEntry.deleteMany).toHaveBeenCalledWith({
+      where: { orderId: 4, kind: LoyaltyKind.REDEEM },
+    });
+  });
+
+  it('chỉ dùng points: không đụng coupon', async () => {
+    const txMock = makeBaseTx();
+    txMock.user.updateMany.mockResolvedValue({ count: 1 });
+    await service.releaseReservedOnCancel(
+      { orderId: 4, userId: 7, couponCode: null, pointsRedeemed: 5_000 },
+      txMock as never,
+    );
+    expect(txMock.coupon.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('quota đã bằng 0 => 409; không hoàn điểm một cách đơn lẻ', async () => {
+    const txMock = makeBaseTx();
+    txMock.coupon.updateMany.mockResolvedValue({ count: 0 });
+    await expect(service.releaseReservedOnCancel(
+      { orderId: 4, userId: 7, couponCode: 'GIAM10', pointsRedeemed: 5_000 },
+      txMock as never,
+    )).rejects.toBeInstanceOf(ConflictException);
+    expect(txMock.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('user bị xóa => 409 để transaction cancel rollback', async () => {
+    const txMock = makeBaseTx();
+    txMock.user.updateMany.mockResolvedValue({ count: 0 });
+    await expect(service.releaseReservedOnCancel(
+      { orderId: 4, userId: 7, couponCode: null, pointsRedeemed: 5_000 },
+      txMock as never,
+    )).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('cancel không có reservation: không thay đổi quota/balance', async () => {
+    const txMock = makeBaseTx();
+    await service.releaseReservedOnCancel(
+      { orderId: 4, userId: 7, couponCode: null, pointsRedeemed: 0 },
+      txMock as never,
+    );
+    expect(txMock.coupon.updateMany).not.toHaveBeenCalled();
+    expect(txMock.user.updateMany).not.toHaveBeenCalled();
   });
 });
