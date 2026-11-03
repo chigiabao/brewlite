@@ -19,6 +19,7 @@ describe('Customer order actions HTTP', () => {
   const cancel = vi.fn();
   const pay = vi.fn();
   const createCheckout = vi.fn();
+  const getVnpayStatus = vi.fn();
 
   beforeAll(async () => {
     const module = await Test.createTestingModule({
@@ -26,7 +27,7 @@ describe('Customer order actions HTTP', () => {
       controllers: [OrdersController, PaymentsController],
       providers: [JwtStrategy, JwtAuthGuard,
         { provide: OrdersService, useValue: { cancel } },
-        { provide: PaymentsService, useValue: { createCheckout } },
+        { provide: PaymentsService, useValue: { createCheckout, getVnpayStatus } },
         { provide: MockPaymentService, useValue: { pay } }],
     }).compile();
     app = module.createNestApplication();
@@ -40,7 +41,16 @@ describe('Customer order actions HTTP', () => {
   it('requires authentication for cancel and payment configuration', async () => {
     await request(app.getHttpServer()).post('/orders/42/cancel').expect(401);
     await request(app.getHttpServer()).get('/payments/config').expect(401);
+    await request(app.getHttpServer()).get('/payments/vnpay/status/42_1_123').expect(401);
     expect(cancel).not.toHaveBeenCalled();
+  });
+
+  it('reads VNPay status for the authenticated owner without trusting return query codes', async () => {
+    getVnpayStatus.mockResolvedValue({ orderId: 42, orderStatus: 'PENDING', paymentStatus: 'PENDING' });
+    await request(app.getHttpServer()).get('/payments/vnpay/status/42_1_123?vnp_ResponseCode=00&vnp_TransactionStatus=00')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200, { orderId: 42, orderStatus: 'PENDING', paymentStatus: 'PENDING' });
+    expect(getVnpayStatus).toHaveBeenCalledWith(7, '42_1_123');
   });
 
   it('uses the JWT owner and rejects invalid order IDs before calling cancellation', async () => {

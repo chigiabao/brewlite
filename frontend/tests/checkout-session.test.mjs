@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   CHECKOUT_SESSION_KEY, jwtSubject, loadCheckoutSession, saveCheckoutSession,
   clearCheckoutSession, isDefinitivePaymentFailure, isPaidOrderStatus,
+  cartSignature, completePaidCheckout,
 } from '../lib/checkout-session.ts';
 
 const data = new Map();
@@ -13,6 +14,7 @@ globalThis.sessionStorage = {
   removeItem: (k) => data.delete(k),
 };
 globalThis.window = { dispatchEvent: () => {} };
+globalThis.localStorage = { getItem: () => alice };
 function token(id) {
   const part = (obj) => Buffer.from(JSON.stringify(obj)).toString('base64url');
   return `${part({alg:'HS256'})}.${part({sub:id})}.fake-signature`;
@@ -80,4 +82,43 @@ test('bad, missing, and unrelated identity cannot restore session', () => {
   assert.equal(loadCheckoutSession(bob), null);
   assert.equal(loadCheckoutSession(alice)?.subject, '101');
   clearCheckoutSession();
+});
+
+test('verified payment cleans only its own session and matching cart', () => {
+  saveCheckoutSession({ ...session(), orderId: 55 });
+  let cleared = 0;
+  completePaidCheckout(alice, 55, 'cart-A', () => cleared++);
+  assert.equal(cleared, 1);
+  assert.equal(loadCheckoutSession(alice), null);
+});
+
+test('paying an old order preserves a newer cart or a different checkout', () => {
+  saveCheckoutSession({ ...session(), orderId: 55 });
+  let cleared = 0;
+  completePaidCheckout(alice, 55, 'cart-NEW', () => cleared++);
+  assert.equal(cleared, 0);
+  assert.equal(loadCheckoutSession(alice), null);
+  saveCheckoutSession({ ...session(), orderId: 56 });
+  completePaidCheckout(alice, 55, 'cart-A', () => cleared++);
+  assert.equal(cleared, 0);
+  assert.equal(loadCheckoutSession(alice)?.orderId, 56);
+  clearCheckoutSession();
+});
+
+test('an old account response cannot clear the current account checkout', () => {
+  saveCheckoutSession({ ...session(), orderId: 55 });
+  globalThis.localStorage = { getItem: () => bob };
+  let cleared = 0;
+  completePaidCheckout(alice, 55, 'cart-A', () => cleared++);
+  assert.equal(cleared, 0);
+  assert.equal(loadCheckoutSession(alice)?.orderId, 55);
+  globalThis.localStorage = { getItem: () => alice };
+  clearCheckoutSession();
+});
+
+test('cart signatures keep toppings canonical without hiding a changed price or quantity', () => {
+  const item = { productId:1, size:'M', toppings:['Kem','Trân châu'], qty:1, unitPrice:50000 };
+  assert.equal(cartSignature([item]), cartSignature([{ ...item, toppings:['Trân châu','Kem'] }]));
+  assert.notEqual(cartSignature([item]), cartSignature([{ ...item, qty:2 }]));
+  assert.notEqual(cartSignature([item]), cartSignature([{ ...item, unitPrice:55000 }]));
 });

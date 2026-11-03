@@ -4,7 +4,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
-import { clearCheckoutSession, isDefinitivePaymentFailure, isPaidOrderStatus, jwtSubject, loadCheckoutSession } from '@/lib/checkout-session';
+import { cartSignature, completePaidCheckout, clearCheckoutSession, isDefinitivePaymentFailure, isPaidOrderStatus, jwtSubject, loadCheckoutSession } from '@/lib/checkout-session';
+import { paymentRequest, validCheckoutUrl } from '@/lib/payment-client';
 import { useCart } from '@/store/cart';
 
 type PaymentConfig = { provider: 'MOCK' | 'STRIPE' | 'VNPAY'; mockDeclineEnabled: boolean };
@@ -34,12 +35,8 @@ function clearOrderSession(token: string, orderId: number, paid: boolean) {
   if (!session || session.orderId !== orderId) return;
   if (paid) {
     if (!useCart.persist.hasHydrated()) return; // Trang xác nhận sẽ dọn sau hydration.
-    const cartKey = JSON.stringify(useCart.getState().items.map(
-      ({ productId, size, toppings, qty, unitPrice }) => ({
-        productId, size, toppings: [...toppings].sort(), qty, unitPrice,
-      }),
-    ));
-    if (cartKey === session.cartKey) useCart.getState().clear();
+    completePaidCheckout(token, orderId, cartSignature(useCart.getState().items), useCart.getState().clear);
+    return;
   }
   clearCheckoutSession();
 }
@@ -138,33 +135,25 @@ export function OrderActions({ orderId, status, token }: { orderId: number; stat
     setError('');
     try {
       assertCurrentAccount();
+      const provider = method === 'VNPAY' ? 'VNPAY' : details.config.provider;
       const current = readAttempt(storageKey) ?? {
-        key: crypto.randomUUID(), method, demoDecline, provider: details.config.provider,
+        key: crypto.randomUUID(), method, demoDecline: provider === 'MOCK' && details.config.mockDeclineEnabled && demoDecline, provider,
       };
-      if (current.provider !== details.config.provider) {
+      if (current.provider !== provider) {
         throw new Error('Cổng thanh toán đã thay đổi. Cần kiểm tra giao dịch cũ trước khi tiếp tục.');
       }
       // Lưu TRƯỚC request: mất mạng/reload vẫn dùng đúng khóa và phương thức cũ.
       sessionStorage.setItem(storageKey, JSON.stringify(current));
       setAttempt(current);
+      const request = paymentRequest(current.provider, orderId, current.method, current.demoDecline);
       const result = await api<{ orderId: number; status: string; checkoutUrl?: string }>(
-        current.provider === 'MOCK' ? '/payments' : '/payments/checkout', {
+        request.path, {
           method: 'POST', headers: { 'Idempotency-Key': current.key },
-          body: JSON.stringify({ orderId, method: current.method,
-            ...(current.provider === 'MOCK' && current.demoDecline ? { demoDecline: true } : {}) }),
+          body: request.body,
         },
       );
       assertCurrentAccount();
       if (result.orderId !== orderId) throw new Error('Kết quả trả về không khớp mã đơn.');
-      if (current.provider !== 'MOCK' && result.status !== 'SUCCEEDED') {
-        if (!result.checkoutUrl || (current.provider === 'STRIPE'
-          ? !result.checkoutUrl.startsWith('https://checkout.stripe.com/')
-          : !result.checkoutUrl.startsWith('https://'))) {
-          throw new Error('Không nhận được trang thanh toán hợp lệ.');
-        }
-        window.location.assign(result.checkoutUrl);
-        return;
-      }
       if (result.status === 'FAILED') {
         sessionStorage.removeItem(storageKey);
         setAttempt(null);
@@ -172,8 +161,16 @@ export function OrderActions({ orderId, status, token }: { orderId: number; stat
         setError('Thanh toán bị từ chối. Đơn hàng và giỏ vẫn còn; bạn có thể thử lại.');
         return;
       }
+      if (result.status !== 'SUCCEEDED') {
+        if (result.status !== 'PENDING' || !validCheckoutUrl(result.checkoutUrl, current.provider)) {
+          throw new Error('Không nhận được trang thanh toán hợp lệ.');
+        }
+        window.location.assign(result.checkoutUrl);
+        return;
+      }
       await finishPayment();
     } catch (e) {
+      if (localStorage.getItem('token') !== token) { setError('Tài khoản đã thay đổi. Vui lòng tải lại trang.'); return; }
       if (e instanceof ApiError && e.code === 'ORDER_ALREADY_PAID') {
         try { await finishPayment(); return; } catch { /* Giữ lượt cũ nếu không xác minh được. */ }
       }
@@ -249,13 +246,13 @@ export function OrderActions({ orderId, status, token }: { orderId: number; stat
           <p className="my-4 flex justify-between border-t border-stone-700 pt-3 font-bold">Tổng thanh toán <span className="text-amber-400">{details.order.total.toLocaleString('vi-VN')}đ</span></p>
           <fieldset disabled={busy || Boolean(attempt) || details.order.payments?.some(payment => payment.status === 'PENDING')} className="flex gap-5">
             <legend className="mb-2 text-stone-300">Phương thức thanh toán</legend>
-            {(details.config.provider === 'VNPAY' ? ['VNPAY'] as const : ['WALLET', 'CARD'] as const).map(value => <label key={value} className="flex items-center gap-2">
+            {(details.config.provider === 'VNPAY' ? ['VNPAY'] as const : ['WALLET', 'CARD', 'VNPAY'] as const).map(value => <label key={value} className="flex items-center gap-2">
               <input type="radio" name={`resume-method-${orderId}`} checked={method === value} onChange={() => setMethod(value)} />
               {value === 'VNPAY' ? 'VNPay' : value === 'WALLET' ? 'Ví điện tử' : 'Thẻ ngân hàng'}
             </label>)}
           </fieldset>
-          {details.config.provider === 'MOCK' && <p className="mt-4 rounded-lg bg-amber-500/10 p-3 text-amber-200">Thanh toán mô phỏng, không trừ tiền thật. Bấm xác nhận bên dưới để hoàn tất đơn.</p>}
-          {details.config.provider === 'MOCK' && details.config.mockDeclineEnabled && <label className="mt-3 flex items-center gap-2 text-stone-300">
+          {details.config.provider === 'MOCK' && method !== 'VNPAY' && <p className="mt-4 rounded-lg bg-amber-500/10 p-3 text-amber-200">Thanh toán mô phỏng, không trừ tiền thật. Bấm xác nhận bên dưới để hoàn tất đơn.</p>}
+          {details.config.provider === 'MOCK' && method !== 'VNPAY' && details.config.mockDeclineEnabled && <label className="mt-3 flex items-center gap-2 text-stone-300">
             <input type="checkbox" checked={demoDecline} disabled={busy || Boolean(attempt)} onChange={e => setDemoDecline(e.target.checked)} />Mô phỏng thanh toán thất bại
           </label>}
           {attempt && <p className="mt-3 text-xs text-stone-400">Đang giữ lượt thanh toán trước. Thử lại sẽ không tạo đơn mới hoặc thu lặp.</p>}
@@ -265,7 +262,7 @@ export function OrderActions({ orderId, status, token }: { orderId: number; stat
           <button type="button" disabled={busy} onClick={closeDialog} className="rounded-lg border border-stone-600 px-4 py-2 disabled:opacity-50">Quay lại</button>
           <button type="button" disabled={busy} onClick={() => void (confirmCancel ? cancelOrder() : pay())}
             className={`rounded-lg px-4 py-2 font-semibold disabled:opacity-50 ${confirmCancel ? 'bg-red-600 text-white' : 'bg-amber-500 text-stone-950'}`}>
-            {busy ? 'Đang xử lý…' : confirmCancel ? 'Xác nhận hủy đơn' : details?.config.provider === 'MOCK' ? 'Xác nhận thanh toán mô phỏng' : 'Mở trang thanh toán'}
+            {busy ? 'Đang xử lý…' : confirmCancel ? 'Xác nhận hủy đơn' : details?.config.provider === 'MOCK' && method !== 'VNPAY' ? 'Xác nhận thanh toán mô phỏng' : 'Mở trang thanh toán'}
           </button>
         </div>
       </dialog>

@@ -31,6 +31,23 @@ export type CheckoutSession = {
 
 export const CHECKOUT_SESSION_KEY = 'brewlite-checkout-v1';
 
+export function cartSignature(items: (CheckoutItem & { unitPrice: number })[]): string {
+  return JSON.stringify(items.map(({ productId, size, toppings, qty, unitPrice }) => ({
+    productId, size, toppings: [...toppings].sort(), qty, unitPrice,
+  })));
+}
+
+/** Call only after a server read confirms payment, and after Cart hydration. */
+export function completePaidCheckout(
+  token: string, orderId: number, currentCartKey: string, clearCart: () => void,
+): void {
+  if (localStorage.getItem('token') !== token) return;
+  const session = loadCheckoutSession(token);
+  if (!session || session.orderId !== orderId) return;
+  if (session.cartKey === currentCartKey) clearCart();
+  clearCheckoutSession();
+}
+
 /** Chỉ dùng claim sub để cách ly dữ liệu UI. Không dùng để xác thực: backend luôn xác minh JWT. */
 export function jwtSubject(token: string | null): string | null {
   if (!token) return null;
