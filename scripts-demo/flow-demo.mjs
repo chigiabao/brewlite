@@ -40,7 +40,7 @@ async function main() {
 
   // 2) ADMIN đăng nhập (đã được grant role + đổi mật khẩu BrewAdminPass123)
   const adminLogin = await call('POST', '/auth/login', {
-    body: { email: 'admin@brewlite.local', password: 'BrewAdminPass123' },
+    body: { email: 'admin3@gmail.com', password: 'password123' },
   });
   const adminToken = adminLogin.data.accessToken ?? adminLogin.data.access_token ?? adminLogin.data.token;
   log('Admin login status', { status: adminLogin.status, hasToken: Boolean(adminToken) });
