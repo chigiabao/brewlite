@@ -1,0 +1,245 @@
+
+\documentclass[tikz,border=10pt]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[vietnamese]{babel}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, shapes.misc, fit, calc}
+
+\begin{document}
+\begin{tikzpicture}[
+  font=\small,
+  >=Stealth,
+  node distance=6mm and 9mm,
+  startstop/.style={
+    ellipse, draw, thick,
+    minimum width=30mm, minimum height=9mm,
+    align=center, fill=gray!12
+  },
+  process/.style={
+    rectangle, rounded corners=2mm,
+    draw, thick, align=center,
+    text width=49mm,
+    minimum height=10mm,
+    inner sep=4pt
+  },
+  decision/.style={
+    diamond, draw, thick,
+    aspect=2.2, align=center,
+    text width=26mm,
+    inner sep=1.5pt,
+    fill=yellow!15
+  },
+  success/.style={
+    process, fill=green!10
+  },
+  error/.style={
+    process, fill=red!8
+  },
+  db/.style={
+    cylinder,
+    shape border rotate=90,
+    aspect=0.25,
+    draw, thick,
+    align=center,
+    text width=35mm,
+    minimum height=12mm,
+    fill=blue!8
+  },
+  flow/.style={->, thick},
+  errorflow/.style={->, thick, red!75!black},
+  every node/.style={outer sep=1pt}
+]
+\node[font=\Large\bfseries, above=8mm of start] {FLOW-02: Order Transaction + OCC + Idempotency};
+% =========================
+% MAIN FLOW
+% =========================
+
+\node[startstop] (start)
+  {Client gửi POST /orders\\Idempotency-Key + DTO};
+
+\node[process, below=of start] (validate)
+  {OrdersService.create()\\
+   Trim key; kiểm tra key rỗng\\
+   Key > 200 ký tự $\rightarrow$ 400};
+
+\node[process, below=of validate] (hash)
+  {Chuẩn hóa payload\\
+   Sắp xếp toppings; chuẩn hóa coupon\\
+   SHA-256 $\rightarrow$ requestHash};
+
+\node[db, below=of hash] (lookup)
+  {Tìm Order theo\\
+   userId + idempotencyKey};
+
+\node[decision, below=of lookup] (exists)
+  {Đã có Order?};
+
+\node[decision, below left=12mm and 20mm of exists] (match)
+  {requestHash\\giống?};
+
+\node[success, below left=8mm and 7mm of match] (replay)
+  {Trả kết quả Order cũ\\
+   Không tạo đơn mới};
+
+\node[error, below right=8mm and 7mm of match] (mismatch)
+  {409\\
+   IDEMPOTENCY\_KEY\_PAYLOAD\_MISMATCH};
+
+\node[process, right=22mm of exists] (begin)
+  {BEGIN TRANSACTION\\
+   prisma.\$transaction(tx)};
+
+\node[db, below=of begin] (duplicate)
+  {Kiểm tra duplicate lần 2\\
+   bên trong transaction};
+
+\node[decision, below=of duplicate] (dupcheck)
+  {Có duplicate?};
+
+\node[decision, below=of dupcheck] (dupmatch)
+  {Hash giống?};
+
+\node[success, below left=8mm and 6mm of dupmatch] (dupreplay)
+  {Trả kết quả Order cũ\\
+   Transaction kết thúc};
+
+\node[error, below right=8mm and 6mm of dupmatch] (duperror)
+  {409\\
+   Payload mismatch};
+
+\node[process, right=19mm of dupcheck] (products)
+  {Lấy Product từ DB\\
+   Kiểm tra đủ sản phẩm\\
+   Không đủ $\rightarrow$ PRODUCT\_NOT\_FOUND};
+
+\node[process, below=of products] (pricing)
+  {Tính unitPrice() từ giá DB\\
+   Tạo pricedItems + subtotal};
+
+\node[decision, below=of pricing] (rewardneeded)
+  {Dùng coupon\\
+   hoặc points?};
+
+\node[decision, below left=10mm and 8mm of rewardneeded] (rewardavail)
+  {Rewards khả dụng?};
+
+\node[process, below=of rewardavail] (reserve)
+  {Rewards.reserveCouponAndPoints(params, tx)\\
+   Nhận quote: discount, total, points};
+
+\node[process, right=20mm of rewardneeded] (noreward)
+  {Không reserve Rewards\\
+   total = subtotal};
+
+\node[process, below=13mm of reserve] (stock)
+  {StockService.reserve(tx)\\
+   Gom qty theo productId\\
+   Sắp xếp ID tăng dần};
+
+\node[process, below=of stock] (occ)
+  {updateMany Product\\
+   WHERE id + version\\
+   + stock >= qty\\
+   SET stock -= qty, version += 1};
+
+\node[decision, below=of occ] (occresult)
+  {count = 1?};
+
+\node[process, below=of occresult] (next)
+  {Reserve sản phẩm tiếp theo\\
+   Nếu hết danh sách: tiếp tục};
+
+\node[process, below=of next] (createorder)
+  {Tạo Order PENDING + OrderItems\\
+   Snapshot giá, coupon, points\\
+   cancelAfter};
+
+\node[success, below=of createorder] (commit)
+  {COMMIT\\
+   Trả Order đã tạo};
+
+% =========================
+% ERROR PATH
+% =========================
+
+\node[error, right=22mm of occresult] (occerror)
+  {409 STOCK\_VERSION\_CONFLICT\\
+   Transaction rollback};
+
+\node[error, right=22mm of rewardavail] (rewarderror)
+  {REWARDS\_SERVICE\_UNAVAILABLE\\
+   hoặc lỗi reserve Rewards};
+
+\node[process, right=24mm of occerror] (winner)
+  {Catch tại OrdersService\\
+   Tìm winner theo userId + key};
+
+\node[decision, below=of winner] (winnercheck)
+  {Có winner?};
+
+\node[decision, below left=8mm and 6mm of winnercheck] (winnerhash)
+  {Hash giống?};
+
+\node[success, below left=7mm and 5mm of winnerhash] (winnerreplay)
+  {Trả Order winner};
+
+\node[error, below right=7mm and 5mm of winnerhash] (winnermismatch)
+  {409 Payload mismatch};
+
+\node[error, right=15mm of winnercheck] (throworiginal)
+  {Không có winner\\
+   Ném lại lỗi ban đầu};
+
+% =========================
+% CONNECTIONS
+% =========================
+
+\draw[flow] (start) -- (validate);
+\draw[flow] (validate) -- (hash);
+\draw[flow] (hash) -- (lookup);
+\draw[flow] (lookup) -- (exists);
+
+\draw[flow] (exists) -- node[above left]{Có} (match);
+\draw[flow] (match) -- node[left]{Có} (replay);
+\draw[errorflow] (match) -- node[right]{Không} (mismatch);
+
+\draw[flow] (exists.east) -- node[above]{Không} (begin.west);
+\draw[flow] (begin) -- (duplicate);
+\draw[flow] (duplicate) -- (dupcheck);
+
+\draw[flow] (dupcheck) -- node[left]{Có} (dupmatch);
+\draw[flow] (dupmatch) -- node[left]{Có} (dupreplay);
+\draw[errorflow] (dupmatch) -- node[right]{Không} (duperror);
+
+\draw[flow] (dupcheck.east) -- node[above]{Không} (products.west);
+\draw[flow] (products) -- (pricing);
+\draw[flow] (pricing) -- (rewardneeded);
+
+\draw[flow] (rewardneeded) -- node[left]{Có} (rewardavail);
+\draw[flow] (rewardneeded.east) -- node[above]{Không} (noreward.west);
+
+\draw[flow] (rewardavail) -- node[left]{Có} (reserve);
+\draw[errorflow] (rewardavail.east) -- node[above]{Không} (rewarderror.west);
+
+\draw[flow] (reserve) -- (stock);
+\draw[flow] (noreward.south) |- (stock.east);
+
+\draw[flow] (stock) -- (occ);
+\draw[flow] (occ) -- (occresult);
+
+\draw[flow] (occresult) -- node[left]{Có} (next);
+\draw[flow] (next) -- (createorder);
+\draw[flow] (createorder) -- (commit);
+
+\draw[errorflow] (occresult.east) -- node[above]{Không} (occerror.west);
+
+% Error recovery
+\draw[flow] (occerror.east) -- (winner.west);
+\draw[flow] (winner) -- (winnercheck);
+\draw[flow] (winnercheck) -- node[left]{Có} (winnerhash);
+\draw[flow] (winnerhash) -- node[left]{Có} (winnerreplay);
+\draw[errorflow] (winnerhash) -- node[right]{Không} (winnermismatch);
+\draw[errorflow] (winnercheck.east) -- node[above]{Không} (throworiginal);
+
+\end{tikzpicture}
+\end{document}

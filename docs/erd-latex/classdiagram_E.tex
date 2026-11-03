@@ -1,0 +1,104 @@
+\documentclass[tikz,border=12pt]{standalone}
+\usepackage[utf8]{inputenc}
+\usepackage[T5]{fontenc}
+\usepackage[vietnamese]{babel}
+\usetikzlibrary{positioning,arrows.meta,calc,shapes.multipart}
+
+\newcommand{\stereo}[1]{{\scriptsize$\ll$\textit{#1}$\gg$}}
+
+\begin{document}
+\begin{tikzpicture}[
+  >={Stealth[length=2.5mm]},
+  class/.style={rectangle split, rectangle split parts=2,
+    rectangle split draw splits=true, draw=blue!70!black,
+    fill=blue!4, font=\footnotesize, inner sep=5pt,
+    text width=4.8cm, align=left},
+  single/.style={class, rectangle split parts=1},
+  iface/.style={class, draw=orange!80!black, fill=orange!6, text width=6cm},
+  dep/.style={->, thick, dashed, draw=black!70},
+  use/.style={->, thick, draw=blue!70!black},
+  lbl/.style={font=\scriptsize, fill=white, inner sep=1.5pt}
+]
+
+% ---------- NODES ----------
+\node[iface] (rewards) at (7.5,6) {%
+  {\centering\textbf{RewardsPort}\\\stereo{Giao diện}\par}
+  \nodepart{second}\scriptsize
+  + reserveCouponAndPoints(params, tx)\\
+  + releaseReservedOnCancel(params, tx)\\
+  + finalizeRewardsOnPaid(params, tx)\\
+  + refundRewardsOnRefund(params, tx)};
+
+\node[class] (controller) at (0,0) {%
+  {\centering\textbf{OrdersController}\\\stereo{Bộ điều khiển NestJS}\par}
+  \nodepart{second}\scriptsize
+  + create(user, dto, idempotencyKey)\\
+  + mine(user)\\
+  + findOne(orderId, user)};
+
+\node[class] (service) at (7.5,0) {%
+  {\centering\textbf{OrdersService}\par}
+  \nodepart{second}\scriptsize
+  + create(userId, dto, key)\\
+  + findMine(userId)\\
+  + findOne(userId, orderId)\\
+  + advancePreparation(orderId, to)\\
+  + cancel(userId, orderId)\\
+  + cancelExpired(orderId, now)};
+
+\node[class] (stock) at (15,0) {%
+  {\centering\textbf{StockService}\par}
+  \nodepart{second}\scriptsize
+  + reserve(tx, items, products)\\
+  + release(tx, items)};
+
+\node[class] (expiry) at (0,-5) {%
+  {\centering\textbf{OrderExpiryService}\par}
+  \nodepart{second}\scriptsize
+  + handleCron()\\
+  + cancelExpiredOrders(now)};
+
+\node[class] (state) at (7.5,-5) {%
+  {\centering\textbf{OrderState}\\\stereo{Quy tắc trạng thái}\par}
+  \nodepart{second}\scriptsize
+  + assertTransition(from, to)\\
+  + assertPreparationTarget(to)};
+
+\node[single] (prisma) at (15,-5) {%
+  {\centering\textbf{PrismaService}\\\stereo{Lớp lưu trữ}\par}};
+
+\node[class, text width=3.2cm] (product) at (22.5,0) {%
+  {\centering\textbf{Product}\par}
+  \nodepart{second}\scriptsize
+  + id\\ + name\\ + price\\ + stock\\ + version};
+
+\node[class, text width=3.4cm] (item) at (29,0) {%
+  {\centering\textbf{OrderItem}\par}
+  \nodepart{second}\scriptsize
+  + id\\ + orderId\\ + productId\\ + size\\ + toppings\\
+  + qty\\ + unitPrice\\ + lineTotal};
+
+\node[class, text width=3.4cm] (order) at (29,6.5) {%
+  {\centering\textbf{Order}\par}
+  \nodepart{second}\scriptsize
+  + id\\ + userId\\ + status\\ + subtotal\\ + discountTotal\\
+  + total\\ + cancelAfter\\ + idempotencyKey\\ + requestHash};
+
+% ---------- EDGES ----------
+\draw[use] (controller.east) -- node[lbl,above]{ủy quyền xử lý} (service.west);
+\draw[use] (service.east) -- node[lbl,above]{giữ / trả tồn kho} (stock.west);
+\draw[use] (service.south east) -- node[lbl,sloped,above]{giao dịch và truy vấn} (prisma.north west);
+\draw[use] (stock.south) -- node[lbl,right]{tx do nơi gọi truyền vào} (prisma.north);
+\draw[use] (expiry.north east) -- node[lbl,sloped,above]{hủy đơn hết hạn} (service.south west);
+\draw[dep] (service.north) -- node[lbl,right]{tiêm phụ thuộc (tùy chọn)} (rewards.south);
+\draw[dep] (service.south) -- node[lbl,right]{kiểm tra chuyển trạng thái} (state.north);
+\draw[dep] (stock.east) -- node[lbl,above]{khóa lạc quan} (product.west);
+\draw[thick,{Diamond[length=4mm,width=2.5mm]}-] (order.south) -- (item.north);
+\node[lbl] at ($(order.south)+(0.5,-0.4)$) {1};
+\node[lbl] at ($(item.north)+(0.7,0.4)$) {1..*};
+\draw[use] (item.west) -- node[lbl,above]{sản phẩm} (product.east);
+\node[lbl] at ($(item.west)+(-0.35,0.3)$) {*};
+\node[lbl] at ($(product.east)+(0.35,0.3)$) {1};
+
+\end{tikzpicture}
+\end{document}
