@@ -3,6 +3,8 @@ import {
   Controller,
   Get,
   Headers,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseIntPipe,
   Post,
@@ -31,6 +33,15 @@ export class OrdersController {
   @Get('me')
   mine(@CurrentUser() user: AuthUser) {
     return this.orders.findMine(user.userId);
+  }
+
+  @Post(':id/cancel')
+  @HttpCode(HttpStatus.OK)
+  cancel(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.orders.cancel(user.userId, id);
   }
 
   @Get(':id')

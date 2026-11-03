@@ -17,7 +17,7 @@ import type { Request } from 'express';
 import type { Response } from 'express';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { CurrentUser, JwtAuthGuard, type AuthUser } from '../auth/public.js';
-import { getFrontendUrl, getPaymentProvider } from '../config/app-config.js';
+import { getFrontendUrl, getPaymentProvider, isMockDeclineEnabled } from '../config/app-config.js';
 import { MockPayDto, PayDto } from './payments.dto.js';
 import { PaymentsService } from './payments.service.js';
 import { MockPaymentService } from './mock-payment.service.js';
@@ -34,6 +34,12 @@ export class PaymentsController {
     private readonly payments: PaymentsService,
     private readonly mockPayments: MockPaymentService,
   ) {}
+
+  @UseGuards(JwtAuthGuard)
+  @Get('config')
+  configuration() {
+    return { provider: getPaymentProvider(), mockDeclineEnabled: isMockDeclineEnabled() };
+  }
 
   @UseGuards(JwtAuthGuard)
   @Post()

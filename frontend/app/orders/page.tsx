@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useSyncExternalStore } from 'react';
 import { api } from '@/lib/api';
+import { OrderActions } from '@/components/order-actions';
 
 type Order = {
   id: number;
@@ -76,7 +77,7 @@ export default function OrdersPage() {
   const token = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['orders'],
+    queryKey: ['orders', token],
     queryFn: () => api<Order[]>('/orders/me'),
     enabled: Boolean(token),
   });
@@ -160,9 +161,9 @@ export default function OrdersPage() {
               >
                 <div>
                   <div className="flex items-center gap-3">
-                    <span className="font-mono font-bold text-amber-400 text-base">
+                    <Link href={`/orders/${order.id}/confirmed`} className="font-mono font-bold text-amber-400 text-base hover:underline">
                       Đơn #{order.id}
-                    </span>
+                    </Link>
                     <span
                       className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusInfo.bg} ${statusInfo.color} ${statusInfo.border}`}
                     >
@@ -172,6 +173,7 @@ export default function OrdersPage() {
                   <div className="text-xs text-stone-400 mt-1.5 flex items-center gap-2">
                     <span>🕒 {new Date(order.createdAt).toLocaleString('vi-VN')}</span>
                   </div>
+                  <OrderActions key={`${token}-${order.id}`} orderId={order.id} status={order.status} token={token} />
                 </div>
 
                 <div className="flex sm:flex-col items-center sm:items-end justify-between border-t sm:border-t-0 border-stone-800/60 pt-3 sm:pt-0">

@@ -7,6 +7,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { api } from '@/lib/api';
 import { clearCheckoutSession, isPaidOrderStatus, loadCheckoutSession } from '@/lib/checkout-session';
 import { useCart } from '@/store/cart';
+import { OrderActions } from '@/components/order-actions';
 
 type OrderDetail = {
   id: number;
@@ -109,11 +110,9 @@ export default function ConfirmedPage() {
               {order.status === 'PAID' && <p className="text-stone-400">Đã thanh toán; cửa hàng sẽ chuẩn bị đồ uống.</p>}
               {order.status === 'PREPARING' && <p className="text-stone-400">Đồ uống đang được chuẩn bị.</p>}
               {order.status === 'PENDING' && <p className="text-amber-300">Đơn đang chờ thanh toán; vui lòng kiểm tra phiên checkout.</p>}
-              {order.status === 'PAYMENT_FAILED' && <p className="text-red-300">Có thể thử thanh toán lại tại Checkout nếu còn phiên giỏ hàng.</p>}
+              {order.status === 'PAYMENT_FAILED' && <p className="text-red-300">Bạn có thể thanh toán lại trên chính đơn này.</p>}
             </div>
-            {(order.status === 'PENDING' || order.status === 'PAYMENT_FAILED') && (
-              <Link href="/checkout" className="block text-amber-400 underline text-sm mb-3">Quay lại Checkout để tiếp tục thanh toán</Link>
-            )}
+            <OrderActions key={`${token}-${orderId}`} orderId={orderId} status={order.status} token={token} />
             <button
               type="button"
               onClick={() => void refetch()}
