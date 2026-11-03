@@ -6,6 +6,7 @@ import {
   Headers,
   HttpCode,
   HttpStatus,
+  Param,
   Post,
   Query,
   Req,
@@ -39,6 +40,12 @@ export class PaymentsController {
   @Get('config')
   configuration() {
     return { provider: getPaymentProvider(), mockDeclineEnabled: isMockDeclineEnabled() };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('vnpay/status/:txnRef')
+  vnpayStatus(@CurrentUser() user: AuthUser, @Param('txnRef') txnRef: string) {
+    return this.payments.getVnpayStatus(user.userId, txnRef);
   }
 
   @UseGuards(JwtAuthGuard)

@@ -20,9 +20,21 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-brew}:${POSTGRES_PASSWORD:-brew}@db:5432/${POSTGRES_DB:-brewlite}
       JWT_SECRET: ${JWT_SECRET:-local-only-change-me-before-deploy}
-      FRONTEND_URL: http://localhost:3000
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       PORT: 3001
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-MOCK}
       MOCK_GATEWAY_TEST_MODE: ${MOCK_GATEWAY_TEST_MODE:-false}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      VNPAY_TMN_CODE: ${VNPAY_TMN_CODE:-}
+      VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET:-}
+      VNPAY_URL: ${VNPAY_URL:-https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+      VNPAY_RETURN_URL: ${VNPAY_RETURN_URL:-http://localhost:3001/payments/vnpay/return}
+      VNPAY_IPN_URL: ${VNPAY_IPN_URL:-http://localhost:3001/payments/vnpay/ipn}
+      ENABLE_ORDER_AUTO_CANCEL: ${ENABLE_ORDER_AUTO_CANCEL:-true}
+      ENABLE_STRIPE_REFUND: ${ENABLE_STRIPE_REFUND:-true}
+      ORDER_PAYMENT_EXPIRY_MINUTES: ${ORDER_PAYMENT_EXPIRY_MINUTES:-30}
+      CHECKOUT_SESSION_TTL_MINUTES: ${CHECKOUT_SESSION_TTL_MINUTES:-31}
     depends_on:
       db:
         condition: service_healthy
@@ -44,7 +56,7 @@ services:
     build:
       context: ./frontend
       args:
-        NEXT_PUBLIC_API_URL: http://localhost:3001
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
     depends_on:
       backend:
         condition: service_healthy

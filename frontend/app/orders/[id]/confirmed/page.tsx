@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useSyncExternalStore } from 'react';
 import { api } from '@/lib/api';
-import { clearCheckoutSession, isPaidOrderStatus, loadCheckoutSession } from '@/lib/checkout-session';
+import { cartSignature, completePaidCheckout, isPaidOrderStatus } from '@/lib/checkout-session';
 import { useCart } from '@/store/cart';
 import { OrderActions } from '@/components/order-actions';
 
@@ -27,6 +27,7 @@ const STATUS_LABEL: Record<string, string> = {
   PENDING: 'Chờ thanh toán', PAYMENT_FAILED: 'Thanh toán thất bại',
   PAID: 'Đã thanh toán', PREPARING: 'Đang pha chế',
   READY: 'Sẵn sàng nhận', COMPLETED: 'Đã nhận món', CANCELLED: 'Đã hủy',
+  REFUNDED: 'Đã hoàn tiền',
 };
 
 export default function ConfirmedPage() {
@@ -50,7 +51,7 @@ export default function ConfirmedPage() {
     // Webhook Stripe có thể đến sau redirect; tự cập nhật khi đơn chưa PAID.
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return status && isPaidOrderStatus(status) ? false : 3000;
+      return status && ['PENDING', 'PAYMENT_FAILED'].includes(status) ? 3000 : false;
     },
   });
   const paid = Boolean(order && isPaidOrderStatus(order.status));
@@ -58,16 +59,7 @@ export default function ConfirmedPage() {
 
   useEffect(() => {
     if (!paid || !token || !cartHydrated) return;
-    const session = loadCheckoutSession(token);
-    if (!session || session.orderId !== orderId) return;
-    // Chỉ xóa GIỎ ĐÃ THANH TOÁN. Nếu user thay giỏ trong tab, giữ giỏ mới.
-    const currentCartKey = JSON.stringify(useCart.getState().items.map(
-      ({ productId, size, toppings, qty, unitPrice }) => ({
-        productId, size, toppings: [...toppings].sort(), qty, unitPrice,
-      }),
-    ));
-    if (session.cartKey === currentCartKey) useCart.getState().clear();
-    clearCheckoutSession();
+    completePaidCheckout(token, orderId, cartSignature(useCart.getState().items), useCart.getState().clear);
   }, [paid, token, orderId, cartHydrated]);
 
   return (

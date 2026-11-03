@@ -3,8 +3,10 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import { api, ApiError } from '@/lib/api';
-import { CHECKOUT_SESSION_KEY, clearCheckoutSession, isDefinitivePaymentFailure, isPaidOrderStatus, jwtSubject, loadCheckoutSession, saveCheckoutSession, type CheckoutSession } from '@/lib/checkout-session';
+import { CHECKOUT_SESSION_KEY, cartSignature as signatureForCart, completePaidCheckout, clearCheckoutSession, isDefinitivePaymentFailure, isPaidOrderStatus, jwtSubject, loadCheckoutSession, saveCheckoutSession, type CheckoutSession } from '@/lib/checkout-session';
+import { paymentProvider, paymentRequest, validCheckoutUrl, type PaymentConfig } from '@/lib/payment-client';
 import { useCart } from '@/store/cart';
 
 function subscribe(callback: () => void) {
@@ -43,13 +45,22 @@ export default function CheckoutPage() {
   const router = useRouter();
   const items = useCart((s) => s.items);
   const total = useCart((s) => s.total());
-  const clear = useCart((s) => s.clear);
 
   const token = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const isLoggedIn = Boolean(token);
-  const [method, setMethod] = useState<'WALLET' | 'CARD' | 'VNPAY'>('VNPAY');
+  const [method, setMethod] = useState<'WALLET' | 'CARD' | 'VNPAY'>('WALLET');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { data: paymentConfig, error: configError, refetch: reloadConfig } = useQuery({
+    queryKey: ['payment-config', token],
+    queryFn: async () => {
+      const config = await api<PaymentConfig>('/payments/config');
+      if (!['MOCK', 'STRIPE'].includes(config.provider)) throw new Error('Cấu hình thanh toán không hợp lệ.');
+      return config;
+    },
+    enabled: Boolean(token),
+    retry: 1,
+  });
   
   // Coupon state
   const [couponInput, setCouponInput] = useState('');
@@ -113,9 +124,7 @@ export default function CheckoutPage() {
   }, [cartHydrated, items.length, checkoutSession, router]);
 
   // Không dùng quote đã cũ nếu người dùng sửa giỏ hàng sau khi validate.
-  const cartSignature = JSON.stringify(items.map(({ productId, size, toppings, qty, unitPrice }) => ({
-    productId, size, toppings: [...toppings].sort(), qty, unitPrice,
-  })));
+  const cartSignature = signatureForCart(items);
   const activeCouponCode = validatedCartSignature === cartSignature ? couponCode : null;
   const activeCouponDiscount = activeCouponCode ? couponDiscount : 0;
   // Points chỉ giảm số tiền còn lại SAU coupon, và không vượt balance đang đọc được.
@@ -126,6 +135,8 @@ export default function CheckoutPage() {
   const previewPoints = Math.min(pointsRequested, maxRedeemable);
   const sessionMismatch = Boolean(checkoutSession && checkoutSession.cartKey !== cartSignature);
   const selectedMethod = checkoutSession?.attempt?.method ?? method;
+  const mockPayment = paymentConfig?.provider === 'MOCK' && selectedMethod !== 'VNPAY';
+  const canSimulateFailure = mockPayment && paymentConfig.mockDeclineEnabled;
   const savedOrder = checkoutSession?.cartKey === cartSignature && checkoutSession.orderId !== null
     ? checkoutSession : null;
   const appliedPoints = savedOrder ? (savedOrder.pointsRedeemed ?? 0) : previewPoints;
@@ -178,10 +189,10 @@ export default function CheckoutPage() {
     }
   };
 
-  const finishPaid = (orderId: number) => {
+  const finishPaid = (orderId: number, activeToken: string) => {
+    if (localStorage.getItem('token') !== activeToken) throw new Error('Tài khoản đã thay đổi. Vui lòng tải lại trang.');
     finishing.current = true;
-    clearCheckoutSession();
-    clear();
+    completePaidCheckout(activeToken, orderId, signatureForCart(useCart.getState().items), useCart.getState().clear);
     router.push(`/orders/${orderId}/confirmed`);
   };
 
@@ -203,7 +214,14 @@ export default function CheckoutPage() {
 
     let current: CheckoutSession | null = null;
     let creatingOrder = false;
+    const assertCurrentAccount = () => {
+      if (localStorage.getItem('token') !== activeToken) throw new Error('Tài khoản đã thay đổi. Vui lòng tải lại trang.');
+    };
     try {
+      // Recheck before creating an Order; do not reserve stock when config is unavailable.
+      const config = await api<PaymentConfig>('/payments/config');
+      assertCurrentAccount();
+      if (!['MOCK', 'STRIPE'].includes(config.provider)) throw new Error('Cấu hình thanh toán không hợp lệ.');
       current = loadCheckoutSession(activeToken);
       if (current && current.cartKey !== cartSignature) {
         setError('Giỏ hàng đã đổi khi đang xử lý đơn cũ. Mở lịch sử đơn và giải quyết đơn trước khi tiếp tục.');
@@ -212,7 +230,7 @@ export default function CheckoutPage() {
       if (!current) {
         // LƯU TRƯỚC KHI POST: mất mạng ở bước tạo Order vẫn retry cùng key + cùng payload.
         current = {
-          version: 1, subject, cartKey: cartSignature,
+          version: 1, subject, cartKey: cartSignature, provider: config.provider,
           orderKey: crypto.randomUUID(),
           orderRequest: {
             items: items.map(({ productId, size, toppings, qty }) => ({ productId, size, toppings, qty })),
@@ -230,6 +248,7 @@ export default function CheckoutPage() {
           headers: { 'Idempotency-Key': current.orderKey },
           body: JSON.stringify(current.orderRequest),
         });
+        assertCurrentAccount();
         creatingOrder = false;
         if (!Number.isSafeInteger(created.id) || created.id <= 0 ||
             !Number.isSafeInteger(created.total) || created.total < 0 ||
@@ -244,42 +263,64 @@ export default function CheckoutPage() {
         if (isPaidOrderStatus(created.status)) {
           // Đơn đã được thanh toán từ trước (replay order-key).
           const verified = await api<{ status: string }>(`/orders/${created.id}`);
-          if (isPaidOrderStatus(verified.status)) finishPaid(created.id);
+          if (isPaidOrderStatus(verified.status)) finishPaid(created.id, activeToken);
           return;
         }
       }
       const orderId = current.orderId;
       if (orderId === null) throw new Error('Chưa nhận được mã đơn.');
+      const order = await api<{ id: number; status: string }>(`/orders/${orderId}`);
+      assertCurrentAccount();
+      if (order.id !== orderId) throw new Error('Phản hồi không khớp mã đơn.');
+      if (isPaidOrderStatus(order.status)) { finishPaid(orderId, activeToken); return; }
+      if (!['PENDING', 'PAYMENT_FAILED'].includes(order.status)) throw new Error('Đơn không còn chờ thanh toán. Vui lòng xem lịch sử đơn.');
+      if (current.attempt && current.attempt.method !== 'VNPAY' && current.provider && current.provider !== config.provider) {
+        throw new Error('Cổng thanh toán đã thay đổi. Vui lòng kiểm tra giao dịch cũ trong lịch sử đơn.');
+      }
       // Khi thanh toán đang không rõ kết quả, tuyệt đối giữ nguyên method/demoDecline + payment key.
       if (!current.attempt) {
         current = {
           ...current,
-          attempt: { key: crypto.randomUUID(), method, demoDecline: simulateFailure },
+          provider: config.provider,
+          attempt: { key: crypto.randomUUID(), method, demoDecline: method !== 'VNPAY' && config.provider === 'MOCK' && config.mockDeclineEnabled && simulateFailure },
         };
         saveCheckoutSession(current);
       }
       const attempt = current.attempt;
       // Kiểm tra rõ ràng để TypeScript và runtime không dùng một lượt thanh toán rỗng.
       if (!attempt) throw new Error('Chưa tạo được khóa thanh toán, vui lòng thử lại.');
+      const provider = paymentProvider({ ...config, provider: current.provider ?? config.provider }, attempt.method);
+      const request = paymentRequest(provider, orderId, attempt.method, attempt.demoDecline);
       const res = await api<{
         orderId: number;
         paymentId: number;
         status: string;
-        checkoutUrl: string;
-      }>('/payments/checkout', {
+        checkoutUrl?: string;
+      }>(request.path, {
         method: 'POST',
         headers: { 'Idempotency-Key': attempt.key },
-        body: JSON.stringify({ orderId, method: attempt.method,
-          ...(attempt.demoDecline ? { demoDecline: true } : {}) }),
+        body: request.body,
       });
+      assertCurrentAccount();
       if (res.orderId !== orderId) throw new Error('Payment trả mã đơn không khớp. Cần kiểm tra thủ công.');
-      if (!res.checkoutUrl || typeof res.checkoutUrl !== 'string') {
-        throw new Error('Backend không trả về URL thanh toán VNPay hợp lệ.');
+      if (res.status === 'FAILED') {
+        saveCheckoutSession({ ...current, attempt: null });
+        setError('Thanh toán bị từ chối. Đơn hàng và giỏ vẫn còn; bạn có thể thử lại.');
+        return;
       }
+      if (res.status === 'SUCCEEDED') {
+        const verified = await api<{ id: number; status: string }>(`/orders/${orderId}`);
+        assertCurrentAccount();
+        if (verified.id !== orderId || !isPaidOrderStatus(verified.status)) throw new Error('Chưa xác nhận được trạng thái thanh toán của đơn.');
+        finishPaid(orderId, activeToken);
+        return;
+      }
+      if (res.status !== 'PENDING' || !validCheckoutUrl(res.checkoutUrl, provider)) throw new Error('Backend không trả về trang thanh toán hợp lệ.');
       window.location.assign(res.checkoutUrl);
     } catch (e: unknown) {
       const apiError = e instanceof ApiError ? e : null;
       const message = e instanceof Error ? e.message : 'Không thể kết nối máy chủ';
+      if (localStorage.getItem('token') !== activeToken) { setError('Tài khoản đã thay đổi. Vui lòng tải lại trang.'); return; }
       if (creatingOrder && apiError && [400, 404, 409, 422].includes(apiError.status)) {
         // API đã từ chối tạo đơn (validation/stock/coupon); không có transaction nào commit.
         clearCheckoutSession();
@@ -292,14 +333,14 @@ export default function CheckoutPage() {
         try {
           const order = await api<{ status: string }>(`/orders/${current.orderId}`);
           if (isPaidOrderStatus(order.status)) {
-            finishPaid(current.orderId);
+            finishPaid(current.orderId, activeToken);
             return;
           }
         } catch { /* giữ nguyên phiên để xử lý tiếp */ }
       }
       if (current?.orderId !== null && current?.orderId !== undefined &&
           (isDefinitivePaymentFailure(apiError?.status, apiError?.code) ||
-            apiError?.status === 400)) {
+            apiError?.code === 'STRIPE_SESSION_EXPIRED' || apiError?.status === 400)) {
         // Backend đã trả kết quả lỗi rõ ràng; lần thử MỚI dùng payment key mới.
         saveCheckoutSession({ ...current, attempt: null });
         setError(message + ' Đơn hàng và giỏ vẫn còn; bạn có thể thử lại.');
@@ -512,7 +553,7 @@ export default function CheckoutPage() {
                 <div className="font-semibold text-sm flex items-center gap-1.5">
                   <span>📱</span> Ví điện tử
                 </div>
-                <div className="text-[11px] text-stone-400">MoMo / ZaloPay (Không tiền mặt)</div>
+                <div className="text-[11px] text-stone-400">{paymentConfig?.provider === 'MOCK' ? 'Ví mô phỏng, không trừ tiền thật' : 'Thanh toán qua Stripe'}</div>
               </div>
             </label>
 
@@ -535,14 +576,17 @@ export default function CheckoutPage() {
                 <div className="font-semibold text-sm flex items-center gap-1.5">
                   <span>💳</span> Thẻ ngân hàng
                 </div>
-                <div className="text-[11px] text-stone-400">ATM Napas / Visa / Mastercard</div>
+                <div className="text-[11px] text-stone-400">{paymentConfig?.provider === 'MOCK' ? 'Thẻ mô phỏng, không trừ tiền thật' : 'Thẻ qua Stripe Checkout'}</div>
               </div>
             </label>
           </div>
+          {mockPayment && <p className="mt-3 text-sm text-amber-300">Thanh toán mô phỏng, không trừ tiền thật. Bấm xác nhận để hoàn tất đơn.</p>}
+          {!paymentConfig && <p role="status" className="mt-3 text-sm text-stone-400">Đang tải cấu hình thanh toán…</p>}
+          {configError && <p role="alert" className="mt-3 text-red-300">Không tải được cấu hình thanh toán. <button type="button" className="underline" onClick={() => void reloadConfig()}>Thử tải lại</button></p>}
         </div>
 
         {/* Công cụ demo cho giảng viên (US-05 Acceptance Criteria) */}
-        <div className="py-3 px-3.5 my-4 bg-stone-950/70 border border-stone-800 rounded-xl">
+        {canSimulateFailure && <div className="py-3 px-3.5 my-4 bg-stone-950/70 border border-stone-800 rounded-xl">
           <label className="flex items-center gap-2.5 cursor-pointer text-xs text-stone-400 hover:text-stone-300">
             <input
               type="checkbox"
@@ -552,10 +596,10 @@ export default function CheckoutPage() {
               className="accent-red-500 w-4 h-4 rounded"
             />
             <span>
-              <strong className="text-amber-400">[Demo cho GV]:</strong> Gửi yêu cầu mô phỏng ngân hàng từ chối <em>qua backend thật</em> (đơn chuyển <code className="text-red-400">PAYMENT_FAILED</code>). Cần bật <code>MOCK_GATEWAY_TEST_MODE=true</code> trên backend local.
+              Mô phỏng thanh toán thất bại
             </span>
           </label>
-        </div>
+        </div>}
 
         {/* Tổng kết tiền */}
         <div className="space-y-1.5 py-3 text-sm">
@@ -602,7 +646,7 @@ export default function CheckoutPage() {
         )}
         {/* Thông báo lỗi */}
         {error && (
-          <div className="mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs leading-relaxed">
+          <div role="alert" className="mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs leading-relaxed">
             {error}
           </div>
         )}
@@ -617,7 +661,7 @@ export default function CheckoutPage() {
           </Link>
           <button
             onClick={handlePay}
-            disabled={loading || validatingCoupon || sessionMismatch || !cartHydrated}
+            disabled={loading || validatingCoupon || sessionMismatch || !cartHydrated || !paymentConfig || !token}
             className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-stone-950 font-bold text-center text-sm shadow-lg shadow-amber-500/20 disabled:opacity-50 transition"
           >
             {loading ? 'Đang xử lý giao dịch…' : checkoutSession?.attempt ? 'Thử lại giao dịch cũ' : checkoutSession ? 'Tiếp tục thanh toán' : 'Xác nhận thanh toán'}

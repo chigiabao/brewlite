@@ -148,6 +148,27 @@ jobs:
         env:
           BREWLITE_ALLOW_TEST_WRITES: '1'
         run: node scripts/smoke-e2e.mjs | tee .ci-artifacts/fix12-smoke-e2e.json
+      - name: Install browser regression dependencies
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Browser checkout, retry, cancellation and VNPay return regression
+        working-directory: frontend
+        env:
+          BREWLITE_ALLOW_TEST_WRITES: '1'
+          BREWLITE_E2E_UI: http://localhost:3000
+          BREWLITE_E2E_API: http://localhost:3001
+        run: npm run test:e2e
+      - name: Upload browser test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-checkout-regression
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          if-no-files-found: ignore
       - name: Upload Docker/HTTP verification evidence
         if: always()
         uses: actions/upload-artifact@v4

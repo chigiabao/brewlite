@@ -77,6 +77,26 @@ describe('VNPay Checkout & IPN E2E (real PostgreSQL)', () => {
     return { ...params, vnp_SecureHash: hash };
   }
 
+  it('return status uses the exact owned VNPay attempt and never settles from URL codes', async () => {
+    const order = await seedOrder();
+    const checkout = await request(app.getHttpServer()).post('/payments/checkout')
+      .set('Authorization', `Bearer ${authToken}`).set('Idempotency-Key', `return-${order.id}`)
+      .send({ orderId: order.id, method: 'VNPAY' }).expect(200);
+    const payment = await prisma.payment.findUniqueOrThrow({ where: { id: checkout.body.paymentId } });
+    const path = `/payments/vnpay/status/${payment.vnpTxnRef}`;
+    await request(app.getHttpServer()).get(path).expect(401);
+    await request(app.getHttpServer()).get(`${path}?vnp_ResponseCode=00&vnp_TransactionStatus=00`)
+      .set('Authorization', `Bearer ${authToken}`)
+      .expect(200, { orderId: order.id, orderStatus: 'PENDING', paymentStatus: 'PENDING' });
+    const otherToken = jwtService.sign({ sub: USER_ID + 100000, email: 'other@example.test' });
+    await request(app.getHttpServer()).get(path).set('Authorization', `Bearer ${otherToken}`).expect(404);
+    await request(app.getHttpServer()).get(`/payments/vnpay/status/${order.id}_999999_123`)
+      .set('Authorization', `Bearer ${authToken}`).expect(404);
+    await request(app.getHttpServer()).get('/payments/vnpay/status/invalid')
+      .set('Authorization', `Bearer ${authToken}`).expect(400);
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe('PENDING');
+  });
+
   it('POST /payments/checkout với method VNPAY -> trả về checkoutUrl VNPay sandbox và lưu txnRef', async () => {
     const order = await seedOrder();
     const idemKey = `vnp-e2e-${Date.now()}`;

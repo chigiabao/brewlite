@@ -58,6 +58,10 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; border: stri
     border: 'border-stone-800',
     bg: 'bg-stone-900',
   },
+  REFUNDED: {
+    label: 'Đã hoàn tiền', color: 'text-orange-300',
+    border: 'border-orange-500/30', bg: 'bg-orange-500/10',
+  },
 };
 
 function subscribe(callback: () => void) {
@@ -80,6 +84,7 @@ export default function OrdersPage() {
     queryKey: ['orders', token],
     queryFn: () => api<Order[]>('/orders/me'),
     enabled: Boolean(token),
+    refetchInterval: 5000,
   });
 
   if (!token) {
@@ -104,16 +109,16 @@ export default function OrdersPage() {
 
   return (
     <div className="max-w-3xl mx-auto py-8 px-4">
-      <div className="flex items-center justify-between pb-6 mb-6 border-b border-stone-800">
+      <div className="flex items-center justify-between pb-6 mb-6 border-b border-stone-300">
         <div>
-          <h1 className="text-2xl font-serif font-bold text-stone-100">Lịch Sử Đơn Hàng</h1>
-          <p className="text-xs text-stone-400 mt-1">
-            Theo dõi trạng thái đơn hàng của bạn theo thời gian thực (GET /orders/me)
+          <h1 className="text-2xl font-serif font-bold text-stone-900">Lịch Sử Đơn Hàng</h1>
+          <p className="text-xs text-stone-600 mt-1">
+            Theo dõi trạng thái đơn hàng của bạn
           </p>
         </div>
         <Link
           href="/"
-          className="text-xs text-amber-400 hover:text-amber-300 font-semibold border border-amber-500/30 px-3 py-1.5 rounded-lg transition"
+          className="text-xs text-amber-800 hover:text-amber-950 font-semibold border border-amber-700/40 px-3 py-1.5 rounded-lg transition"
         >
           + Đặt món mới
         </Link>

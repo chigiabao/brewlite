@@ -119,6 +119,22 @@ export class PaymentsService {
   // ============================================================
   // 1. CREATE / RESUME CHECKOUT — FE gọi, nhận URL redirect sang Stripe
   // ============================================================
+  async getVnpayStatus(userId: number, txnRef: string) {
+    if (txnRef.length > 200 || !/^\d+_\d+_\d+$/.test(txnRef)) {
+      throw new BadRequestException('VNPay transaction reference is invalid');
+    }
+    // Return-page query parameters never settle a payment. Read the exact
+    // persisted VNPay attempt and enforce ownership in the database query.
+    const payment = await this.prisma.payment.findFirst({
+      where: { vnpTxnRef: txnRef, gateway: PaymentGateway.VNPAY, order: { userId } },
+      select: { orderId: true, status: true, order: { select: { status: true } } },
+    });
+    if (!payment) {
+      throw new PaymentError(PaymentErrorCode.ORDER_NOT_FOUND, 'Không tìm thấy giao dịch của tài khoản hiện tại', 404);
+    }
+    return { orderId: payment.orderId, paymentStatus: payment.status, orderStatus: payment.order.status };
+  }
+
   async createCheckout(input: PayInput): Promise<CreateCheckoutResult> {
     const idempotencyKey = assertValidIdempotencyKey(input.idempotencyKey);
     const requestHash = paymentRequestHash({
