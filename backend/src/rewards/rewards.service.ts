@@ -5,7 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { LoyaltyKind } from '../generated/prisma/enums.js';
+import { LoyaltyKind, OrderStatus } from '../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
   calculateCouponDiscount,
@@ -114,6 +114,13 @@ export class RewardsService {
       const updated = await tx.coupon.updateMany({
         where: {
           code,
+          // Kiểm tra lại tại UPDATE để tránh coupon bị tắt/sửa trong lúc checkout.
+          active: true,
+          expiresAt: { gt: new Date() },
+          minOrderValue: coupon.minOrderValue,
+          discountPercent: coupon.discountPercent,
+          discountAmount: coupon.discountAmount,
+          maxUses: coupon.maxUses,
           ...(coupon.maxUses !== null ? { usedCount: { lt: coupon.maxUses } } : {}),
         },
         data: { usedCount: { increment: 1 } },
@@ -159,6 +166,20 @@ export class RewardsService {
     const { orderId, userId, couponCode, pointsRedeemed } = params;
     assertNonNegativeInteger(pointsRedeemed, 'pointsRedeemed');
 
+    // Chỉ hoàn phần đã giữ của đúng đơn đã hủy, trong cùng transaction.
+    if (tx.order) {
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        select: { userId: true, status: true, couponCode: true, pointsRedeemed: true },
+      });
+      if (!order || order.status !== OrderStatus.CANCELLED || order.userId !== userId ||
+        order.pointsRedeemed !== pointsRedeemed ||
+        (order.couponCode ? normalizeCouponCode(order.couponCode) : null) !==
+          (couponCode?.trim() ? normalizeCouponCode(couponCode) : null)) {
+        throw new ConflictException('REWARDS_CANCEL_SNAPSHOT_MISMATCH');
+      }
+    }
+
     if (couponCode?.trim()) {
       const code = normalizeCouponCode(couponCode);
       const released = await tx.coupon.updateMany({
@@ -201,6 +222,18 @@ export class RewardsService {
     const { orderId, userId, totalPaid, pointsRedeemed } = params;
     assertNonNegativeInteger(pointsRedeemed, 'pointsRedeemed');
     assertNonNegativeInteger(totalPaid, 'totalPaid');
+
+    // Chỉ ghi REDEEM/EARN khi đơn thực sự PAID và snapshot khớp DB.
+    if (tx.order) {
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        select: { userId: true, status: true, total: true, pointsRedeemed: true },
+      });
+      if (!order || order.status !== OrderStatus.PAID || order.userId !== userId ||
+        order.total !== totalPaid || order.pointsRedeemed !== pointsRedeemed) {
+        throw new ConflictException('REWARDS_PAID_SNAPSHOT_MISMATCH');
+      }
+    }
 
     if (pointsRedeemed > 0) {
       const existingRedeem = await tx.loyaltyEntry.findUnique({

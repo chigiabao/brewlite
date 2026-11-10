@@ -34,7 +34,7 @@ test('real API: menu to mock decline, reload, retry same Order and one successfu
   const headers = { Authorization: `Bearer ${token}` };
   await page.getByRole('checkbox', { name: 'Mô phỏng thanh toán thất bại' }).check();
   await page.getByRole('button', { name: 'Xác nhận thanh toán', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('Thanh toán bị từ chối');
+  await expect(page.getByRole('alert').filter({ hasText: 'Thanh toán bị từ chối' })).toBeVisible();
   const saved = await page.evaluate(() => JSON.parse(sessionStorage.getItem('brewlite-checkout-v1')!));
   await page.reload();
   await page.getByRole('button', { name: 'Tiếp tục thanh toán', exact: true }).click();
@@ -55,7 +55,7 @@ test('real API: cancel from history returns reserved stock and preserves the car
   const headers = { Authorization: `Bearer ${token}` };
   await page.getByRole('checkbox', { name: 'Mô phỏng thanh toán thất bại' }).check();
   await page.getByRole('button', { name: 'Xác nhận thanh toán', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('Thanh toán bị từ chối');
+  await expect(page.getByRole('alert').filter({ hasText: 'Thanh toán bị từ chối' })).toBeVisible();
   const { orderId } = await page.evaluate(() => JSON.parse(sessionStorage.getItem('brewlite-checkout-v1')!));
   await page.goto('/orders');
   await page.getByRole('button', { name: 'Hủy đơn', exact: true }).click();
@@ -77,7 +77,7 @@ test('real API: lost success response recovers the paid Order without a second c
     await route.abort('failed');
   });
   await page.getByRole('button', { name: 'Xác nhận thanh toán', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('Kết quả có thể chưa rõ');
+  await expect(page.getByRole('alert').filter({ hasText: 'Kết quả có thể chưa rõ' })).toBeVisible();
   const saved = await page.evaluate(() => JSON.parse(sessionStorage.getItem('brewlite-checkout-v1')!));
   await page.reload();
   await page.getByRole('button', { name: 'Thử lại giao dịch cũ', exact: true }).click();

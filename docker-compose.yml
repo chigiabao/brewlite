@@ -15,6 +15,18 @@ services:
       timeout: 3s
       retries: 20
 
+  # UI web quản lý database (xem/sửa bảng User, đổi role ADMIN...). Mở http://localhost:8080
+  adminer:
+    image: adminer:5
+    restart: unless-stopped
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+      ADMINER_DESIGN: dracula
+    ports: ["8080:8080"]
+    depends_on:
+      db:
+        condition: service_healthy
+
   backend:
     build: ./backend
     environment:
