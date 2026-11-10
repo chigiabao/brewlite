@@ -5,11 +5,12 @@ import { OrdersModule } from '../orders/public.js';
 import { AdminRoleGuard } from './admin-role.guard.js';
 import { AdminController } from './admin.controller.js';
 import { AdminService } from './admin.service.js';
+import { BomService } from './bom/bom.service.js';
 
 @Module({
   imports: [PrismaModule, AuthModule, OrdersModule],
   controllers: [AdminController],
-  providers: [AdminService, AdminRoleGuard],
-  exports: [AdminService],
+  providers: [AdminService, AdminRoleGuard, BomService],
+  exports: [AdminService, BomService],
 })
 export class AdminModule {}

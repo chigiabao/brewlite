@@ -10,6 +10,9 @@ import {
   AdminProduct,
   AdminCoupon,
   AdminUser,
+  Ingredient,
+  CapacityItem,
+  CogsItem,
 } from '@/lib/admin-api';
 
 function formatVND(amount: number): string {
@@ -31,7 +34,7 @@ const STATUS_LABELS: Record<string, { label: string; bg: string; text: string; b
   PAYMENT_FAILED: { label: 'Thanh toán lỗi', bg: 'bg-rose-950/60', text: 'text-rose-400', border: 'border-rose-700/50' },
 };
 
-type AdminTab = 'overview' | 'orders' | 'products' | 'coupons' | 'users';
+type AdminTab = 'overview' | 'orders' | 'products' | 'coupons' | 'users' | 'inventory_bom';
 type StockFilter = 'ALL' | 'LOW' | 'NORMAL';
 
 const DEFAULT_COUPON_EXPIRY = new Date(
@@ -82,6 +85,14 @@ export default function AdminPage() {
   });
   const [pointsDelta, setPointsDelta] = useState(50);
 
+  // BOM & Raw Materials State
+  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const [capacities, setCapacities] = useState<CapacityItem[]>([]);
+  const [cogsList, setCogsList] = useState<CogsItem[]>([]);
+  const [isBomLoading, setIsBomLoading] = useState(false);
+  const [restockModalIng, setRestockModalIng] = useState<Ingredient | null>(null);
+  const [restockAmount, setRestockAmount] = useState<number>(1000);
+
   const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3500);
@@ -111,6 +122,36 @@ export default function AdminPage() {
       setLoading(false);
     }
   }, [showToast, isAdminVerified]);
+
+  const loadBomData = useCallback(async () => {
+    setIsBomLoading(true);
+    try {
+      const [ings, caps, cogs] = await Promise.all([
+        adminApi.getIngredients(),
+        adminApi.getCapacity(),
+        adminApi.getCogs(),
+      ]);
+      setIngredients(ings);
+      setCapacities(caps);
+      setCogsList(cogs);
+    } catch {
+      showToast('Không thể tải dữ liệu định mức nguyên vật liệu BOM', 'error');
+    } finally {
+      setIsBomLoading(false);
+    }
+  }, [showToast]);
+
+  const handleRestock = async () => {
+    if (!restockModalIng || restockAmount <= 0) return;
+    try {
+      await adminApi.restockIngredient(restockModalIng.id, restockAmount);
+      showToast(`Đã nhập thêm +${restockAmount} ${restockModalIng.unit} ${restockModalIng.name}`, 'success');
+      setRestockModalIng(null);
+      void loadBomData();
+    } catch {
+      showToast('Lỗi khi nhập kho nguyên vật liệu', 'error');
+    }
+  };
 
   // FIX 10: server kiểm chứng quyền bằng JWT + role trong CSDL.
   // Email trong payload JWT/localStorage tuyệt đối KHÔNG chứng minh quyền Admin.
@@ -415,10 +456,16 @@ export default function AdminPage() {
             },
             { id: 'coupons', label: '🎟️ Mã khuyến mãi', badge: `${coupons.length} mã` },
             { id: 'users', label: '👥 Khách hàng', badge: `${users.length} khách` },
+            { id: 'inventory_bom', label: '⚖️ Kho BOM (Gram / ml)', badge: 'Mới', badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' },
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as AdminTab)}
+              onClick={() => {
+                setActiveTab(tab.id as AdminTab);
+                if (tab.id === 'inventory_bom') {
+                  void loadBomData();
+                }
+              }}
               className={`flex items-center gap-2 py-3.5 px-4 text-xs sm:text-sm font-bold whitespace-nowrap transition-all border-b-2 ${
                 activeTab === tab.id
                   ? 'border-amber-400 text-amber-300 bg-amber-950/30'
@@ -1393,6 +1440,204 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+
+        {/* ============================================================== */}
+        {/* TAB 6: ĐỊNH MỨC NGUYÊN VẬT LIỆU BOM (GRAM / ML) & TÍNH TOÁN NGUỒN */}
+        {/* ============================================================== */}
+        {activeTab === 'inventory_bom' && (
+          <div className="space-y-8 animate-in fade-in">
+            {/* Header tab */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-2xl bg-gradient-to-r from-stone-900 via-amber-950/40 to-stone-900 border border-amber-900/40 shadow-xl">
+              <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold mb-2">
+                  <span>✨ Phân Hệ Nâng Cao</span>
+                  <span>•</span>
+                  <span>BOM &amp; Raw Materials</span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black text-amber-200">
+                  Kho Nguyên Vật Liệu (Gram / ml) &amp; Thuật Toán Tính Nguồn
+                </h2>
+                <p className="text-xs sm:text-sm text-stone-400 mt-1">
+                  Định mức tiêu hao theo gram &amp; ml, phát hiện điểm nghẽn nguyên liệu (Bottleneck) và phân tích biên lợi nhuận COGS.
+                </p>
+              </div>
+              <button
+                onClick={() => void loadBomData()}
+                disabled={isBomLoading}
+                className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-stone-950 font-bold text-xs shadow-lg transition flex items-center gap-2 shrink-0"
+              >
+                <span>{isBomLoading ? '⏳ Đang tính toán...' : '🔄 Làm mới số liệu BOM'}</span>
+              </button>
+            </div>
+
+            {/* PHẦN 1: TỒN KHO NGUYÊN VẬT LIỆU THỰC TẾ (CARD GRID) */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-bold text-stone-200 flex items-center gap-2">
+                  <span>📦 Tồn Kho Nguyên Liệu Thô (Gram / ml / Cái)</span>
+                </h3>
+                <span className="text-xs text-stone-400">{ingredients.length} nguyên liệu trong kho</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {ingredients.map((ing) => {
+                  const isLow = ing.stock <= ing.minThreshold;
+                  const unitLabel = ing.unit === 'GRAM' ? 'g' : ing.unit === 'ML' ? 'ml' : 'bộ';
+                  return (
+                    <div
+                      key={ing.id}
+                      className={`p-5 rounded-2xl bg-stone-900/80 border transition-all ${
+                        isLow
+                          ? 'border-rose-700/60 bg-rose-950/20 shadow-rose-950/40'
+                          : 'border-stone-800 hover:border-amber-700/50'
+                      } shadow-lg`}
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="text-xs font-semibold text-stone-400">{ing.name}</span>
+                        {isLow ? (
+                          <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-bold animate-pulse">
+                            ⚠️ Sắp hết
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold">
+                            ✅ An toàn
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-baseline gap-1.5 my-2">
+                        <span className="text-2xl font-black text-amber-300 font-mono">
+                          {ing.stock.toLocaleString('vi-VN')}
+                        </span>
+                        <span className="text-sm font-bold text-stone-400">{unitLabel}</span>
+                      </div>
+
+                      <div className="flex justify-between text-[11px] text-stone-500 pt-2 border-t border-stone-800/80 mb-3">
+                        <span>Ngưỡng tối thiểu: {ing.minThreshold.toLocaleString('vi-VN')} {unitLabel}</span>
+                        <span>Đơn giá vốn: {ing.costPerUnit.toLocaleString('vi-VN')}đ/{unitLabel}</span>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          setRestockModalIng(ing);
+                          setRestockAmount(ing.unit === 'PIECE' ? 100 : 1000);
+                        }}
+                        className="w-full py-2 rounded-xl bg-stone-800 hover:bg-amber-600 hover:text-stone-950 text-stone-300 font-bold text-xs transition border border-stone-700 flex items-center justify-center gap-1.5"
+                      >
+                        <span>📥</span>
+                        <span>Nhập thêm {unitLabel}</span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* PHẦN 2: THUẬT TOÁN TÍNH TOÁN NGUỒN CUNG (CAPACITY & BOTTLENECK ENGINE) */}
+            <div className="p-6 rounded-2xl bg-stone-900/70 border border-stone-800 shadow-xl">
+              <div className="mb-4">
+                <h3 className="text-base font-bold text-stone-100 flex items-center gap-2">
+                  <span>⚡ Thuật Toán Tính Nguồn: Số Ly Tối Đa &amp; Điểm Nghẽn (Bottleneck)</span>
+                </h3>
+                <p className="text-xs text-stone-400 mt-0.5">
+                  Dựa vào số gram/ml hiện có trong kho để tính toán số ly tối đa quán có thể phục vụ trước khi cạn kiệt.
+                </p>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-stone-300">
+                  <thead className="bg-stone-950/80 text-stone-400 uppercase tracking-wider text-[11px] border-b border-stone-800">
+                    <tr>
+                      <th className="py-3 px-4 font-bold">Món đồ uống</th>
+                      <th className="py-3 px-4 font-bold">Size</th>
+                      <th className="py-3 px-4 font-bold text-amber-400">Số ly tối đa có thể pha</th>
+                      <th className="py-3 px-4 font-bold text-rose-400">Nguyên liệu là điểm nghẽn (Bottleneck)</th>
+                      <th className="py-3 px-4 font-bold text-stone-400">Định lượng tiêu hao / ly</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-800/60 font-medium">
+                    {capacities.map((cap, idx) => (
+                      <tr key={idx} className="hover:bg-stone-800/40 transition">
+                        <td className="py-3 px-4 font-bold text-stone-100">{cap.productName}</td>
+                        <td className="py-3 px-4">
+                          <span className="px-2 py-0.5 rounded-md bg-amber-950/60 border border-amber-800 text-amber-300 font-bold">
+                            Size {cap.size}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="text-base font-black text-amber-300 font-mono">
+                            {cap.maxServings.toLocaleString('vi-VN')} ly
+                          </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="px-2.5 py-1 rounded-full bg-rose-950/60 border border-rose-800/60 text-rose-300 text-[11px] font-bold">
+                            ⚠️ {cap.bottleneck.ingredientName} (còn {cap.bottleneck.currentStock.toLocaleString('vi-VN')} {cap.bottleneck.unit === 'GRAM' ? 'g' : cap.bottleneck.unit === 'ML' ? 'ml' : 'bộ'})
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-stone-400">
+                          {cap.bottleneck.amountPerCup} {cap.bottleneck.unit === 'GRAM' ? 'g' : cap.bottleneck.unit === 'ML' ? 'ml' : 'bộ'} / ly
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* PHẦN 3: GIÁ VỐN HÀNG BÁN (COGS) & TỶ SUẤT LỢI NHUẬN GỘP */}
+            <div className="p-6 rounded-2xl bg-stone-900/70 border border-stone-800 shadow-xl">
+              <div className="mb-4">
+                <h3 className="text-base font-bold text-stone-100 flex items-center gap-2">
+                  <span>💰 Phân Tích Giá Vốn Hàng Bán (COGS) &amp; Biên Lợi Nhuận Gộp</span>
+                </h3>
+                <p className="text-xs text-stone-400 mt-0.5">
+                  Bóc tách chi phí nguyên vật liệu cấu thành 1 ly đồ uống và tỷ lệ lợi nhuận kinh doanh.
+                </p>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-stone-300">
+                  <thead className="bg-stone-950/80 text-stone-400 uppercase tracking-wider text-[11px] border-b border-stone-800">
+                    <tr>
+                      <th className="py-3 px-4 font-bold">Món đồ uống &amp; Size</th>
+                      <th className="py-3 px-4 font-bold text-right">Giá bán menu</th>
+                      <th className="py-3 px-4 font-bold text-right text-rose-400">Giá vốn nguyên liệu (COGS)</th>
+                      <th className="py-3 px-4 font-bold text-right text-emerald-400">Lợi nhuận gộp</th>
+                      <th className="py-3 px-4 font-bold text-right text-amber-400">Tỷ suất lợi nhuận (%)</th>
+                      <th className="py-3 px-4 font-bold">Chi tiết bóc tách thành phần</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-800/60 font-medium">
+                    {cogsList.map((cogs, idx) => (
+                      <tr key={idx} className="hover:bg-stone-800/40 transition">
+                        <td className="py-3 px-4 font-bold text-stone-100">
+                          {cogs.productName} ({cogs.size})
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-stone-200">
+                          {formatVND(cogs.sellingPrice)}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-rose-300">
+                          {formatVND(cogs.cogs)}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-emerald-300">
+                          {formatVND(cogs.grossProfit)}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-700 text-emerald-300 font-mono font-black">
+                            {cogs.marginPercent}%
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-stone-400 text-[11px]">
+                          {cogs.breakdown.map((b) => `${b.ingredientName}: ${b.amount}${b.unit === 'GRAM' ? 'g' : b.unit === 'ML' ? 'ml' : 'bộ'} (${formatVND(b.cost)})`).join(' • ')}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* ============================================================== */}
@@ -1855,6 +2100,85 @@ export default function AdminPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL 5: NHẬP THÊM NGUYÊN VẬT LIỆU (RESTOCK INGREDIENT) */}
+      {/* ============================================================== */}
+      {restockModalIng && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in">
+          <div className="w-full max-w-md rounded-2xl bg-stone-950 border border-amber-900/50 p-6 shadow-2xl relative">
+            <button
+              onClick={() => setRestockModalIng(null)}
+              className="absolute top-4 right-4 text-stone-400 hover:text-white text-lg font-bold w-8 h-8 rounded-full bg-stone-900 flex items-center justify-center"
+            >
+              ✕
+            </button>
+
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-xl font-bold border border-amber-500/40">
+                📥
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-amber-100">Nhập Thêm Nguyên Vật Liệu</h3>
+                <p className="text-xs text-stone-400">{restockModalIng.name}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="p-3 rounded-xl bg-stone-900 border border-stone-800 text-xs flex justify-between">
+                <span className="text-stone-400">Tồn kho hiện tại:</span>
+                <span className="font-mono font-bold text-amber-300">
+                  {restockModalIng.stock.toLocaleString('vi-VN')} {restockModalIng.unit === 'GRAM' ? 'g' : restockModalIng.unit === 'ML' ? 'ml' : 'bộ'}
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-stone-300 mb-1">
+                  Số lượng nhập thêm ({restockModalIng.unit === 'GRAM' ? 'g' : restockModalIng.unit === 'ML' ? 'ml' : 'bộ'}):
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  step="10"
+                  value={restockAmount}
+                  onChange={(e) => setRestockAmount(Math.max(1, Number(e.target.value)))}
+                  className="w-full px-3 py-2.5 rounded-xl bg-stone-900 border border-stone-800 text-amber-300 font-mono font-bold text-base focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                {[500, 1000, 2000, 5000].map((quick) => (
+                  <button
+                    key={quick}
+                    type="button"
+                    onClick={() => setRestockAmount(quick)}
+                    className="flex-1 py-1.5 rounded-lg bg-stone-900 hover:bg-stone-800 border border-stone-800 text-stone-400 text-xs font-bold transition"
+                  >
+                    +{quick}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex gap-3 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setRestockModalIng(null)}
+                  className="flex-1 py-2.5 rounded-xl bg-stone-900 text-stone-400 font-bold text-xs hover:bg-stone-800 transition"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleRestock()}
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-stone-950 font-black text-xs shadow-lg shadow-amber-950/50 transition"
+                >
+                  Xác nhận nhập kho
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

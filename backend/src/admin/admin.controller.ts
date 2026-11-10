@@ -14,6 +14,7 @@ import {
 import { CurrentUser, JwtAuthGuard, type AuthUser } from '../auth/public.js';
 import { AdminRoleGuard } from './admin-role.guard.js';
 import { AdminService } from './admin.service.js';
+import { BomService } from './bom/bom.service.js';
 import {
   AdjustUserPointsDto,
   CreateCouponDto,
@@ -28,7 +29,10 @@ import {
 @UseGuards(JwtAuthGuard, AdminRoleGuard)
 @Controller('admin')
 export class AdminController {
-  constructor(private readonly admin: AdminService) {}
+  constructor(
+    private readonly admin: AdminService,
+    private readonly bom: BomService,
+  ) {}
 
   // Endpoint kiểm tra session: FE phải gọi API này thay vì tự đoán Admin từ email.
   @Get('session')
@@ -127,5 +131,29 @@ export class AdminController {
     @Body() dto: AdjustUserPointsDto,
   ) {
     return this.admin.adjustUserPoints(id, dto.pointsDelta);
+  }
+
+  // 6. Quản lý Nguyên vật liệu (BOM) & Tính toán Nguồn
+  @Get('bom/ingredients')
+  getIngredients() {
+    return this.bom.getAllIngredients();
+  }
+
+  @Post('bom/ingredients/:id/restock')
+  restockIngredient(
+    @Param('id') id: string,
+    @Body('amount') amount: number,
+  ) {
+    return this.bom.restockIngredient(id, Number(amount));
+  }
+
+  @Get('bom/capacity')
+  getCapacity() {
+    return this.bom.calculateCapacities();
+  }
+
+  @Get('bom/cogs')
+  getCogs() {
+    return this.bom.calculateCogs();
   }
 }

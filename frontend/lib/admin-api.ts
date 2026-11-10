@@ -179,4 +179,56 @@ export const adminApi = {
       method: 'PATCH',
       body: JSON.stringify({ pointsDelta }),
     }),
+
+  // BOM & Raw Materials (Gram / ml / Capacity / COGS)
+  getIngredients: () => api<Ingredient[]>('/admin/bom/ingredients'),
+
+  restockIngredient: (id: string, amount: number) =>
+    api<Ingredient>(`/admin/bom/ingredients/${id}/restock`, {
+      method: 'POST',
+      body: JSON.stringify({ amount }),
+    }),
+
+  getCapacity: () => api<CapacityItem[]>('/admin/bom/capacity'),
+
+  getCogs: () => api<CogsItem[]>('/admin/bom/cogs'),
 };
+
+export interface Ingredient {
+  id: string;
+  name: string;
+  unit: 'GRAM' | 'ML' | 'PIECE';
+  stock: number;
+  minThreshold: number;
+  costPerUnit: number;
+}
+
+export interface CapacityItem {
+  productId: number;
+  productName: string;
+  size: 'S' | 'M' | 'L';
+  maxServings: number;
+  bottleneck: {
+    ingredientId: string;
+    ingredientName: string;
+    unit: 'GRAM' | 'ML' | 'PIECE';
+    currentStock: number;
+    amountPerCup: number;
+  };
+}
+
+export interface CogsItem {
+  productId: number;
+  productName: string;
+  size: 'S' | 'M' | 'L';
+  sellingPrice: number;
+  cogs: number;
+  grossProfit: number;
+  marginPercent: number;
+  breakdown: Array<{
+    ingredientName: string;
+    amount: number;
+    unit: 'GRAM' | 'ML' | 'PIECE';
+    cost: number;
+  }>;
+}
